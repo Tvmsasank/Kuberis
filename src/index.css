@@ -1077,3 +1077,68 @@ select.form-control option {
   }
 }
 
+/* ==========================================================================
+   ✨ HIGH-FIDELITY THEME-INTEGRATED CUSTOM SCROLLBARS (WebKit & Firefox)
+   ========================================================================== */
+
+/* Global Firefox Scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(16, 185, 129, 0.35) transparent;
+}
+
+[data-theme='light'] *, .theme-light * {
+  scrollbar-color: rgba(5, 150, 105, 0.35) transparent;
+}
+
+/* Global WebKit Scrollbars (Chrome, Edge, Brave, Opera, Safari) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(16, 185, 129, 0.32);
+  border-radius: 10px;
+  border: 1px solid transparent;
+  transition: all 0.25s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+  box-shadow: 0 0 12px var(--primary-glow);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Theme-specific thumb colors */
+.theme-dark ::-webkit-scrollbar-thumb,
+[data-theme='dark'] ::-webkit-scrollbar-thumb,
+[data-theme='emerald'] ::-webkit-scrollbar-thumb {
+  background: rgba(16, 185, 129, 0.35);
+}
+
+.theme-dark ::-webkit-scrollbar-thumb:hover,
+[data-theme='dark'] ::-webkit-scrollbar-thumb:hover,
+[data-theme='emerald'] ::-webkit-scrollbar-thumb:hover {
+  background: #10B981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+}
+
+.theme-light ::-webkit-scrollbar-thumb,
+[data-theme='light'] ::-webkit-scrollbar-thumb {
+  background: rgba(5, 150, 105, 0.3);
+}
+
+.theme-light ::-webkit-scrollbar-thumb:hover,
+[data-theme='light'] ::-webkit-scrollbar-thumb:hover {
+  background: #059669;
+}
+

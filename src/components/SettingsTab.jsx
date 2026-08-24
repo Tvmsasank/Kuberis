@@ -295,7 +295,7 @@ export default function SettingsTab({
               </button>
             </form>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '220px', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '220px', overflowY: 'auto', paddingRight: '6px' }}>
               {categories.map(cat => (
                 <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'var(--bg-app)', borderRadius: 'var(--radius-md)', fontSize: '13px' }}>
                   <span>{cat}</span>
@@ -324,7 +324,7 @@ export default function SettingsTab({
               </button>
             </form>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '220px', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '220px', overflowY: 'auto', paddingRight: '6px' }}>
               {accounts.map(acc => (
                 <div key={acc} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'var(--bg-app)', borderRadius: 'var(--radius-md)', fontSize: '13px' }}>
                   <span>{acc}</span>
