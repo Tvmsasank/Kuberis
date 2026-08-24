@@ -56,14 +56,35 @@ export default function InvestmentsTab({
           maximumFractionDigits: 2
         });
 
-  // Calculate High-Level Metrics
-  const totalValuation = safeInvestments.reduce((sum, i) => sum + (Number(i.currentValuation) || 0), 0);
-  const totalCost = safeInvestments.reduce((sum, i) => sum + ((Number(i.buyPrice) || 0) * (Number(i.quantity) || 1)), 0);
+  // Category counts
+  const countAll = safeInvestments.length;
+  const countIndian = safeInvestments.filter(i => i.type === 'stock').length;
+  const countUS = safeInvestments.filter(i => i.type === 'us_stock').length;
+  const countMF = safeInvestments.filter(i => i.type === 'mutual_fund').length;
+  const countGold = safeInvestments.filter(i => i.type === 'gold').length;
+  const countCrypto = safeInvestments.filter(i => i.type === 'crypto').length;
+  const countFD = safeInvestments.filter(i => i.type === 'fd' || i.type === 'other').length;
+
+  // Filter Holdings by Active Category Tab First
+  const categoryHoldings = safeInvestments.filter((item) => {
+    if (categoryFilter === 'all') return true;
+    if (categoryFilter === 'stock') return item.type === 'stock';
+    if (categoryFilter === 'us_stock') return item.type === 'us_stock';
+    if (categoryFilter === 'mutual_fund') return item.type === 'mutual_fund';
+    if (categoryFilter === 'gold') return item.type === 'gold';
+    if (categoryFilter === 'crypto') return item.type === 'crypto';
+    if (categoryFilter === 'fd') return item.type === 'fd' || item.type === 'other';
+    return true;
+  });
+
+  // Calculate High-Level Metrics dynamically on active categoryHoldings
+  const totalValuation = categoryHoldings.reduce((sum, i) => sum + (Number(i.currentValuation) || 0), 0);
+  const totalCost = categoryHoldings.reduce((sum, i) => sum + ((Number(i.buyPrice) || 0) * (Number(i.quantity) || 1)), 0);
   const totalPnL = totalValuation - totalCost;
   const totalPnLPercentage = totalCost > 0 ? (totalPnL / totalCost) * 100 : 0;
 
-  // Day's P&L calculation (estimated across holdings)
-  const totalDayPnL = safeInvestments.reduce((sum, i) => {
+  // Day's P&L calculation (estimated across active category holdings)
+  const totalDayPnL = categoryHoldings.reduce((sum, i) => {
     const ltp = Number(i.currentPrice || i.buyPrice || 0);
     const qty = Number(i.quantity || 1);
     const dayPct = i.dayPercentage !== undefined ? Number(i.dayPercentage) : (Number(i.unrealizedPnL || 0) >= 0 ? 0.85 : -0.42);
@@ -71,37 +92,76 @@ export default function InvestmentsTab({
   }, 0);
   const dayPnLPct = totalValuation > 0 ? (totalDayPnL / totalValuation) * 100 : 0;
 
-  // Filter holdings
-  const filteredInvestments = safeInvestments.filter((item) => {
-    const matchesCat =
-      categoryFilter === 'all'
-        ? true
-        : categoryFilter === 'stock'
-        ? item.type === 'stock'
-        : categoryFilter === 'us_stock'
-        ? item.type === 'us_stock' || item.type === 'crypto'
-        : categoryFilter === 'mutual_fund'
-        ? item.type === 'mutual_fund'
-        : categoryFilter === 'gold'
-        ? item.type === 'gold'
-        : item.type === 'fd' || item.type === 'other';
-
-    const matchesSearch =
-      searchQuery.trim() === ''
-        ? true
-        : (item.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (item.symbol || '').toLowerCase().includes(searchQuery.toLowerCase());
-
-    return matchesCat && matchesSearch;
+  // Filter holdings further by search query
+  const filteredInvestments = categoryHoldings.filter((item) => {
+    if (!searchQuery.trim()) return true;
+    return (
+      (item.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.symbol || '').toLowerCase().includes(searchQuery.toLowerCase())
+    );
   });
 
-  // Category counts
-  const countAll = safeInvestments.length;
-  const countIndian = safeInvestments.filter(i => i.type === 'stock').length;
-  const countUS = safeInvestments.filter(i => i.type === 'us_stock' || i.type === 'crypto').length;
-  const countMF = safeInvestments.filter(i => i.type === 'mutual_fund').length;
-  const countGold = safeInvestments.filter(i => i.type === 'gold').length;
-  const countFD = safeInvestments.filter(i => i.type === 'fd' || i.type === 'other').length;
+  // Dynamic Metadata Labels & Subtitles based on Category Filter
+  const categoryTitles = {
+    all: {
+      investedTitle: 'TOTAL INVESTED',
+      investedSub: 'Initial capital deployed',
+      valueTitle: 'CURRENT PORTFOLIO VALUE',
+      dayTitle: "DAY'S P&L",
+      pnlTitle: 'TOTAL REALIZED & UNREALIZED P&L',
+      pnlSub: `Across ${categoryHoldings.length} holdings`
+    },
+    stock: {
+      investedTitle: 'TOTAL INVESTED (INDIAN STOCKS)',
+      investedSub: 'Indian stocks capital deployed',
+      valueTitle: 'INDIAN STOCKS VALUE',
+      dayTitle: "INDIAN STOCKS DAY'S P&L",
+      pnlTitle: 'INDIAN STOCKS TOTAL P&L',
+      pnlSub: `Across ${categoryHoldings.length} Indian stock holdings`
+    },
+    us_stock: {
+      investedTitle: 'TOTAL INVESTED (US STOCKS)',
+      investedSub: 'US stocks capital deployed',
+      valueTitle: 'US STOCKS VALUE',
+      dayTitle: "US STOCKS DAY'S P&L",
+      pnlTitle: 'US STOCKS TOTAL P&L',
+      pnlSub: `Across ${categoryHoldings.length} US stock holdings`
+    },
+    mutual_fund: {
+      investedTitle: 'TOTAL INVESTED (MUTUAL FUNDS)',
+      investedSub: 'Mutual funds capital deployed',
+      valueTitle: 'MUTUAL FUNDS VALUE',
+      dayTitle: "MUTUAL FUNDS DAY'S P&L",
+      pnlTitle: 'MUTUAL FUNDS TOTAL P&L',
+      pnlSub: `Across ${categoryHoldings.length} mutual fund holdings`
+    },
+    gold: {
+      investedTitle: 'TOTAL INVESTED (GOLD & SGB)',
+      investedSub: 'Gold & SGB capital deployed',
+      valueTitle: 'GOLD & SGB VALUE',
+      dayTitle: "GOLD & SGB DAY'S P&L",
+      pnlTitle: 'GOLD & SGB TOTAL P&L',
+      pnlSub: `Across ${categoryHoldings.length} gold assets`
+    },
+    crypto: {
+      investedTitle: 'TOTAL INVESTED (CRYPTO)',
+      investedSub: 'Crypto capital deployed',
+      valueTitle: 'CRYPTO VALUE',
+      dayTitle: "CRYPTO DAY'S P&L",
+      pnlTitle: 'CRYPTO TOTAL P&L',
+      pnlSub: `Across ${categoryHoldings.length} crypto holdings`
+    },
+    fd: {
+      investedTitle: 'TOTAL INVESTED (FIXED DEPOSITS)',
+      investedSub: 'FD & deposits capital deployed',
+      valueTitle: 'FIXED DEPOSITS VALUE',
+      dayTitle: "FIXED DEPOSITS DAY'S P&L",
+      pnlTitle: 'FIXED DEPOSITS TOTAL P&L',
+      pnlSub: `Across ${categoryHoldings.length} deposits`
+    }
+  };
+
+  const currentMeta = categoryTitles[categoryFilter] || categoryTitles.all;
 
   // Allocation Pie Chart Data
   const typeMap = {};
@@ -288,7 +348,7 @@ export default function InvestmentsTab({
       {/* ========================================================================= */}
       {activeSubTab === 'holdings' && (
         <>
-          {/* High-Impact Metrics Banner */}
+          {/* High-Impact Metrics Banner (Calculated Dynamically for Selected Category Tab) */}
           <div
             style={{
               display: 'grid',
@@ -299,19 +359,19 @@ export default function InvestmentsTab({
           >
             <div className="card" style={{ padding: '18px 20px', borderRadius: '18px' }}>
               <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                Total Invested
+                {currentMeta.investedTitle}
               </div>
               <div style={{ fontSize: '24px', fontWeight: '900', color: 'var(--text-main)', marginTop: '4px' }}>
                 {formatInr(totalCost)}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                Initial capital deployed
+                {currentMeta.investedSub}
               </div>
             </div>
 
             <div className="card" style={{ padding: '18px 20px', borderRadius: '18px' }}>
               <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                Current Portfolio Value
+                {currentMeta.valueTitle}
               </div>
               <div style={{ fontSize: '24px', fontWeight: '900', color: '#38BDF8', marginTop: '4px' }}>
                 {formatInr(totalValuation)}
@@ -323,7 +383,7 @@ export default function InvestmentsTab({
 
             <div className="card" style={{ padding: '18px 20px', borderRadius: '18px' }}>
               <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                Day's P&L
+                {currentMeta.dayTitle}
               </div>
               <div style={{ fontSize: '24px', fontWeight: '900', color: totalDayPnL >= 0 ? '#10B981' : '#F87171', marginTop: '4px' }}>
                 {totalDayPnL >= 0 ? '+' : ''}{formatInr(totalDayPnL)}
@@ -335,13 +395,13 @@ export default function InvestmentsTab({
 
             <div className="card" style={{ padding: '18px 20px', borderRadius: '18px' }}>
               <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                Total Realized & Unrealized P&L
+                {currentMeta.pnlTitle}
               </div>
               <div style={{ fontSize: '24px', fontWeight: '900', color: totalPnL >= 0 ? '#10B981' : '#F87171', marginTop: '4px' }}>
                 {totalPnL >= 0 ? '+' : ''}{formatInr(totalPnL)}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                Across {safeInvestments.length} holdings
+                {currentMeta.pnlSub}
               </div>
             </div>
           </div>
@@ -373,6 +433,7 @@ export default function InvestmentsTab({
                 { id: 'us_stock', label: 'US Stocks', count: countUS },
                 { id: 'mutual_fund', label: 'Mutual Funds', count: countMF },
                 { id: 'gold', label: 'Gold & SGB', count: countGold },
+                ...(countCrypto > 0 ? [{ id: 'crypto', label: 'Crypto', count: countCrypto }] : []),
                 { id: 'fd', label: 'Fixed Deposits', count: countFD }
               ].map((cat) => (
                 <button
