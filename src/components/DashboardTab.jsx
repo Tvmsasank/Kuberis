@@ -68,8 +68,9 @@ export default function DashboardTab({
     netWorth: netWorthValue
   } = calculateDynamicNetWorth(investments, settings);
 
-  // Cash flow chart data (up to 7 monthly points)
-  const cashFlowData = getCashFlowChartData(filteredTransactions);
+  // Cash Flow Chart View Mode ('daily' | 'cumulative' | 'monthly')
+  const [chartViewMode, setChartViewMode] = React.useState('daily');
+  const cashFlowData = getCashFlowChartData(filteredTransactions, chartViewMode);
 
   // Spending by Category Pie chart data
   const categoryData = getSpendingByCategoryData(filteredTransactions);
@@ -275,16 +276,36 @@ export default function DashboardTab({
       <div className="grid-2" style={{ marginBottom: '28px' }}>
         {/* Cash Flow Trend Line Chart */}
         <div className="card">
-          <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px' }}>Cash Flow Trend</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+            <h3 style={{ fontSize: '16px', fontWeight: '700', margin: 0 }}>Cash Flow & Spending Trajectory</h3>
+            <div style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.05)', padding: '3px', borderRadius: '10px' }}>
+              {[
+                { id: 'daily', label: 'Date-wise' },
+                { id: 'cumulative', label: 'Cumulative' },
+                { id: 'monthly', label: 'Monthly' }
+              ].map(m => (
+                <button
+                  key={m.id}
+                  type="button"
+                  className={`btn btn-sm ${chartViewMode === m.id ? 'btn-primary' : 'btn-ghost'}`}
+                  style={{ fontSize: '11px', padding: '3px 9px', borderRadius: '7px', height: '26px', fontWeight: '700' }}
+                  onClick={() => setChartViewMode(m.id)}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {cashFlowData.length > 0 ? (
             <div style={{ width: '100%', height: '240px' }}>
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={cashFlowData}>
-                  <XAxis dataKey="month" stroke="var(--text-muted)" fontSize={12} />
-                  <YAxis stroke="var(--text-muted)" fontSize={12} />
-                  <Tooltip formatter={(value) => `₹${Number(value).toFixed(2)}`} />
-                  <Line type="monotone" dataKey="income" stroke="#10B981" strokeWidth={2} name="Income" />
-                  <Line type="monotone" dataKey="spending" stroke="#F97316" strokeWidth={2} name="Spending" />
+                <LineChart data={cashFlowData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                  <XAxis dataKey="dateLabel" stroke="var(--text-muted)" fontSize={11} tickLine={false} />
+                  <YAxis stroke="var(--text-muted)" fontSize={11} tickFormatter={v => `₹${(v/1000).toFixed(0)}k`} tickLine={false} />
+                  <Tooltip content={<CustomCashFlowTooltip isPrivacyMode={isPrivacyMode} />} />
+                  <Line type="monotone" dataKey="income" stroke="#10B981" strokeWidth={2.5} dot={{ r: 3, fill: '#10B981' }} activeDot={{ r: 6, fill: '#10B981', stroke: '#FFFFFF' }} name="Income" />
+                  <Line type="monotone" dataKey="spending" stroke="#F97316" strokeWidth={2.5} dot={{ r: 3, fill: '#F97316' }} activeDot={{ r: 6, fill: '#F97316', stroke: '#FFFFFF' }} name="Spending" />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -496,20 +517,158 @@ function filterByPeriod(txs, period) {
   });
 }
 
-function getCashFlowChartData(txs) {
-  const map = {};
-  for (const t of txs) {
-    const key = t.date ? t.date.substring(0, 7) : 'Unknown';
-    if (!map[key]) map[key] = { month: key, income: 0, spending: 0 };
-    if (t.type === 'income') map[key].income += Math.abs(t.amount);
-    else if (t.type === 'expense') map[key].spending += Math.abs(t.amount);
+const CustomCashFlowTooltip = ({ active, payload, label, isPrivacyMode }) => {
+  if (!active || !payload || !payload.length) return null;
+  const data = payload[0].payload;
+  const mask = (v) => isPrivacyMode ? '₹••••' : `₹${Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+
+  return (
+    <div
+      style={{
+        background: 'rgba(10, 25, 47, 0.95)',
+        border: '1px solid rgba(16, 185, 129, 0.3)',
+        borderRadius: '14px',
+        padding: '12px 16px',
+        boxShadow: '0 12px 32px rgba(0, 0, 0, 0.6)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        color: '#F8FAFC',
+        minWidth: '220px',
+        fontSize: '12px'
+      }}
+    >
+      <div style={{ fontWeight: '800', color: '#10B981', marginBottom: '8px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: '4px' }}>
+        📅 {data.fullDate || label}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ color: '#10B981', fontWeight: '700' }}>● Income:</span>
+          <span style={{ fontWeight: '800' }}>{mask(data.income)}</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ color: '#F97316', fontWeight: '700' }}>● Spending:</span>
+          <span style={{ fontWeight: '800' }}>{mask(data.spending)}</span>
+        </div>
+      </div>
+
+      {data.itemizedSpends && data.itemizedSpends.length > 0 && (
+        <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '6px', marginTop: '4px' }}>
+          <div style={{ fontSize: '10px', fontWeight: '800', textTransform: 'uppercase', color: '#94A3B8', marginBottom: '4px' }}>
+            Itemized Spends Breakdown:
+          </div>
+          {data.itemizedSpends.slice(0, 4).map((item, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#CBD5E1', marginBottom: '2px' }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '130px' }}>• {item.category}</span>
+              <span style={{ color: '#FCA5A5', fontWeight: '700' }}>{mask(item.amount)}</span>
+            </div>
+          ))}
+          {data.itemizedSpends.length > 4 && (
+            <div style={{ fontSize: '10px', color: '#94A3B8', textAlign: 'right', marginTop: '2px' }}>
+              +{data.itemizedSpends.length - 4} more items
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+function getCashFlowChartData(txs, viewMode = 'daily') {
+  if (!txs || txs.length === 0) return [];
+
+  const sorted = [...txs].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  if (viewMode === 'monthly') {
+    const map = {};
+    for (const t of sorted) {
+      const key = t.date ? t.date.substring(0, 7) : 'Unknown';
+      if (!map[key]) map[key] = { dateLabel: key, fullDate: key, income: 0, spending: 0, dayTxs: [] };
+      if (t.type === 'income') map[key].income += Math.abs(t.amount);
+      else if (t.type === 'expense') map[key].spending += Math.abs(t.amount);
+      map[key].dayTxs.push(t);
+    }
+    const keys = Object.keys(map).sort();
+    return keys.map(k => {
+      const categoryMap = {};
+      for (const t of map[k].dayTxs) {
+        if (t.type === 'expense') {
+          const cat = t.category || t.merchant || 'Other';
+          categoryMap[cat] = (categoryMap[cat] || 0) + Math.abs(t.amount);
+        }
+      }
+      const itemizedSpends = Object.keys(categoryMap).map(c => ({ category: c, amount: categoryMap[c] })).sort((a, b) => b.amount - a.amount);
+      return {
+        dateLabel: k,
+        fullDate: `Month ${k}`,
+        income: Math.round(map[k].income),
+        spending: Math.round(map[k].spending),
+        itemizedSpends
+      };
+    });
   }
-  const keys = Object.keys(map).sort();
-  return keys.slice(-7).map(k => ({
-    month: k,
-    income: Math.round(map[k].income),
-    spending: Math.round(map[k].spending)
-  }));
+
+  const firstTxDate = new Date(sorted[0].date);
+  const lastTxDate = new Date(sorted[sorted.length - 1].date);
+
+  const minDate = new Date(firstTxDate);
+  const maxDate = new Date(lastTxDate);
+  const dayDiff = (maxDate - minDate) / (1000 * 60 * 60 * 24);
+  if (dayDiff < 14) {
+    minDate.setDate(minDate.getDate() - (14 - Math.round(dayDiff)));
+  }
+
+  const mapByDate = {};
+  for (const t of sorted) {
+    const dStr = t.date ? t.date.substring(0, 10) : '';
+    if (!dStr) continue;
+    if (!mapByDate[dStr]) mapByDate[dStr] = { income: 0, spending: 0, txs: [] };
+    if (t.type === 'income') mapByDate[dStr].income += Math.abs(t.amount);
+    else if (t.type === 'expense') mapByDate[dStr].spending += Math.abs(t.amount);
+    mapByDate[dStr].txs.push(t);
+  }
+
+  const result = [];
+  let curr = new Date(minDate);
+  let cumIncome = 0;
+  let cumSpending = 0;
+
+  while (curr <= maxDate || result.length < 14) {
+    const dStr = curr.toISOString().substring(0, 10);
+    const dayObj = mapByDate[dStr] || { income: 0, spending: 0, txs: [] };
+
+    cumIncome += dayObj.income;
+    cumSpending += dayObj.spending;
+
+    const dateLabel = curr.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    const fullDate = curr.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
+    const categoryMap = {};
+    for (const t of dayObj.txs) {
+      if (t.type === 'expense') {
+        const cat = t.category || t.merchant || 'Other';
+        categoryMap[cat] = (categoryMap[cat] || 0) + Math.abs(t.amount);
+      }
+    }
+    const itemizedSpends = Object.keys(categoryMap).map(c => ({ category: c, amount: categoryMap[c] })).sort((a, b) => b.amount - a.amount);
+
+    result.push({
+      dateStr: dStr,
+      dateLabel,
+      fullDate,
+      income: viewMode === 'cumulative' ? Math.round(cumIncome) : Math.round(dayObj.income),
+      spending: viewMode === 'cumulative' ? Math.round(cumSpending) : Math.round(dayObj.spending),
+      rawIncome: dayObj.income,
+      rawSpending: dayObj.spending,
+      txs: dayObj.txs,
+      itemizedSpends
+    });
+
+    curr.setDate(curr.getDate() + 1);
+    if (result.length > 120) break;
+  }
+
+  return result;
 }
 
 function getSpendingByCategoryData(txs) {
