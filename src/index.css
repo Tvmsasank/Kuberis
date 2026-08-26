@@ -1142,3 +1142,13 @@ select.form-control option {
   background: #059669;
 }
 
+/* Hide HTML5 Number Input Spinners (Up/Down Counter Arrows) */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+input[type=number] {
+  -moz-appearance: textfield !important;
+}
+

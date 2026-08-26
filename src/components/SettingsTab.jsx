@@ -59,13 +59,38 @@ export default function SettingsTab({
 
   const handleNetWorthSubmit = async (e) => {
     e.preventDefault();
+
+    const newManualAssets = assetsInput !== '' ? Math.max(0, parseFloat(assetsInput) || 0) : 0;
+    const newManualLiabilities = liabilitiesInput !== '' ? Math.max(0, parseFloat(liabilitiesInput) || 0) : 0;
+
+    let updatedCustomAssets = Array.isArray(settings.customAssetsList) ? [...settings.customAssetsList] : [];
+    if (newManualAssets === 0) {
+      updatedCustomAssets = [];
+    } else if (updatedCustomAssets.length === 0 && newManualAssets > 0) {
+      updatedCustomAssets = [{ id: 'general-asset-1', name: 'General Additional Asset', value: newManualAssets }];
+    } else if (updatedCustomAssets.length === 1 && newManualAssets > 0) {
+      updatedCustomAssets = [{ ...updatedCustomAssets[0], value: newManualAssets }];
+    }
+
+    let updatedCustomLiabilities = Array.isArray(settings.customLiabilitiesList) ? [...settings.customLiabilitiesList] : [];
+    if (newManualLiabilities === 0) {
+      updatedCustomLiabilities = [];
+    } else if (updatedCustomLiabilities.length === 0 && newManualLiabilities > 0) {
+      updatedCustomLiabilities = [{ id: 'general-liability-1', name: 'General Liability / Debt', value: newManualLiabilities }];
+    } else if (updatedCustomLiabilities.length === 1 && newManualLiabilities > 0) {
+      updatedCustomLiabilities = [{ ...updatedCustomLiabilities[0], value: newManualLiabilities }];
+    }
+
     onSaveNetWorth({
-      manualAssets: manualAssetsVal,
-      manualLiabilities: manualLiabilitiesVal,
-      assets: calculatedAssets,
-      liabilities: manualLiabilitiesVal,
+      manualAssets: newManualAssets,
+      customAssetsList: updatedCustomAssets,
+      manualLiabilities: newManualLiabilities,
+      customLiabilitiesList: updatedCustomLiabilities,
+      assets: liveInvestmentsValuation + newManualAssets,
+      liabilities: newManualLiabilities,
       netWorthConfigured: true
     });
+
     setNetWorthMessage('Dynamic Net Worth configuration saved!');
     setTimeout(() => setNetWorthMessage(''), 3000);
   };

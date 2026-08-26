@@ -25,6 +25,18 @@ export default function NetWorthModal({
   onSaveSettings,
   isPrivacyMode = false
 }) {
+  // Prevent background page scrolling when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const mask = (val) => (isPrivacyMode ? '₹••••••••' : val);
@@ -40,9 +52,12 @@ export default function NetWorthModal({
   // Calculate dynamic metrics using unified helper
   const {
     liveInvestmentsValuation,
+    manualAssets,
     customAssetsList,
     customAssetsTotal,
+    additionalAssetsTotal,
     totalAssets,
+    manualLiabilities,
     customLiabilitiesList,
     customLiabilitiesTotal,
     totalLiabilities,
@@ -76,7 +91,8 @@ export default function NetWorthModal({
     onSaveSettings({
       ...settings,
       customAssetsList: updatedAssets,
-      manualAssets: updatedAssetsTotal, // Keep manualAssets in sync
+      manualAssets: updatedAssetsTotal, // Keep manualAssets in 100% sync
+      assets: liveInvestmentsValuation + updatedAssetsTotal,
       netWorthConfigured: true
     });
 
@@ -94,9 +110,22 @@ export default function NetWorthModal({
       ...settings,
       customAssetsList: updatedAssets,
       manualAssets: updatedAssetsTotal,
+      assets: liveInvestmentsValuation + updatedAssetsTotal,
       netWorthConfigured: true
     });
     setSaveMsg('Asset removed!');
+    setTimeout(() => setSaveMsg(''), 2500);
+  };
+
+  const handleClearGeneralManualAsset = () => {
+    onSaveSettings({
+      ...settings,
+      manualAssets: 0,
+      customAssetsList: [],
+      assets: liveInvestmentsValuation,
+      netWorthConfigured: true
+    });
+    setSaveMsg('Manual asset cleared!');
     setTimeout(() => setSaveMsg(''), 2500);
   };
 
@@ -111,7 +140,8 @@ export default function NetWorthModal({
     onSaveSettings({
       ...settings,
       customLiabilitiesList: updatedLiabilities,
-      manualLiabilities: updatedLiabilitiesTotal, // Keep manualLiabilities in sync
+      manualLiabilities: updatedLiabilitiesTotal, // Keep manualLiabilities in 100% sync
+      liabilities: updatedLiabilitiesTotal,
       netWorthConfigured: true
     });
 
@@ -129,9 +159,22 @@ export default function NetWorthModal({
       ...settings,
       customLiabilitiesList: updatedLiabilities,
       manualLiabilities: updatedLiabilitiesTotal,
+      liabilities: updatedLiabilitiesTotal,
       netWorthConfigured: true
     });
     setSaveMsg('Liability removed!');
+    setTimeout(() => setSaveMsg(''), 2500);
+  };
+
+  const handleClearGeneralManualLiability = () => {
+    onSaveSettings({
+      ...settings,
+      manualLiabilities: 0,
+      customLiabilitiesList: [],
+      liabilities: 0,
+      netWorthConfigured: true
+    });
+    setSaveMsg('Manual liability cleared!');
     setTimeout(() => setSaveMsg(''), 2500);
   };
 
@@ -139,9 +182,11 @@ export default function NetWorthModal({
     onSaveSettings({
       ...settings,
       customAssetsList: customAssetsList,
-      manualAssets: customAssetsTotal,
+      manualAssets: additionalAssetsTotal,
       customLiabilitiesList: customLiabilitiesList,
-      manualLiabilities: customLiabilitiesTotal,
+      manualLiabilities: totalLiabilities,
+      assets: liveInvestmentsValuation + additionalAssetsTotal,
+      liabilities: totalLiabilities,
       netWorthConfigured: true
     });
     setSaveMsg('Net worth breakdown configuration saved!');
@@ -158,8 +203,9 @@ export default function NetWorthModal({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.75)',
-        backdropFilter: 'blur(8px)',
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
         zIndex: 1000,
         display: 'flex',
         alignItems: 'center',
@@ -181,7 +227,7 @@ export default function NetWorthModal({
           background: 'var(--bg-card)',
           backdropFilter: 'blur(28px)',
           border: '1px solid var(--border-glass)',
-          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.7)'
+          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.85)'
         }}
       >
         {/* Header */}
@@ -290,6 +336,22 @@ export default function NetWorthModal({
                 </div>
               </div>
             ))}
+
+            {/* Fallback Display if General Manual Asset entered outside */}
+            {customAssetsList.length === 0 && manualAssets > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '12px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Home size={15} style={{ color: '#38BDF8' }} />
+                  <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)' }}>General Additional Asset (Manual Input)</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-main)' }}>{formatInr(manualAssets)}</span>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={handleClearGeneralManualAsset} style={{ padding: '4px', color: 'var(--danger)' }} title="Clear Manual Asset">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Form to Add Custom Asset (e.g. Property, Vehicle) */}
@@ -324,22 +386,36 @@ export default function NetWorthModal({
 
           {/* Custom Liabilities List */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-            {customLiabilitiesList.length === 0 ? (
+            {customLiabilitiesList.length === 0 && manualLiabilities === 0 ? (
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', padding: '8px 0' }}>
                 No active loans or credit liabilities added. Add any home loan, car loan, or credit card debt below.
               </div>
             ) : (
-              customLiabilitiesList.map((item) => (
-                <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                  <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)' }}>{item.name}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontSize: '14px', fontWeight: '800', color: 'var(--danger)' }}>-{formatInr(item.value)}</span>
-                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleDeleteLiability(item.id)} style={{ padding: '4px', color: 'var(--danger)' }} title="Delete Liability">
-                      <Trash2 size={14} />
-                    </button>
+              <>
+                {customLiabilitiesList.map((item) => (
+                  <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)' }}>{item.name}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: '800', color: 'var(--danger)' }}>-{formatInr(item.value)}</span>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => handleDeleteLiability(item.id)} style={{ padding: '4px', color: 'var(--danger)' }} title="Delete Liability">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))
+                ))}
+
+                {customLiabilitiesList.length === 0 && manualLiabilities > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)' }}>General Liability / Debt (Manual Input)</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: '800', color: 'var(--danger)' }}>-{formatInr(manualLiabilities)}</span>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={handleClearGeneralManualLiability} style={{ padding: '4px', color: 'var(--danger)' }} title="Clear Manual Liability">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
