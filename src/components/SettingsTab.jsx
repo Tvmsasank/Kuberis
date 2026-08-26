@@ -201,7 +201,7 @@ export default function SettingsTab({
         </div>
 
         <form onSubmit={handleNetWorthSubmit}>
-          <div className="settings-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+          <div className="settings-grid-5" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '16px' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label" style={{ fontSize: '12px', fontWeight: '700' }}>
                 1. Live Investments Portfolio (Auto)
@@ -226,8 +226,17 @@ export default function SettingsTab({
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label" style={{ fontSize: '12px', fontWeight: '700', color: '#38BDF8' }}>
+                3. Total Assets (Combined)
+              </label>
+              <div style={{ padding: '10px 14px', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: 'var(--radius-md)', fontSize: '15px', fontWeight: '800', color: '#38BDF8', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
+                ₹{calculatedAssets.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label" style={{ fontSize: '12px', fontWeight: '700' }}>
-                3. Total Liabilities & Debts (₹)
+                4. Total Liabilities & Debts (₹)
               </label>
               <input
                 type="number"
@@ -241,7 +250,7 @@ export default function SettingsTab({
 
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label" style={{ fontSize: '12px', fontWeight: '700' }}>
-                Calculated Dynamic Net Worth
+                5. Calculated Dynamic Net Worth
               </label>
               <div style={{ padding: '10px 14px', background: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', fontSize: '16px', fontWeight: '900', color: calculatedPreview >= 0 ? 'var(--primary)' : 'var(--danger)', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
                 ₹{calculatedPreview.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
