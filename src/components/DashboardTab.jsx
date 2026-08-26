@@ -136,7 +136,7 @@ export default function DashboardTab({
               {formatInr(netWorthValue)}
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-              Assets: {formatInr(totalDynamicAssets)} • Debts: -{formatInr(manualLiabilities)}
+              Assets: {formatInr(totalDynamicAssets)} • Debts: -{formatInr(totalLiabilities)}
             </div>
           </div>
           <div style={{ fontSize: '11px', color: 'var(--primary)', fontWeight: '700', borderTop: '1px solid var(--border-color)', paddingTop: '8px', marginTop: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
