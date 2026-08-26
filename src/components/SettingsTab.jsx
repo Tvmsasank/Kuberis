@@ -8,6 +8,7 @@ export default function SettingsTab({
   categories = [],
   accounts = [],
   tags = [],
+  isPrivacyMode = false,
   onSaveNetWorth,
   onSaveCategories,
   onSaveAccounts,
@@ -15,6 +16,15 @@ export default function SettingsTab({
   onOpenConfirmWipe,
   onOpenNetWorthModal
 }) {
+  const formatInr = (val) =>
+    isPrivacyMode
+      ? '₹••••••••'
+      : '₹' +
+        Number(val || 0).toLocaleString('en-IN', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        });
+
   const {
     liveInvestmentsValuation,
     additionalAssetsTotal,
@@ -197,7 +207,7 @@ export default function SettingsTab({
 
         {/* Informative Note Box */}
         <div style={{ padding: '12px 16px', borderRadius: '14px', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.2)', marginBottom: '20px', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-          💡 <strong>Dynamic Net Worth Auto-Calculation:</strong> Your Net Worth includes your live stock & mutual fund investments (<strong>₹{liveInvestmentsValuation.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>) which update live every 3 seconds. You can add additional manual assets (real estate, vehicles) or debts below.
+          💡 <strong>Dynamic Net Worth Auto-Calculation:</strong> Your Net Worth includes your live stock & mutual fund investments (<strong>{formatInr(liveInvestmentsValuation)}</strong>) which update live every 3 seconds. You can add additional manual assets (real estate, vehicles) or debts below.
         </div>
 
         <form onSubmit={handleNetWorthSubmit}>
@@ -207,7 +217,7 @@ export default function SettingsTab({
                 1. Live Investments Portfolio (Auto)
               </label>
               <div style={{ padding: '10px 14px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', fontSize: '15px', fontWeight: '800', color: '#10B981', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
-                ₹{liveInvestmentsValuation.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                {formatInr(liveInvestmentsValuation)}
               </div>
             </div>
 
@@ -216,9 +226,9 @@ export default function SettingsTab({
                 2. Additional Manual Assets (₹)
               </label>
               <input
-                type="number"
+                type={isPrivacyMode ? 'password' : 'number'}
                 step="1"
-                placeholder="e.g. Real Estate, Vehicles..."
+                placeholder={isPrivacyMode ? '••••••••' : 'e.g. Real Estate, Vehicles...'}
                 className="form-control"
                 value={assetsInput}
                 onChange={e => setAssetsInput(e.target.value)}
@@ -230,7 +240,7 @@ export default function SettingsTab({
                 3. Total Assets (Combined)
               </label>
               <div style={{ padding: '10px 14px', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: 'var(--radius-md)', fontSize: '15px', fontWeight: '800', color: '#38BDF8', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
-                ₹{calculatedAssets.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                {formatInr(calculatedAssets)}
               </div>
             </div>
 
@@ -239,9 +249,9 @@ export default function SettingsTab({
                 4. Total Liabilities & Debts (₹)
               </label>
               <input
-                type="number"
+                type={isPrivacyMode ? 'password' : 'number'}
                 step="1"
-                placeholder="e.g. Home Loan, Credit Cards..."
+                placeholder={isPrivacyMode ? '••••••••' : 'e.g. Home Loan, Credit Cards...'}
                 className="form-control"
                 value={liabilitiesInput}
                 onChange={e => setLiabilitiesInput(e.target.value)}
@@ -253,7 +263,7 @@ export default function SettingsTab({
                 5. Calculated Dynamic Net Worth
               </label>
               <div style={{ padding: '10px 14px', background: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', fontSize: '16px', fontWeight: '900', color: calculatedPreview >= 0 ? 'var(--primary)' : 'var(--danger)', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
-                ₹{calculatedPreview.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                {formatInr(calculatedPreview)}
               </div>
             </div>
           </div>

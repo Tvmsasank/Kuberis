@@ -822,6 +822,7 @@ export default function App() {
                   categories={settings.categories || []}
                   accounts={settings.accounts || []}
                   tags={allTagNames}
+                  isPrivacyMode={isPrivacyMode}
                   onSaveNetWorth={updates => savePreferences(updates)}
                   onSaveCategories={cats => savePreferences({ categories: cats })}
                   onSaveAccounts={accs => savePreferences({ accounts: accs })}
