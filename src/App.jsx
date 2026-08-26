@@ -36,8 +36,28 @@ import NetWorthModal from './components/NetWorthModal';
 import LandingPage from './components/LandingPage';
 import { CheckCircle2, FolderSync, X, Shield, Lock, UserPlus, LogIn, Fingerprint, KeyRound, Zap, Landmark } from 'lucide-react';
 
+const getInitialTab = () => {
+  try {
+    const hash = window.location.hash.replace('#/', '').replace('#', '').trim();
+    const validTabs = [
+      'home', 'dashboard', 'investments', 'transactions', 'calculators',
+      'recurring', 'subscriptions', 'budgets', 'goals', 'documents', 'rules', 'settings'
+    ];
+    if (hash && validTabs.includes(hash)) {
+      return hash;
+    }
+    const savedTab = localStorage.getItem('wealthpulse_active_tab');
+    if (savedTab && validTabs.includes(savedTab)) {
+      return savedTab;
+    }
+  } catch (e) {
+    console.error('Error reading saved tab:', e);
+  }
+  return 'home'; // Default landing page
+};
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(getInitialTab);
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState(() => localStorage.getItem('wealthpulse_theme') || localStorage.getItem('ledgerly_theme') || 'dark');
   const [isPrivacyMode, setIsPrivacyMode] = useState(() => {
@@ -93,6 +113,31 @@ export default function App() {
       setIsMpinModalOpen(true);
       window.history.replaceState({}, document.title, window.location.pathname);
     }
+  }, []);
+
+  // Sync activeTab state to URL Hash & LocalStorage
+  useEffect(() => {
+    if (activeTab) {
+      window.location.hash = '#/' + activeTab;
+      localStorage.setItem('wealthpulse_active_tab', activeTab);
+    }
+  }, [activeTab]);
+
+  // Handle Browser Back/Forward buttons and Hash changes
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#/', '').replace('#', '').trim();
+      const validTabs = [
+        'home', 'dashboard', 'investments', 'transactions', 'calculators',
+        'recurring', 'subscriptions', 'budgets', 'goals', 'documents', 'rules', 'settings'
+      ];
+      if (hash && validTabs.includes(hash)) {
+        setActiveTab(hash);
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
   // Cross-Tab Multi-Session Synchronization
