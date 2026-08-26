@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Wallet, Settings, FolderSync, AlertTriangle, RefreshCw, Plus, Trash2, CheckCircle2, Download, ExternalLink, Link2 } from 'lucide-react';
+import { Wallet, Settings, FolderSync, AlertTriangle, RefreshCw, Plus, Trash2, CheckCircle2, Download, ExternalLink, Link2, Sparkles, TrendingUp, CreditCard, PieChart } from 'lucide-react';
 
 export default function SettingsTab({
   settings = {},
+  investments = [],
   categories = [],
   accounts = [],
   tags = [],
@@ -10,14 +11,18 @@ export default function SettingsTab({
   onSaveCategories,
   onSaveAccounts,
   onRestoreIgnoredSuggestions,
-  onOpenConfirmWipe
+  onOpenConfirmWipe,
+  onOpenNetWorthModal
 }) {
   const { netWorthConfigured = false } = settings;
+  const safeInvestments = Array.isArray(investments) ? investments : [];
+  const totalInvestmentsValuation = safeInvestments.reduce((sum, i) => sum + (Number(i.currentValuation) || 0), 0);
+
   const [assetsInput, setAssetsInput] = useState(
-    netWorthConfigured && settings.assets !== undefined ? settings.assets : ''
+    settings.manualAssets !== undefined ? settings.manualAssets : (settings.assets || '')
   );
   const [liabilitiesInput, setLiabilitiesInput] = useState(
-    netWorthConfigured && settings.liabilities !== undefined ? settings.liabilities : ''
+    settings.manualLiabilities !== undefined ? settings.manualLiabilities : (settings.liabilities || '')
   );
   const [netWorthMessage, setNetWorthMessage] = useState('');
 
@@ -39,40 +44,35 @@ export default function SettingsTab({
     lastSyncedAt: null,
     lastStatus: 'idle'
   };
-  const dismissedCount = (settings.dismissedPatterns || []).length;
 
-  const hasEnteredValues = assetsInput !== '' || liabilitiesInput !== '';
-  const calculatedPreview = (parseFloat(assetsInput) || 0) - (parseFloat(liabilitiesInput) || 0);
+  const manualAssetsVal = parseFloat(assetsInput) || 0;
+  const manualLiabilitiesVal = parseFloat(liabilitiesInput) || 0;
+  const totalDynamicAssets = totalInvestmentsValuation + manualAssetsVal;
+  const calculatedPreview = totalDynamicAssets - manualLiabilitiesVal;
 
   const handleNetWorthSubmit = async (e) => {
     e.preventDefault();
-    if (assetsInput === '' && liabilitiesInput === '') {
-      setNetWorthMessage('Please enter assets or liabilities amount');
-      return;
-    }
-    const assets = parseFloat(assetsInput) || 0;
-    const liabilities = parseFloat(liabilitiesInput) || 0;
-
-    await onSaveNetWorth({
-      assets,
-      liabilities,
+    onSaveNetWorth({
+      manualAssets: manualAssetsVal,
+      manualLiabilities: manualLiabilitiesVal,
+      assets: totalDynamicAssets,
+      liabilities: manualLiabilitiesVal,
       netWorthConfigured: true
     });
-
-    setNetWorthMessage('Net worth configuration saved successfully!');
-    setTimeout(() => setNetWorthMessage(''), 4000);
+    setNetWorthMessage('Dynamic Net Worth configuration saved!');
+    setTimeout(() => setNetWorthMessage(''), 3000);
   };
 
-  const handleDriveFolderSubmit = async (e) => {
+  const handleDriveFolderSubmit = (e) => {
     e.preventDefault();
-    await onSaveNetWorth({
+    onSaveNetWorth({
       driveFolder: {
         name: driveNameInput.trim() || 'WealthPulse Financial Inbox',
         url: driveUrlInput.trim() || 'https://drive.google.com/drive/my-drive'
       }
     });
-    setDriveMessage('Custom Google Drive Folder link saved successfully!');
-    setTimeout(() => setDriveMessage(''), 4000);
+    setDriveMessage('Google Drive folder saved!');
+    setTimeout(() => setDriveMessage(''), 3000);
   };
 
   const handleAddCategory = (e) => {
@@ -128,18 +128,33 @@ export default function SettingsTab({
         <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Configure net worth totals, accounts, categories, and sync behavior</p>
       </div>
 
-      {/* 1. Net Worth Setup */}
+      {/* 1. Dynamic Net Worth Setup */}
       <div className="card" style={{ marginBottom: '28px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-          <div style={{ padding: '8px', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: 'var(--radius-md)' }}>
-            <Wallet size={20} />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ padding: '8px', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: 'var(--radius-md)' }}>
+              <Wallet size={20} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '16px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                Dynamic Net Worth Setup <span className="badge badge-success" style={{ fontSize: '9px', padding: '1px 6px' }}>Auto Live</span>
+              </h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Net Worth is calculated live as Total Assets (Investments + Extra Assets) minus Total Liabilities.
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 style={{ fontSize: '16px', fontWeight: '700' }}>Net Worth Setup</h3>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              Net Worth is calculated as total assets minus total liabilities (not monthly cash flow).
-            </p>
-          </div>
+
+          {onOpenNetWorthModal && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              style={{ borderRadius: '10px', fontSize: '12px', fontWeight: '700', gap: '6px' }}
+              onClick={onOpenNetWorthModal}
+            >
+              <PieChart size={15} style={{ color: 'var(--primary)' }} /> View Itemized Breakdown
+            </button>
+          )}
         </div>
 
         {netWorthMessage && (
@@ -148,14 +163,30 @@ export default function SettingsTab({
           </div>
         )}
 
+        {/* Informative Note Box */}
+        <div style={{ padding: '12px 16px', borderRadius: '14px', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.2)', marginBottom: '20px', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
+          💡 <strong>Dynamic Net Worth Auto-Calculation:</strong> Your Net Worth includes your live stock & mutual fund investments (<strong>₹{totalInvestmentsValuation.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>) which update live every 3 seconds. You can add additional manual assets (real estate, vehicles) or debts below.
+        </div>
+
         <form onSubmit={handleNetWorthSubmit}>
-          <div className="settings-grid-3">
+          <div className="settings-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '16px' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Total Assets (₹)</label>
+              <label className="form-label" style={{ fontSize: '12px', fontWeight: '700' }}>
+                1. Live Investments Portfolio (Auto)
+              </label>
+              <div style={{ padding: '10px 14px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', fontSize: '15px', fontWeight: '800', color: '#10B981', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
+                ₹{totalInvestmentsValuation.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label" style={{ fontSize: '12px', fontWeight: '700' }}>
+                2. Additional Manual Assets (₹)
+              </label>
               <input
                 type="number"
                 step="1"
-                placeholder="e.g. 500000"
+                placeholder="e.g. Real Estate, Vehicles..."
                 className="form-control"
                 value={assetsInput}
                 onChange={e => setAssetsInput(e.target.value)}
@@ -163,11 +194,13 @@ export default function SettingsTab({
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Total Liabilities (₹)</label>
+              <label className="form-label" style={{ fontSize: '12px', fontWeight: '700' }}>
+                3. Total Liabilities & Debts (₹)
+              </label>
               <input
                 type="number"
                 step="1"
-                placeholder="e.g. 100000"
+                placeholder="e.g. Home Loan, Credit Cards..."
                 className="form-control"
                 value={liabilitiesInput}
                 onChange={e => setLiabilitiesInput(e.target.value)}
@@ -175,18 +208,25 @@ export default function SettingsTab({
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Calculated Net Worth Preview</label>
-              <div style={{ padding: '10px 14px', background: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', fontSize: '18px', fontWeight: '700', color: hasEnteredValues ? (calculatedPreview >= 0 ? 'var(--success)' : 'var(--warning)') : 'var(--warning)', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
-                {hasEnteredValues
-                  ? `₹${calculatedPreview.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
-                  : 'Not set'}
+              <label className="form-label" style={{ fontSize: '12px', fontWeight: '700' }}>
+                Calculated Dynamic Net Worth
+              </label>
+              <div style={{ padding: '10px 14px', background: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', fontSize: '16px', fontWeight: '900', color: calculatedPreview >= 0 ? 'var(--primary)' : 'var(--danger)', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
+                ₹{calculatedPreview.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </div>
             </div>
           </div>
 
-          <button type="submit" className="btn btn-primary" style={{ marginTop: '16px' }}>
-            Save Net Worth Configuration
-          </button>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <button type="submit" className="btn btn-primary">
+              Save Net Worth Configuration
+            </button>
+            {onOpenNetWorthModal && (
+              <button type="button" className="btn btn-secondary" onClick={onOpenNetWorthModal}>
+                Open Detailed Breakdown & Itemized List
+              </button>
+            )}
+          </div>
         </form>
       </div>
 
@@ -203,50 +243,39 @@ export default function SettingsTab({
         </div>
 
         {driveMessage && (
-          <div style={{ padding: '10px 14px', background: 'var(--success-light)', color: 'var(--success)', borderRadius: 'var(--radius-md)', marginBottom: '16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <CheckCircle2 size={16} /> {driveMessage}
+          <div style={{ padding: '10px 14px', background: 'var(--success-light)', color: 'var(--success)', borderRadius: 'var(--radius-md)', marginBottom: '16px', fontSize: '13px' }}>
+            {driveMessage}
           </div>
         )}
 
-        <form onSubmit={handleDriveFolderSubmit} style={{ marginBottom: '20px', padding: '16px', background: 'var(--bg-app)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-          <h4 style={{ fontSize: '13px', fontWeight: '700', marginBottom: '12px', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Link2 size={16} style={{ color: 'var(--primary)' }} /> Configure Your Google Drive Folder Link
-          </h4>
-
-          <div className="settings-grid-2">
+        <form onSubmit={handleDriveFolderSubmit} style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '12px' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label" style={{ fontSize: '12px' }}>Folder Name</label>
+              <label className="form-label">Folder Name</label>
               <input
                 type="text"
-                placeholder="e.g. My Financial Inbox"
                 className="form-control"
-                style={{ fontSize: '13px' }}
                 value={driveNameInput}
                 onChange={e => setDriveNameInput(e.target.value)}
               />
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label" style={{ fontSize: '12px' }}>Google Drive Folder Link / URL</label>
+              <label className="form-label">Folder Web URL</label>
               <input
                 type="url"
-                placeholder="https://drive.google.com/drive/folders/your-folder-id"
                 className="form-control"
-                style={{ fontSize: '13px' }}
                 value={driveUrlInput}
                 onChange={e => setDriveUrlInput(e.target.value)}
               />
             </div>
           </div>
-
-          <button type="submit" className="btn btn-secondary btn-sm" style={{ fontSize: '12px', marginTop: '12px' }}>
-            Save Drive Folder Link
-          </button>
+          <button type="submit" className="btn btn-secondary btn-sm">Save Drive Folder Link</button>
         </form>
 
-        <div style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }} className="settings-grid-2">
+        <div style={{ display: 'flex', gap: '20px', fontSize: '13px', color: 'var(--text-muted)', flexWrap: 'wrap', marginBottom: '16px' }}>
           <div>Folder Name: <strong>{driveFolder.name}</strong></div>
           <div>Schedule: <strong>{driveSync.schedule} ({driveSync.timezone})</strong></div>
-          <div>Last Synced: <strong>{driveSync.lastSyncedAt ? new Date(driveSync.lastSyncedAt).toLocaleString() : 'Never'}</strong></div>
+          <div>Last Synced: <strong>{driveSync.lastSyncedAt ? new Date(driveSync.lastSyncedAt).toLocaleString('en-IN') : 'Never'}</strong></div>
           <div>Sync Status: <strong style={{ color: 'var(--success)' }}>{driveSync.lastStatus}</strong></div>
         </div>
 
@@ -338,35 +367,22 @@ export default function SettingsTab({
         </div>
       </div>
 
-      {/* 4. Restore Ignored Suggestions */}
-      {dismissedCount > 0 && (
-        <div className="card" style={{ marginBottom: '28px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-            <div>
-              <h3 style={{ fontSize: '15px', fontWeight: '700' }}>Ignored Suggestions ({dismissedCount})</h3>
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                You have ignored {dismissedCount} auto-detected recurring or subscription pattern suggestions.
-              </p>
-            </div>
-            <button className="btn btn-secondary btn-sm" onClick={onRestoreIgnoredSuggestions}>
-              <RefreshCw size={14} /> Restore All Suggestions
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 5. Danger Zone: Wipe All Data */}
-      <div className="card" style={{ border: '1px solid var(--danger-light)', background: 'rgba(239, 68, 68, 0.03)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', color: 'var(--danger)' }}>
-          <AlertTriangle size={20} />
-          <h3 style={{ fontSize: '16px', fontWeight: '700' }}>Danger Zone</h3>
+      {/* 4. Danger Zone */}
+      <div className="card" style={{ borderColor: 'var(--danger-light)', background: 'rgba(239, 68, 68, 0.04)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+          <AlertTriangle size={20} style={{ color: 'var(--danger)' }} />
+          <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--danger)' }}>Danger Zone</h3>
         </div>
         <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
           Permanently delete all financial transactions, rules, tags, and settings for your account. This action cannot be undone.
         </p>
 
-        <button className="btn btn-danger btn-sm" onClick={onOpenConfirmWipe}>
-          <Trash2 size={14} /> Erase All Account Data
+        <button
+          type="button"
+          className="btn btn-danger"
+          onClick={onOpenConfirmWipe}
+        >
+          Erase All Account Data
         </button>
       </div>
     </div>

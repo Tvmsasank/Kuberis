@@ -32,6 +32,7 @@ import UserProfileModal from './components/UserProfileModal';
 import MpinModal from './components/MpinModal';
 import SmartUpiModal from './components/SmartUpiModal';
 import AccountAggregatorModal from './components/AccountAggregatorModal';
+import NetWorthModal from './components/NetWorthModal';
 import LandingPage from './components/LandingPage';
 import { CheckCircle2, FolderSync, X, Shield, Lock, UserPlus, LogIn, Fingerprint, KeyRound, Zap, Landmark } from 'lucide-react';
 
@@ -143,6 +144,7 @@ export default function App() {
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
   const [isConfirmWipeOpen, setIsConfirmWipeOpen] = useState(false);
+  const [isNetWorthModalOpen, setIsNetWorthModalOpen] = useState(false);
 
   // Drive Sync Notification Modal State
   const [driveSyncStatus, setDriveSyncStatus] = useState(null);
@@ -771,6 +773,7 @@ export default function App() {
               {activeTab === 'settings' && (
                 <SettingsTab
                   settings={settings}
+                  investments={investments}
                   categories={settings.categories || []}
                   accounts={settings.accounts || []}
                   tags={allTagNames}
@@ -779,6 +782,7 @@ export default function App() {
                   onSaveAccounts={accs => savePreferences({ accounts: accs })}
                   onRestoreIgnoredSuggestions={() => savePreferences({ dismissedPatterns: [] })}
                   onOpenConfirmWipe={() => setIsConfirmWipeOpen(true)}
+                  onOpenNetWorthModal={() => setIsNetWorthModalOpen(true)}
                 />
               )}
             </>
@@ -797,6 +801,16 @@ export default function App() {
         />
       )}
 
+      {/* Dynamic Net Worth Itemized Breakdown Modal */}
+      <NetWorthModal
+        isOpen={isNetWorthModalOpen}
+        onClose={() => setIsNetWorthModalOpen(false)}
+        investments={investments}
+        settings={settings}
+        onSaveSettings={updates => savePreferences(updates)}
+        isPrivacyMode={isPrivacyMode}
+      />
+
       {/* User Profile & Portfolio Modal */}
       <UserProfileModal
         isOpen={isProfileModalOpen}
@@ -804,6 +818,7 @@ export default function App() {
         user={user}
         token={token}
         settings={settings}
+        investments={investments}
         transactionCount={transactions.length}
         onLogout={handleLogout}
         onOpenForgotPassword={() => setIsForgotPasswordOpen(true)}

@@ -60,8 +60,11 @@ export default function DashboardTab({
 
   const savingsRate = totalIncome > 0 ? (((totalIncome - totalSpending) / totalIncome) * 100).toFixed(1) : '0';
 
-  // Net Worth strictly follows user configured Assets minus Liabilities
-  const netWorthValue = (assets || 0) - (liabilities || 0);
+  // Dynamic Real-Time Net Worth Calculation
+  const manualAssets = Number(settings.manualAssets !== undefined ? settings.manualAssets : (settings.assets || 0));
+  const manualLiabilities = Number(settings.manualLiabilities !== undefined ? settings.manualLiabilities : (settings.liabilities || 0));
+  const totalDynamicAssets = totalInvestmentsValuation + manualAssets;
+  const netWorthValue = totalDynamicAssets - manualLiabilities;
 
   // Cash flow chart data (up to 7 monthly points)
   const cashFlowData = getCashFlowChartData(filteredTransactions);
@@ -110,34 +113,32 @@ export default function DashboardTab({
 
       {/* 4 Summary Cards */}
       <div className="grid-4" style={{ marginBottom: '28px' }}>
-        {/* Net Worth Card */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+        {/* Dynamic Net Worth Card */}
+        <div
+          className="card"
+          style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', cursor: 'pointer' }}
+          onClick={() => onNavigateTab ? onNavigateTab('settings') : null}
+          title="Click to view Net Worth setup and breakdown"
+        >
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-              <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)' }}>Net Worth</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                Net Worth <span className="badge badge-success" style={{ fontSize: '9px', padding: '1px 5px' }}>Auto Live</span>
+              </span>
               <div style={{ padding: '8px', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: 'var(--radius-md)' }}>
                 <Wallet size={18} />
               </div>
             </div>
-            {netWorthConfigured ? (
-              <div style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '4px' }}>
-                {formatInr(netWorthValue)}
-              </div>
-            ) : (
-              <div style={{ marginBottom: '4px' }}>
-                <div style={{ fontSize: '22px', fontWeight: '800', color: 'var(--warning)' }}>Not set</div>
-                <button
-                  className="btn btn-ghost btn-sm"
-                  style={{ padding: '0', fontSize: '11px', color: 'var(--primary)', cursor: 'pointer' }}
-                  onClick={() => onNavigateTab('settings')}
-                >
-                  Configure in Settings →
-                </button>
-              </div>
-            )}
+            <div style={{ fontSize: '24px', fontWeight: '900', color: 'var(--text-main)', marginBottom: '4px' }}>
+              {formatInr(netWorthValue)}
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+              Assets: {formatInr(totalDynamicAssets)} • Debts: -{formatInr(manualLiabilities)}
+            </div>
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)', paddingTop: '8px', marginTop: '8px' }}>
-            User configured assets
+          <div style={{ fontSize: '11px', color: 'var(--primary)', fontWeight: '700', borderTop: '1px solid var(--border-color)', paddingTop: '8px', marginTop: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>Auto Live Valuation</span>
+            <ChevronRight size={14} />
           </div>
         </div>
 

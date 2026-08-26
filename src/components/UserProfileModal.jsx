@@ -143,40 +143,40 @@ export default function UserProfileModal({
     }
   };
 
-  const assets = Number(settings.assets || 0);
-  const liabilities = Number(settings.liabilities || 0);
-  const netWorth = assets - liabilities;
-  const hasRegisteredMpin = !!(user?.hasMpin || user?.mpinHash || localStorage.getItem('wealthpulse_has_mpin') === 'true');
-  const hasRegisteredBiometrics = !!(user?.hasBiometrics || user?.webauthnCredentialId || localStorage.getItem('wealthpulse_has_biometrics') === 'true');
+  const safeInvestments = Array.isArray(investments) ? investments : [];
+  const totalInvestmentsValuation = safeInvestments.reduce((sum, i) => sum + (Number(i.currentValuation) || 0), 0);
+  const manualAssets = Number(settings.manualAssets !== undefined ? settings.manualAssets : (settings.assets || 0));
+  const manualLiabilities = Number(settings.manualLiabilities !== undefined ? settings.manualLiabilities : (settings.liabilities || 0));
+
+  const totalDynamicAssets = totalInvestmentsValuation + manualAssets;
+  const netWorth = totalDynamicAssets - manualLiabilities;
 
   return (
-    <div className={`modal-backdrop ${isLoggingOut ? 'fade-out' : ''}`} onClick={onClose} style={{ padding: '16px', boxSizing: 'border-box' }}>
+    <div className={`modal-backdrop ${isLoggingOut ? 'fade-out' : ''}`} onClick={onClose} style={{ padding: '16px' }}>
       <div
         className={`modal-content ${isLoggingOut ? 'scale-down' : ''}`}
         onClick={e => e.stopPropagation()}
         style={{
           maxWidth: '480px',
           width: '100%',
-          padding: '20px 18px',
-          borderRadius: '20px',
+          padding: '24px',
+          borderRadius: '24px',
           background: 'var(--bg-card)',
-          backdropFilter: 'blur(28px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(28px) saturate(180%)',
+          backdropFilter: 'blur(28px)',
           border: '1px solid var(--border-glass)',
           boxShadow: '0 24px 60px rgba(0, 0, 0, 0.7)',
           maxHeight: '88vh',
-          overflowY: 'auto',
-          boxSizing: 'border-box'
+          overflowY: 'auto'
         }}
       >
         {/* Modal Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ padding: '7px', borderRadius: '10px', background: 'var(--primary-light)', color: 'var(--primary)', flexShrink: 0 }}>
-              <ShieldCheck size={18} />
+            <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ShieldCheck size={20} />
             </div>
             <div>
-              <h2 style={{ fontSize: '16px', fontWeight: '800', margin: 0, color: 'var(--text-main)', lineHeight: '1.2' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
                 User Profile & Security
               </h2>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
@@ -190,199 +190,83 @@ export default function UserProfileModal({
         </div>
 
         {/* User Identity Banner */}
-        <div
-          style={{
-            padding: '14px',
-            borderRadius: '14px',
-            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(10, 25, 47, 0.8) 100%)',
-            border: '1px solid var(--border-glass)',
-            marginBottom: '14px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px'
-          }}
-        >
-          <div
-            style={{
-              width: '44px',
-              height: '44px',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, var(--primary) 0%, #059669 100%)',
-              color: '#000000',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: '900',
-              fontSize: '17px',
-              boxShadow: '0 4px 14px var(--primary-glow)',
-              flexShrink: 0
-            }}
-          >
+        <div style={{ padding: '14px', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(10, 25, 47, 0.8) 100%)', border: '1px solid var(--border-glass)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary) 0%, #059669 100%)', color: '#000000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '17px' }}>
             {getInitials(user.name)}
           </div>
-
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-              <h3 style={{ fontSize: '14px', fontWeight: '800', margin: 0, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {user.name}
-              </h3>
-              <span className="badge badge-success" style={{ fontSize: '9px', padding: '1px 5px' }}>
-                <CheckCircle2 size={10} /> Verified
-              </span>
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Mail size={11} style={{ flexShrink: 0, color: 'var(--primary)' }} />
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</span>
+            <h3 style={{ fontSize: '14px', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>{user.name}</h3>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Mail size={11} /> {user.email}
             </div>
           </div>
         </div>
 
-        {/* Fast Authentication Options (Full-Width Clean Stacked Rows) */}
-        <div style={{ marginBottom: '14px' }}>
-          <div style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+        {/* Fast Authentication Options */}
+        <div style={{ marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--text-muted)', marginBottom: '2px' }}>
             Fast Authentication Options
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {/* Face ID / Passkey Row */}
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px 14px',
-                borderRadius: '12px',
-                width: '100%',
-                boxSizing: 'border-box'
-              }}
-              onClick={handleEnableBiometrics}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ padding: '6px', borderRadius: '8px', background: 'var(--primary-light)', color: 'var(--primary)', flexShrink: 0 }}>
-                  <Fingerprint size={18} />
-                </div>
-                <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-main)' }}>Face ID / Biometrics</div>
-                  <div style={{ fontSize: '11px', color: hasRegisteredBiometrics ? '#34D399' : 'var(--text-muted)', fontWeight: hasRegisteredBiometrics ? '700' : '400' }}>
-                    {hasRegisteredBiometrics ? '✓ Face ID / Passkey Active' : 'Touch ID & Device Passkey'}
-                  </div>
-                </div>
+          {/* Passkeys / FaceID Card */}
+          <div style={{ padding: '12px 14px', borderRadius: '12px', background: 'var(--bg-app)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ padding: '8px', background: 'rgba(56, 189, 248, 0.15)', color: '#38BDF8', borderRadius: '10px' }}>
+                <Fingerprint size={18} />
               </div>
-              <ChevronRight size={16} style={{ color: 'var(--text-muted)' }} />
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)' }}>Face ID / Biometrics</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Touch ID & Device Passkey</div>
+              </div>
+            </div>
+            <button type="button" className="btn btn-secondary btn-sm" style={{ borderRadius: '10px', fontSize: '11px', fontWeight: '700', padding: '6px 12px' }} onClick={async () => {
+              setBioError('');
+              setBioMessage('');
+              try {
+                const res = await registerBiometricPasskey(user, token);
+                setBioMessage('Biometric Passkey registered successfully!');
+              } catch (err) {
+                setBioError(err.message || 'Biometric registration failed');
+              }
+            }}>
+              Enable Passkey
             </button>
+          </div>
 
-            {/* 4-Digit MPIN Row */}
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'stretch' }}>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 14px',
-                  borderRadius: '12px',
-                  flex: 1,
-                  boxSizing: 'border-box'
-                }}
-                onClick={() => {
-                  onClose();
-                  onOpenMpinModal(hasRegisteredMpin ? 'change' : 'set');
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{ padding: '6px', borderRadius: '8px', background: 'rgba(56, 189, 248, 0.16)', color: '#38BDF8', flexShrink: 0 }}>
-                    <KeyRound size={18} />
-                  </div>
-                  <div style={{ textAlign: 'left' }}>
-                    <div style={{ fontWeight: '700', fontSize: '13px', color: 'var(--text-main)' }}>
-                      {hasRegisteredMpin ? 'Change 4-Digit MPIN' : 'Set 4-Digit MPIN'}
-                    </div>
-                    <div style={{ fontSize: '11px', color: hasRegisteredMpin ? '#34D399' : 'var(--text-muted)', fontWeight: hasRegisteredMpin ? '700' : '400' }}>
-                      {hasRegisteredMpin ? '✓ MPIN Active' : 'Enable Fast PIN Login'}
-                    </div>
-                  </div>
-                </div>
-                <ChevronRight size={16} style={{ color: 'var(--text-muted)' }} />
+          {/* 4-Digit MPIN Security Card */}
+          <div style={{ padding: '12px 14px', borderRadius: '12px', background: 'var(--bg-app)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ padding: '8px', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '10px' }}>
+                <KeyRound size={18} />
+              </div>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)' }}>Change 4-Digit MPIN</div>
+                <div style={{ fontSize: '11px', color: user.hasMpin ? 'var(--primary)' : 'var(--warning)', fontWeight: '600' }}>{user.hasMpin ? '✓ MPIN Active' : 'MPIN Not Set'}</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button type="button" className="btn btn-secondary btn-sm" style={{ borderRadius: '10px', fontSize: '11px', fontWeight: '700', padding: '6px 10px' }} onClick={() => { onClose(); onOpenMpinModal(user.hasMpin ? 'change' : 'set'); }}>
+                {user.hasMpin ? 'Change' : 'Set MPIN'}
               </button>
-
-              {hasRegisteredMpin && (
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  style={{
-                    padding: '8px 12px',
-                    fontSize: '11px',
-                    fontWeight: '700',
-                    color: '#F87171',
-                    borderRadius: '12px',
-                    border: '1px solid rgba(239, 68, 68, 0.3)',
-                    background: 'rgba(239, 68, 68, 0.08)',
-                    whiteSpace: 'nowrap'
-                  }}
-                  onClick={handleRequestMpinReset}
-                  disabled={mpinResetLoading}
-                  title="Send MPIN Reset Link to Email"
-                >
-                  {mpinResetLoading ? 'Sending...' : 'Reset MPIN'}
+              {user.hasMpin && (
+                <button type="button" className="btn btn-sm" style={{ fontSize: '11px', fontWeight: '700', padding: '6px 10px', color: '#F87171', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.08)' }} onClick={handleRequestMpinReset}>
+                  Reset
                 </button>
               )}
             </div>
           </div>
-
-          {mpinResetMessage && (
-            <div style={{ marginTop: '8px', padding: '8px 12px', background: 'var(--success-light)', color: 'var(--success)', borderRadius: '10px', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <CheckCircle2 size={14} /> {mpinResetMessage}
-              </div>
-              <button type="button" onClick={() => setMpinResetMessage('')} style={{ background: 'none', border: 'none', color: 'var(--success)', cursor: 'pointer' }}>
-                <X size={12} />
-              </button>
-            </div>
-          )}
-
-          {bioMessage && (
-            <div style={{ marginTop: '8px', padding: '8px 12px', background: 'var(--success-light)', color: 'var(--success)', borderRadius: '10px', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Sparkles size={14} /> {bioMessage}
-              </div>
-              <button type="button" onClick={() => setBioMessage('')} style={{ background: 'none', border: 'none', color: 'var(--success)', cursor: 'pointer' }}>
-                <X size={12} />
-              </button>
-            </div>
-          )}
-
-          {bioError && (
-            <div style={{ marginTop: '8px', padding: '8px 12px', background: 'rgba(239, 68, 68, 0.15)', color: '#FCA5A5', border: '1px solid #EF4444', borderRadius: '10px', fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <ShieldAlert size={14} style={{ flexShrink: 0 }} />
-                <span>{bioError}</span>
-              </div>
-              <button type="button" onClick={() => setBioError('')} style={{ background: 'none', border: 'none', color: '#FCA5A5', cursor: 'pointer', padding: '2px' }}>
-                <X size={12} />
-              </button>
-            </div>
-          )}
         </div>
 
-        {/* Portfolio Summary KPI Cards */}
+        {/* Portfolio Summary */}
         <div style={{ marginBottom: '16px' }}>
-          <div style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-            Financial Portfolio Summary
-          </div>
-
+          <div style={{ fontSize: '11px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--text-muted)', marginBottom: '8px' }}>Financial Portfolio Summary</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
             <div style={{ padding: '12px', borderRadius: '12px', background: 'var(--bg-app)', border: '1px solid var(--border-color)', boxSizing: 'border-box' }}>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Wallet size={12} style={{ color: 'var(--primary)' }} /> Net Worth
+                <Wallet size={12} style={{ color: 'var(--primary)' }} /> Net Worth <span className="badge badge-success" style={{ fontSize: '8px', padding: '1px 4px' }}>Live</span>
               </div>
-              <div style={{ fontSize: '17px', fontWeight: '900', color: netWorth >= 0 ? 'var(--primary)' : 'var(--danger)', marginTop: '4px' }}>
-                ₹{netWorth.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </div>
+              <div style={{ fontSize: '17px', fontWeight: '900', color: netWorth >= 0 ? 'var(--primary)' : 'var(--danger)', marginTop: '4px' }}>₹{netWorth.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
             </div>
-
             <div style={{ padding: '12px', borderRadius: '12px', background: 'var(--bg-app)', border: '1px solid var(--border-color)', boxSizing: 'border-box' }}>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <Receipt size={12} style={{ color: '#38BDF8' }} /> Transactions
