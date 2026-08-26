@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Wallet, Settings, FolderSync, AlertTriangle, RefreshCw, Plus, Trash2, CheckCircle2, Download, ExternalLink, Link2, Sparkles, TrendingUp, CreditCard, PieChart } from 'lucide-react';
+import { calculateDynamicNetWorth } from '../utils/netWorth';
 
 export default function SettingsTab({
   settings = {},
@@ -14,17 +15,23 @@ export default function SettingsTab({
   onOpenConfirmWipe,
   onOpenNetWorthModal
 }) {
-  const { netWorthConfigured = false } = settings;
-  const safeInvestments = Array.isArray(investments) ? investments : [];
-  const totalInvestmentsValuation = safeInvestments.reduce((sum, i) => sum + (Number(i.currentValuation) || 0), 0);
+  const {
+    liveInvestmentsValuation,
+    additionalAssetsTotal,
+    totalAssets,
+    totalLiabilities,
+    netWorth
+  } = calculateDynamicNetWorth(investments, settings);
 
-  const [assetsInput, setAssetsInput] = useState(
-    settings.manualAssets !== undefined ? settings.manualAssets : (settings.assets || '')
-  );
-  const [liabilitiesInput, setLiabilitiesInput] = useState(
-    settings.manualLiabilities !== undefined ? settings.manualLiabilities : (settings.liabilities || '')
-  );
+  const [assetsInput, setAssetsInput] = useState('');
+  const [liabilitiesInput, setLiabilitiesInput] = useState('');
   const [netWorthMessage, setNetWorthMessage] = useState('');
+
+  // Update inputs when settings change
+  useEffect(() => {
+    setAssetsInput(additionalAssetsTotal > 0 ? String(additionalAssetsTotal) : '');
+    setLiabilitiesInput(totalLiabilities > 0 ? String(totalLiabilities) : '');
+  }, [additionalAssetsTotal, totalLiabilities]);
 
   const [newCatInput, setNewCatInput] = useState('');
   const [newAccInput, setNewAccInput] = useState('');
@@ -45,17 +52,17 @@ export default function SettingsTab({
     lastStatus: 'idle'
   };
 
-  const manualAssetsVal = parseFloat(assetsInput) || 0;
-  const manualLiabilitiesVal = parseFloat(liabilitiesInput) || 0;
-  const totalDynamicAssets = totalInvestmentsValuation + manualAssetsVal;
-  const calculatedPreview = totalDynamicAssets - manualLiabilitiesVal;
+  const manualAssetsVal = assetsInput !== '' ? parseFloat(assetsInput) || 0 : additionalAssetsTotal;
+  const manualLiabilitiesVal = liabilitiesInput !== '' ? parseFloat(liabilitiesInput) || 0 : totalLiabilities;
+  const calculatedAssets = liveInvestmentsValuation + manualAssetsVal;
+  const calculatedPreview = calculatedAssets - manualLiabilitiesVal;
 
   const handleNetWorthSubmit = async (e) => {
     e.preventDefault();
     onSaveNetWorth({
       manualAssets: manualAssetsVal,
       manualLiabilities: manualLiabilitiesVal,
-      assets: totalDynamicAssets,
+      assets: calculatedAssets,
       liabilities: manualLiabilitiesVal,
       netWorthConfigured: true
     });
@@ -165,7 +172,7 @@ export default function SettingsTab({
 
         {/* Informative Note Box */}
         <div style={{ padding: '12px 16px', borderRadius: '14px', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.2)', marginBottom: '20px', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-          💡 <strong>Dynamic Net Worth Auto-Calculation:</strong> Your Net Worth includes your live stock & mutual fund investments (<strong>₹{totalInvestmentsValuation.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>) which update live every 3 seconds. You can add additional manual assets (real estate, vehicles) or debts below.
+          💡 <strong>Dynamic Net Worth Auto-Calculation:</strong> Your Net Worth includes your live stock & mutual fund investments (<strong>₹{liveInvestmentsValuation.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>) which update live every 3 seconds. You can add additional manual assets (real estate, vehicles) or debts below.
         </div>
 
         <form onSubmit={handleNetWorthSubmit}>
@@ -175,7 +182,7 @@ export default function SettingsTab({
                 1. Live Investments Portfolio (Auto)
               </label>
               <div style={{ padding: '10px 14px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', fontSize: '15px', fontWeight: '800', color: '#10B981', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
-                ₹{totalInvestmentsValuation.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                ₹{liveInvestmentsValuation.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </div>
             </div>
 

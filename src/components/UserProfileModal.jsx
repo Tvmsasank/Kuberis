@@ -17,6 +17,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { registerBiometricPasskey } from '../utils/biometrics';
+import { calculateDynamicNetWorth } from '../utils/netWorth';
 
 export default function UserProfileModal({
   isOpen,
@@ -143,13 +144,7 @@ export default function UserProfileModal({
     }
   };
 
-  const safeInvestments = Array.isArray(investments) ? investments : [];
-  const totalInvestmentsValuation = safeInvestments.reduce((sum, i) => sum + (Number(i.currentValuation) || 0), 0);
-  const manualAssets = Number(settings.manualAssets !== undefined ? settings.manualAssets : (settings.assets || 0));
-  const manualLiabilities = Number(settings.manualLiabilities !== undefined ? settings.manualLiabilities : (settings.liabilities || 0));
-
-  const totalDynamicAssets = totalInvestmentsValuation + manualAssets;
-  const netWorth = totalDynamicAssets - manualLiabilities;
+  const { netWorth } = calculateDynamicNetWorth(investments, settings);
 
   return (
     <div className={`modal-backdrop ${isLoggingOut ? 'fade-out' : ''}`} onClick={onClose} style={{ padding: '16px' }}>

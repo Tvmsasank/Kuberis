@@ -16,6 +16,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, Legend } from 'recharts';
+import { calculateDynamicNetWorth } from '../utils/netWorth';
 
 export default function DashboardTab({
   transactions = [],
@@ -60,11 +61,12 @@ export default function DashboardTab({
 
   const savingsRate = totalIncome > 0 ? (((totalIncome - totalSpending) / totalIncome) * 100).toFixed(1) : '0';
 
-  // Dynamic Real-Time Net Worth Calculation
-  const manualAssets = Number(settings.manualAssets !== undefined ? settings.manualAssets : (settings.assets || 0));
-  const manualLiabilities = Number(settings.manualLiabilities !== undefined ? settings.manualLiabilities : (settings.liabilities || 0));
-  const totalDynamicAssets = totalInvestmentsValuation + manualAssets;
-  const netWorthValue = totalDynamicAssets - manualLiabilities;
+  // Dynamic Real-Time Net Worth Calculation via unified netWorth helper
+  const {
+    totalAssets: totalDynamicAssets,
+    totalLiabilities,
+    netWorth: netWorthValue
+  } = calculateDynamicNetWorth(investments, settings);
 
   // Cash flow chart data (up to 7 monthly points)
   const cashFlowData = getCashFlowChartData(filteredTransactions);

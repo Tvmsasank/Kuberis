@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Wallet,
@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   HelpCircle
 } from 'lucide-react';
+import { calculateDynamicNetWorth } from '../utils/netWorth';
 
 export default function NetWorthModal({
   isOpen,
@@ -36,7 +37,19 @@ export default function NetWorthModal({
           maximumFractionDigits: 2
         });
 
-  // 1. Live Investments Breakdown
+  // Calculate dynamic metrics using unified helper
+  const {
+    liveInvestmentsValuation,
+    customAssetsList,
+    customAssetsTotal,
+    totalAssets,
+    customLiabilitiesList,
+    customLiabilitiesTotal,
+    totalLiabilities,
+    netWorth
+  } = calculateDynamicNetWorth(investments, settings);
+
+  // Breakdown per asset class
   const safeInvestments = Array.isArray(investments) ? investments : [];
   const stockVal = safeInvestments.filter(i => i.type === 'stock').reduce((s, i) => s + (Number(i.currentValuation) || 0), 0);
   const usStockVal = safeInvestments.filter(i => i.type === 'us_stock').reduce((s, i) => s + (Number(i.currentValuation) || 0), 0);
@@ -45,14 +58,6 @@ export default function NetWorthModal({
   const goldVal = safeInvestments.filter(i => i.type === 'gold').reduce((s, i) => s + (Number(i.currentValuation) || 0), 0);
   const fdVal = safeInvestments.filter(i => i.type === 'fd' || i.type === 'other').reduce((s, i) => s + (Number(i.currentValuation) || 0), 0);
 
-  const totalInvestmentsValuation = safeInvestments.reduce((sum, i) => sum + (Number(i.currentValuation) || 0), 0);
-
-  // 2. Manual Assets & Liabilities State
-  const manualAssets = Number(settings.manualAssets || 0);
-  const manualLiabilities = Number(settings.manualLiabilities || 0);
-  const [customAssets, setCustomAssets] = useState(settings.customAssetsList || []);
-  const [customLiabilities, setCustomLiabilities] = useState(settings.customLiabilitiesList || []);
-
   const [newAssetName, setNewAssetName] = useState('');
   const [newAssetVal, setNewAssetVal] = useState('');
   const [newLiabilityName, setNewLiabilityName] = useState('');
@@ -60,50 +65,83 @@ export default function NetWorthModal({
 
   const [saveMsg, setSaveMsg] = useState('');
 
-  const customAssetsTotal = customAssets.reduce((s, a) => s + Number(a.value || 0), 0);
-  const customLiabilitiesTotal = customLiabilities.reduce((s, l) => s + Number(l.value || 0), 0);
-
-  const totalAssets = totalInvestmentsValuation + manualAssets + customAssetsTotal;
-  const totalLiabilities = manualLiabilities + customLiabilitiesTotal;
-  const netWorth = totalAssets - totalLiabilities;
-
-  // Handlers for Custom Assets
+  // Handlers for Custom Assets with Instant Auto-Sync
   const handleAddAsset = (e) => {
     e.preventDefault();
     if (!newAssetName.trim() || !newAssetVal || Number(newAssetVal) <= 0) return;
     const item = { id: Date.now().toString(), name: newAssetName.trim(), value: Number(newAssetVal) };
-    const updated = [...customAssets, item];
-    setCustomAssets(updated);
+    const updatedAssets = [...customAssetsList, item];
+    const updatedAssetsTotal = updatedAssets.reduce((s, a) => s + Number(a.value || 0), 0);
+
+    onSaveSettings({
+      ...settings,
+      customAssetsList: updatedAssets,
+      manualAssets: updatedAssetsTotal, // Keep manualAssets in sync
+      netWorthConfigured: true
+    });
+
     setNewAssetName('');
     setNewAssetVal('');
+    setSaveMsg('Asset added & synced live!');
+    setTimeout(() => setSaveMsg(''), 2500);
   };
 
   const handleDeleteAsset = (id) => {
-    setCustomAssets(customAssets.filter(a => a.id !== id));
+    const updatedAssets = customAssetsList.filter(a => a.id !== id);
+    const updatedAssetsTotal = updatedAssets.reduce((s, a) => s + Number(a.value || 0), 0);
+
+    onSaveSettings({
+      ...settings,
+      customAssetsList: updatedAssets,
+      manualAssets: updatedAssetsTotal,
+      netWorthConfigured: true
+    });
+    setSaveMsg('Asset removed!');
+    setTimeout(() => setSaveMsg(''), 2500);
   };
 
-  // Handlers for Custom Liabilities
+  // Handlers for Custom Liabilities with Instant Auto-Sync
   const handleAddLiability = (e) => {
     e.preventDefault();
     if (!newLiabilityName.trim() || !newLiabilityVal || Number(newLiabilityVal) <= 0) return;
     const item = { id: Date.now().toString(), name: newLiabilityName.trim(), value: Number(newLiabilityVal) };
-    const updated = [...customLiabilities, item];
-    setCustomLiabilities(updated);
+    const updatedLiabilities = [...customLiabilitiesList, item];
+    const updatedLiabilitiesTotal = updatedLiabilities.reduce((s, l) => s + Number(l.value || 0), 0);
+
+    onSaveSettings({
+      ...settings,
+      customLiabilitiesList: updatedLiabilities,
+      manualLiabilities: updatedLiabilitiesTotal, // Keep manualLiabilities in sync
+      netWorthConfigured: true
+    });
+
     setNewLiabilityName('');
     setNewLiabilityVal('');
+    setSaveMsg('Liability added & synced live!');
+    setTimeout(() => setSaveMsg(''), 2500);
   };
 
   const handleDeleteLiability = (id) => {
-    setCustomLiabilities(customLiabilities.filter(l => l.id !== id));
+    const updatedLiabilities = customLiabilitiesList.filter(l => l.id !== id);
+    const updatedLiabilitiesTotal = updatedLiabilities.reduce((s, l) => s + Number(l.value || 0), 0);
+
+    onSaveSettings({
+      ...settings,
+      customLiabilitiesList: updatedLiabilities,
+      manualLiabilities: updatedLiabilitiesTotal,
+      netWorthConfigured: true
+    });
+    setSaveMsg('Liability removed!');
+    setTimeout(() => setSaveMsg(''), 2500);
   };
 
   const handleSaveAll = () => {
     onSaveSettings({
       ...settings,
-      manualAssets: manualAssets,
-      manualLiabilities: manualLiabilities,
-      customAssetsList: customAssets,
-      customLiabilitiesList: customLiabilities,
+      customAssetsList: customAssetsList,
+      manualAssets: customAssetsTotal,
+      customLiabilitiesList: customLiabilitiesList,
+      manualLiabilities: customLiabilitiesTotal,
       netWorthConfigured: true
     });
     setSaveMsg('Net worth breakdown configuration saved!');
@@ -111,20 +149,39 @@ export default function NetWorthModal({
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose} style={{ padding: '16px' }}>
+    <div
+      className="modal-backdrop"
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.75)',
+        backdropFilter: 'blur(8px)',
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px',
+        overflow: 'hidden'
+      }}
+    >
       <div
         className="modal-content"
         onClick={(e) => e.stopPropagation()}
         style={{
           maxWidth: '740px',
           width: '100%',
-          maxHeight: '90vh',
+          maxHeight: '85vh',
           overflowY: 'auto',
           padding: '24px',
           borderRadius: '24px',
           background: 'var(--bg-card)',
           backdropFilter: 'blur(28px)',
-          border: '1px solid var(--border-glass)'
+          border: '1px solid var(--border-glass)',
+          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.7)'
         }}
       >
         {/* Header */}
@@ -192,7 +249,7 @@ export default function NetWorthModal({
 
         {/* Explanatory Banner */}
         <div style={{ padding: '12px 16px', borderRadius: '14px', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.2)', marginBottom: '24px', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-          💡 <strong>How Net Worth is calculated dynamically:</strong> Your stock & mutual fund investments ({formatInr(totalInvestmentsValuation)}) update live every 3 seconds as market quotes change. Any additional real estate or loans added below automatically sync into your total Net Worth.
+          💡 <strong>How Net Worth is calculated dynamically:</strong> Your stock & mutual fund investments ({formatInr(liveInvestmentsValuation)}) update live every 3 seconds as market quotes change. Any additional real estate or loans added below automatically sync into your total Net Worth.
         </div>
 
         {/* Section 1: ASSETS BREAKDOWN */}
@@ -214,12 +271,12 @@ export default function NetWorthModal({
                 </div>
               </div>
               <div style={{ fontSize: '15px', fontWeight: '800', color: '#10B981' }}>
-                {formatInr(totalInvestmentsValuation)}
+                {formatInr(liveInvestmentsValuation)}
               </div>
             </div>
 
             {/* Custom Additional Assets List */}
-            {customAssets.map((asset) => (
+            {customAssetsList.map((asset) => (
               <div key={asset.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '12px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Home size={15} style={{ color: '#38BDF8' }} />
@@ -267,12 +324,12 @@ export default function NetWorthModal({
 
           {/* Custom Liabilities List */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-            {customLiabilities.length === 0 ? (
+            {customLiabilitiesList.length === 0 ? (
               <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic', padding: '8px 0' }}>
                 No active loans or credit liabilities added. Add any home loan, car loan, or credit card debt below.
               </div>
             ) : (
-              customLiabilities.map((item) => (
+              customLiabilitiesList.map((item) => (
                 <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
                   <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)' }}>{item.name}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
