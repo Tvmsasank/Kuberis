@@ -302,7 +302,7 @@ export default function DashboardTab({
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={cashFlowData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                   <XAxis dataKey="dateLabel" stroke="var(--text-muted)" fontSize={11} tickLine={false} />
-                  <YAxis stroke="var(--text-muted)" fontSize={11} tickFormatter={v => `₹${(v/1000).toFixed(0)}k`} tickLine={false} />
+                  <YAxis stroke="var(--text-muted)" fontSize={11} tickFormatter={v => Math.abs(v) >= 1000 ? `₹${(v/1000).toFixed(0)}k` : `₹${v}`} tickLine={false} />
                   <Tooltip content={<CustomCashFlowTooltip isPrivacyMode={isPrivacyMode} />} />
                   <Line type="monotone" dataKey="income" stroke="#10B981" strokeWidth={2.5} dot={{ r: 3, fill: '#10B981' }} activeDot={{ r: 6, fill: '#10B981', stroke: '#FFFFFF' }} name="Income" />
                   <Line type="monotone" dataKey="spending" stroke="#F97316" strokeWidth={2.5} dot={{ r: 3, fill: '#F97316' }} activeDot={{ r: 6, fill: '#F97316', stroke: '#FFFFFF' }} name="Spending" />

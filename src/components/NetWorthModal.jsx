@@ -25,6 +25,12 @@ export default function NetWorthModal({
   onSaveSettings,
   isPrivacyMode = false
 }) {
+  const [newAssetName, setNewAssetName] = useState('');
+  const [newAssetVal, setNewAssetVal] = useState('');
+  const [newLiabilityName, setNewLiabilityName] = useState('');
+  const [newLiabilityVal, setNewLiabilityVal] = useState('');
+  const [saveMsg, setSaveMsg] = useState('');
+
   // Prevent background page scrolling when modal is open
   useEffect(() => {
     if (isOpen) {
@@ -72,13 +78,6 @@ export default function NetWorthModal({
   const mfVal = safeInvestments.filter(i => i.type === 'mutual_fund').reduce((s, i) => s + (Number(i.currentValuation) || 0), 0);
   const goldVal = safeInvestments.filter(i => i.type === 'gold').reduce((s, i) => s + (Number(i.currentValuation) || 0), 0);
   const fdVal = safeInvestments.filter(i => i.type === 'fd' || i.type === 'other').reduce((s, i) => s + (Number(i.currentValuation) || 0), 0);
-
-  const [newAssetName, setNewAssetName] = useState('');
-  const [newAssetVal, setNewAssetVal] = useState('');
-  const [newLiabilityName, setNewLiabilityName] = useState('');
-  const [newLiabilityVal, setNewLiabilityVal] = useState('');
-
-  const [saveMsg, setSaveMsg] = useState('');
 
   // Handlers for Custom Assets with Instant Auto-Sync
   const handleAddAsset = (e) => {
