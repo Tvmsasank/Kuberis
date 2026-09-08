@@ -25,6 +25,7 @@ export default function UserProfileModal({
   user,
   token,
   settings = {},
+  investments = [],
   transactionCount = 0,
   onLogout,
   onOpenForgotPassword,
