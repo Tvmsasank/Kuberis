@@ -403,6 +403,10 @@ export const dbEngine = {
       throw new Error('MPIN must be exactly 4 digits');
     }
 
+    if (user.mpinHash && bcrypt.compareSync(mpin, user.mpinHash)) {
+      throw new Error('New 4-digit MPIN cannot be the same as your previous MPIN. Please choose a different 4-digit MPIN.');
+    }
+
     user.mpinHash = bcrypt.hashSync(mpin, 10);
     saveDb();
 
@@ -483,6 +487,10 @@ export const dbEngine = {
     const user = db.users.find(u => u.resetToken === resetToken && u.resetTokenExpiry > Date.now());
     if (!user) throw new Error('Invalid or expired password reset link');
 
+    if (user.passwordHash && bcrypt.compareSync(newPassword, user.passwordHash)) {
+      throw new Error('New password cannot be the same as your previous password. Please choose a different password.');
+    }
+
     user.passwordHash = bcrypt.hashSync(newPassword, 10);
     user.resetToken = null;
     user.resetTokenExpiry = null;
@@ -521,6 +529,10 @@ export const dbEngine = {
 
     if (!/^\d{4}$/.test(newMpin)) {
       throw new Error('MPIN must be exactly 4 digits');
+    }
+
+    if (user.mpinHash && bcrypt.compareSync(newMpin, user.mpinHash)) {
+      throw new Error('New 4-digit MPIN cannot be the same as your previous MPIN. Please choose a different 4-digit MPIN.');
     }
 
     user.mpinHash = bcrypt.hashSync(newMpin, 10);
