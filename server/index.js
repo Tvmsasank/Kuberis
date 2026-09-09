@@ -340,15 +340,14 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
     return false;
   }
 
-  // Attempt 1: Gmail service with IPv4 enforcement
+  // Attempt 1: Gmail service transport (Cloud-optimized 25s timeout)
   try {
     const transporter = nodemailer.createTransport({
       service: 'gmail',
-      family: 4,
       auth: { user, pass },
-      connectionTimeout: 6000,
-      greetingTimeout: 4000,
-      socketTimeout: 8000
+      connectionTimeout: 25000,
+      greetingTimeout: 20000,
+      socketTimeout: 30000
     });
     const info = await transporter.sendMail({
       from: `"WealthPulse Security" <${user}>`,
@@ -357,23 +356,22 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
       text: text || '',
       html
     });
-    console.log(`[WealthPulse Email] Successfully delivered email to ${to} via Gmail Service (IPv4). MessageId: ${info.messageId}`);
+    console.log(`[WealthPulse Email] Successfully delivered email to ${to} via Gmail Service. MessageId: ${info.messageId}`);
     return true;
   } catch (err1) {
-    console.warn(`[WealthPulse Email] Primary transport failed (${err1.message}). Trying Direct SSL transport...`);
+    console.warn(`[WealthPulse Email] Primary Gmail transport failed (${err1.message}). Trying Direct SSL transport...`);
   }
 
-  // Attempt 2: Direct SMTP SSL (port 465) with IPv4 enforcement
+  // Attempt 2: Direct SMTP SSL (port 465) with 25s timeout
   try {
     const transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
       port: 465,
       secure: true,
-      family: 4,
       auth: { user, pass },
-      connectionTimeout: 6000,
-      greetingTimeout: 4000,
-      socketTimeout: 8000
+      connectionTimeout: 25000,
+      greetingTimeout: 20000,
+      socketTimeout: 30000
     });
     const info = await transporter.sendMail({
       from: `"WealthPulse Security" <${user}>`,
@@ -382,24 +380,23 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
       text: text || '',
       html
     });
-    console.log(`[WealthPulse Email] Successfully delivered email to ${to} via SSL 465 (IPv4). MessageId: ${info.messageId}`);
+    console.log(`[WealthPulse Email] Successfully delivered email to ${to} via SSL 465. MessageId: ${info.messageId}`);
     return true;
   } catch (err2) {
     console.warn(`[WealthPulse Email] SSL transport failed (${err2.message}). Trying STARTTLS 587...`);
   }
 
-  // Attempt 3: Direct SMTP TLS on port 587 with IPv4 enforcement
+  // Attempt 3: Direct SMTP TLS on port 587 with 25s timeout
   try {
     const transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
       port: 587,
       secure: false,
       requireTLS: true,
-      family: 4,
       auth: { user, pass },
-      connectionTimeout: 6000,
-      greetingTimeout: 4000,
-      socketTimeout: 8000
+      connectionTimeout: 25000,
+      greetingTimeout: 20000,
+      socketTimeout: 30000
     });
     const info = await transporter.sendMail({
       from: `"WealthPulse Security" <${user}>`,
@@ -408,10 +405,10 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
       text: text || '',
       html
     });
-    console.log(`[WealthPulse Email] Successfully delivered email to ${to} via Port 587 (IPv4). MessageId: ${info.messageId}`);
+    console.log(`[WealthPulse Email] Successfully delivered email to ${to} via Port 587. MessageId: ${info.messageId}`);
     return true;
   } catch (err3) {
-    console.error(`[WealthPulse Email Error] All 3 SMTP transports failed: ${err3.message}`);
+    console.error(`[WealthPulse Email Error] All SMTP transports failed: ${err3.message}`);
     return false;
   }
 }
