@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   ShieldCheck,
@@ -32,10 +32,10 @@ export default function TwoFactorSetupModal({
   const [copiedSecret, setCopiedSecret] = useState(false);
   const [copiedRecovery, setCopiedRecovery] = useState(false);
 
-  const isAlreadyEnabled = !!user?.twoFactorEnabled;
+  const prevIsOpenRef = useRef(false);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !prevIsOpenRef.current) {
       document.body.style.overflow = 'hidden';
       setError('');
       setSuccessMsg('');
@@ -43,19 +43,21 @@ export default function TwoFactorSetupModal({
       setCopiedSecret(false);
       setCopiedRecovery(false);
 
-      if (isAlreadyEnabled) {
-        setStep(4); // Show option to disable
+      if (user?.twoFactorEnabled) {
+        setStep(4); // Open in Disable Mode
       } else {
         setStep(1);
         fetchTwoFactorSetup();
       }
-    } else {
+    } else if (!isOpen) {
       document.body.style.overflow = '';
     }
+    prevIsOpenRef.current = isOpen;
+
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isOpen, isAlreadyEnabled]);
+  }, [isOpen, user?.twoFactorEnabled]);
 
   const fetchTwoFactorSetup = async () => {
     setLoading(true);
@@ -114,6 +116,10 @@ export default function TwoFactorSetupModal({
   };
 
   const handleDisableTwoFactor = async () => {
+    if (!verificationCode || !verificationCode.trim()) {
+      setError('Please enter your 6-digit authenticator code or emergency recovery code to disable 2FA');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -444,8 +450,8 @@ export default function TwoFactorSetupModal({
               <button
                 type="button"
                 className="btn btn-danger"
-                disabled={loading}
-                style={{ flex: 1, padding: '12px', borderRadius: '12px', fontWeight: '800' }}
+                disabled={loading || !verificationCode.trim()}
+                style={{ flex: 1, padding: '12px', borderRadius: '12px', fontWeight: '800', opacity: (!verificationCode.trim() || loading) ? 0.5 : 1 }}
                 onClick={handleDisableTwoFactor}
               >
                 {loading ? 'Disabling...' : 'Confirm Disable'}

@@ -279,28 +279,30 @@ app.post('/api/auth/2fa/verify-login', (req, res) => {
   }
 });
 
-// POST /api/auth/2fa/disable - Disable 2FA
+// POST /api/auth/2fa/disable - Disable 2FA (Requires valid 6-digit TOTP code or recovery code)
 app.post('/api/auth/2fa/disable', authenticateToken, (req, res) => {
   try {
     const { code } = req.body;
+    if (!code || !code.trim()) {
+      return res.status(400).json({ error: '6-digit authenticator code or recovery code required to disable 2FA' });
+    }
+
     const twoFactorDetails = dbEngine.getUserTwoFactorSecret(req.userId);
 
     if (!twoFactorDetails || !twoFactorDetails.enabled) {
       return res.status(400).json({ error: '2FA is not enabled' });
     }
 
-    if (code) {
-      const cleanCode = code.trim();
-      const verified = speakeasy.totp.verify({
-        secret: twoFactorDetails.secret,
-        encoding: 'base32',
-        token: cleanCode,
-        window: 2
-      }) || dbEngine.useRecoveryCode(req.userId, cleanCode);
+    const cleanCode = code.trim();
+    const verified = speakeasy.totp.verify({
+      secret: twoFactorDetails.secret,
+      encoding: 'base32',
+      token: cleanCode,
+      window: 2
+    }) || dbEngine.useRecoveryCode(req.userId, cleanCode);
 
-      if (!verified) {
-        return res.status(400).json({ error: 'Invalid authenticator code or recovery code' });
-      }
+    if (!verified) {
+      return res.status(400).json({ error: 'Invalid 6-digit authenticator code or recovery code' });
     }
 
     dbEngine.disableTwoFactor(req.userId);
