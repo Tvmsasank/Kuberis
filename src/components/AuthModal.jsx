@@ -838,34 +838,8 @@ export default function AuthModal({
               style={{ width: '100%', padding: '12px', fontSize: '15px', marginTop: '8px' }}
               disabled={loading}
             >
-              {loading ? 'Generating MPIN Reset Link...' : 'Send 4-Digit MPIN Reset Link →'}
+              {loading ? 'Sending Email Link...' : 'Send 4-Digit MPIN Reset Link →'}
             </button>
-
-            {totpTempToken && (
-              <button
-                type="button"
-                className="btn btn-success"
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  fontSize: '14px',
-                  fontWeight: '800',
-                  marginTop: '12px',
-                  background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-                  color: '#000000',
-                  border: 'none',
-                  borderRadius: '12px',
-                  boxShadow: '0 4px 16px rgba(16, 185, 129, 0.4)',
-                  cursor: 'pointer'
-                }}
-                onClick={() => {
-                  onClose();
-                  if (onOpenMpinModal) onOpenMpinModal('reset_token');
-                }}
-              >
-                ⚡ Reset 4-Digit MPIN Right Now →
-              </button>
-            )}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '18px', fontSize: '13px' }}>
               <button

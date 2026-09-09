@@ -512,16 +512,15 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     }
 
     const resetUrl = `${origin}/?resetToken=${result.resetToken}`;
-
     const emailSent = await sendResetEmail(cleanEmail, resetUrl);
 
+    if (!emailSent) {
+      return res.status(500).json({ error: `Failed to deliver email to ${cleanEmail} via Gmail SMTP. Please try again.` });
+    }
+
     res.json({
-      message: emailSent
-        ? `Password reset link sent to ${cleanEmail}. Check your Gmail inbox!`
-        : 'Password reset link generated successfully',
-      emailSent,
-      resetToken: result.resetToken,
-      resetUrl
+      message: `Password reset link sent to ${cleanEmail}! Check your Gmail inbox.`,
+      emailSent
     });
   } catch (err) {
     console.error('POST /api/auth/forgot-password error:', err);
@@ -574,13 +573,13 @@ app.post('/api/auth/forgot-mpin', async (req, res) => {
     const resetMpinUrl = `${origin}/?resetMpinToken=${result.resetMpinToken}`;
     const emailSent = await sendMpinResetEmail(cleanEmail, resetMpinUrl, false);
 
+    if (!emailSent) {
+      return res.status(500).json({ error: `Failed to deliver email to ${cleanEmail} via Gmail SMTP. Please try again.` });
+    }
+
     res.json({
-      message: emailSent
-        ? `MPIN reset link sent to ${cleanEmail}. Check your Gmail inbox!`
-        : 'MPIN reset link generated successfully',
-      emailSent,
-      resetMpinToken: result.resetMpinToken,
-      resetMpinUrl
+      message: `MPIN reset link sent to ${cleanEmail}! Check your Gmail inbox.`,
+      emailSent
     });
   } catch (err) {
     console.error('POST /api/auth/forgot-mpin error:', err);
