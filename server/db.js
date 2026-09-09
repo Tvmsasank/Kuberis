@@ -137,6 +137,21 @@ if (process.env.DATABASE_URL) {
   }
 }
 
+// Helper: Securely execute Stored Procedure with automatic fallback
+async function executeProcedureOrQuery(spQuery, spParams, fallbackQuery, fallbackParams) {
+  if (!pgPool) return;
+  try {
+    await pgPool.query(spQuery, spParams);
+  } catch (err) {
+    if (err.code === '42883' || err.message.includes('function') || err.message.includes('does not exist')) {
+      // Stored Procedure not yet created in Supabase SQL Editor; use fallback
+      await pgPool.query(fallbackQuery, fallbackParams).catch(e => console.error('[Supabase PostgreSQL] Fallback query error:', e.message));
+    } else {
+      console.error('[Supabase PostgreSQL] Stored Procedure execution error:', err.message);
+    }
+  }
+}
+
 function loadDb() {
   if (memoryDb) return memoryDb;
   if (fs.existsSync(DB_FILE)) {
@@ -163,14 +178,18 @@ function saveDb() {
   if (!memoryDb) return;
   fs.writeFileSync(DB_FILE, JSON.stringify(memoryDb, null, 2), 'utf-8');
   if (pgPool) {
-    pgPool.query(
+    executeProcedureOrQuery(
+      'SELECT public.sp_upsert_wealthpulse_store($1, $2)',
+      ['main_store', memoryDb],
       'INSERT INTO public.wealthpulse_store (id, data) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = NOW()',
       ['main_store', JSON.stringify(memoryDb)]
-    ).catch(err => console.error('[Supabase PostgreSQL] Auto-sync write error:', err.message));
+    );
 
     if (Array.isArray(memoryDb.users)) {
       for (const u of memoryDb.users) {
-        pgPool.query(
+        executeProcedureOrQuery(
+          'SELECT public.sp_upsert_wealthpulse_user($1, $2, $3, $4, $5, $6)',
+          [u.id, u.name, u.email, u.passwordHash || null, u.mpinHash || null, u.createdAt || new Date().toISOString()],
           `INSERT INTO public.wealthpulse_users (id, name, email, password_hash, mpin_hash, created_at)
            VALUES ($1, $2, $3, $4, $5, $6)
            ON CONFLICT (id) DO UPDATE SET
@@ -179,7 +198,7 @@ function saveDb() {
              password_hash = EXCLUDED.password_hash,
              mpin_hash = EXCLUDED.mpin_hash`,
           [u.id, u.name, u.email, u.passwordHash || null, u.mpinHash || null, u.createdAt || new Date().toISOString()]
-        ).catch(err => console.error('[Supabase PostgreSQL] User relational sync error:', err.message));
+        );
       }
     }
   }
@@ -225,10 +244,12 @@ export const dbEngine = {
     saveDb();
 
     if (pgPool) {
-      pgPool.query(
+      executeProcedureOrQuery(
+        'SELECT public.sp_upsert_wealthpulse_user($1, $2, $3, $4, NULL, $5)',
+        [newUser.id, newUser.name, newUser.email, newUser.passwordHash, newUser.createdAt],
         'INSERT INTO public.wealthpulse_users (id, name, email, password_hash, created_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING',
         [newUser.id, newUser.name, newUser.email, newUser.passwordHash, newUser.createdAt]
-      ).catch(e => console.error('[Supabase PostgreSQL] Relational User sync error:', e.message));
+      );
     }
 
     return {
@@ -368,10 +389,12 @@ export const dbEngine = {
     saveDb();
 
     if (pgPool) {
-      pgPool.query(
+      executeProcedureOrQuery(
+        'SELECT public.sp_update_user_mpin($1, NULL, $2)',
+        [user.id, user.mpinHash],
         'UPDATE public.wealthpulse_users SET mpin_hash = $1 WHERE id = $2',
         [user.mpinHash, user.id]
-      ).catch(e => console.error('[Supabase PostgreSQL] User MPIN sync error:', e.message));
+      );
     }
     return true;
   },
@@ -448,10 +471,12 @@ export const dbEngine = {
     saveDb();
 
     if (pgPool) {
-      pgPool.query(
+      executeProcedureOrQuery(
+        'SELECT public.sp_update_user_password($1, $2, $3)',
+        [user.id, user.email, user.passwordHash],
         'UPDATE public.wealthpulse_users SET password_hash = $1 WHERE id = $2 OR LOWER(email) = LOWER($3)',
         [user.passwordHash, user.id, user.email]
-      ).catch(e => console.error('[Supabase PostgreSQL] User Password reset sync error:', e.message));
+      );
     }
 
     return true;
@@ -487,10 +512,12 @@ export const dbEngine = {
     saveDb();
 
     if (pgPool) {
-      pgPool.query(
+      executeProcedureOrQuery(
+        'SELECT public.sp_update_user_mpin($1, $2, $3)',
+        [user.id, user.email, user.mpinHash],
         'UPDATE public.wealthpulse_users SET mpin_hash = $1 WHERE id = $2 OR LOWER(email) = LOWER($3)',
         [user.mpinHash, user.id, user.email]
-      ).catch(e => console.error('[Supabase PostgreSQL] User MPIN reset sync error:', e.message));
+      );
     }
 
     return true;
@@ -583,12 +610,14 @@ export const dbEngine = {
 
     // Dual-sync to relational table if pgPool is connected
     if (pgPool) {
-      pgPool.query(
+      executeProcedureOrQuery(
+        'SELECT public.sp_upsert_wealthpulse_transaction($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+        [newTx.id, newTx.userId, newTx.date, newTx.merchant, newTx.amount, newTx.type, newTx.category, newTx.account, JSON.stringify(newTx.tags), newTx.createdAt],
         `INSERT INTO public.wealthpulse_transactions (id, user_id, date, merchant, amount, type, category, account, tags, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          ON CONFLICT (id) DO UPDATE SET date = $3, merchant = $4, amount = $5, type = $6, category = $7, account = $8, tags = $9`,
         [newTx.id, newTx.userId, newTx.date, newTx.merchant, newTx.amount, newTx.type, newTx.category, newTx.account, JSON.stringify(newTx.tags), newTx.createdAt]
-      ).catch(e => console.error('[Supabase PostgreSQL] Relational Tx sync error:', e.message));
+      );
     }
 
     return newTx;
@@ -609,12 +638,14 @@ export const dbEngine = {
 
     if (pgPool) {
       const tx = db.transactions[index];
-      pgPool.query(
+      executeProcedureOrQuery(
+        'SELECT public.sp_update_wealthpulse_transaction($1, $2, $3, $4, $5, $6, $7, $8)',
+        [tx.id, tx.merchant, tx.amount, tx.type, tx.date, tx.category, tx.account, JSON.stringify(tx.tags)],
         `UPDATE public.wealthpulse_transactions
          SET merchant = $1, amount = $2, type = $3, date = $4, category = $5, account = $6, tags = $7
          WHERE id = $8`,
         [tx.merchant, tx.amount, tx.type, tx.date, tx.category, tx.account, JSON.stringify(tx.tags), tx.id]
-      ).catch(e => console.error('[Supabase PostgreSQL] Relational Tx update error:', e.message));
+      );
     }
 
     return db.transactions[index];
