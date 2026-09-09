@@ -351,6 +351,13 @@ export const dbEngine = {
 
     user.mpinHash = bcrypt.hashSync(mpin, 10);
     saveDb();
+
+    if (pgPool) {
+      pgPool.query(
+        'UPDATE public.wealthpulse_users SET mpin_hash = $1 WHERE id = $2',
+        [user.mpinHash, user.id]
+      ).catch(e => console.error('[Supabase PostgreSQL] User MPIN sync error:', e.message));
+    }
     return true;
   },
 
