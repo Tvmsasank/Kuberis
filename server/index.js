@@ -710,6 +710,22 @@ app.post('/api/auth/mpin/verify', async (req, res) => {
     // Reset failed attempts on success
     dbUser.failedMpinAttempts = 0;
 
+    // Check if Google Authenticator 2FA is enabled
+    const twoFactorDetails = dbEngine.getUserTwoFactorSecret(user.id);
+    if (twoFactorDetails && twoFactorDetails.enabled) {
+      const tempToken = jwt.sign(
+        { tempUserId: user.id, email: user.email, rememberMe: true },
+        JWT_SECRET,
+        { expiresIn: '10m' }
+      );
+      return res.json({
+        require2FA: true,
+        message: 'Google Authenticator 2FA verification required',
+        tempToken,
+        email: user.email
+      });
+    }
+
     const token = jwt.sign(
       { userId: user.id, email: user.email },
       JWT_SECRET,
@@ -750,6 +766,22 @@ app.post('/api/auth/webauthn/verify', (req, res) => {
     const user = dbEngine.verifyWebAuthnCredential({ credentialId });
     if (!user) {
       return res.status(401).json({ error: 'Biometric verification failed' });
+    }
+
+    // Check if Google Authenticator 2FA is enabled
+    const twoFactorDetails = dbEngine.getUserTwoFactorSecret(user.id);
+    if (twoFactorDetails && twoFactorDetails.enabled) {
+      const tempToken = jwt.sign(
+        { tempUserId: user.id, email: user.email, rememberMe: true },
+        JWT_SECRET,
+        { expiresIn: '10m' }
+      );
+      return res.json({
+        require2FA: true,
+        message: 'Google Authenticator 2FA verification required',
+        tempToken,
+        email: user.email
+      });
     }
 
     const token = jwt.sign(

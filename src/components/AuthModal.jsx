@@ -165,6 +165,14 @@ export default function AuthModal({
 
       localStorage.setItem('wealthpulse_remembered_email', targetEmail);
       localStorage.setItem('wealthpulse_has_mpin', 'true');
+
+      if (json.require2FA) {
+        setTotpTempToken(json.tempToken);
+        setAuthMethod('2fa_challenge');
+        setSuccess('Google Authenticator 2FA verification required');
+        return;
+      }
+
       setSuccess('MPIN Verified! Logging in...');
       setTimeout(() => {
         onLoginSuccess(json.user, json.token, true);
