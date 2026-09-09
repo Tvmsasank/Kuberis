@@ -156,8 +156,8 @@ app.post('/api/auth/2fa/setup', authenticateToken, async (req, res) => {
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const secret = speakeasy.generateSecret({
-      name: `WealthPulse (${user.email})`,
-      issuer: 'WealthPulse Security'
+      name: `Kuberis (${user.email})`,
+      issuer: 'Kuberis Security'
     });
 
     dbEngine.setTempTwoFactorSecret(user.id, secret.base32);
@@ -348,13 +348,13 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
       });
       const data = await res.json();
       if (res.ok && (data.success || data.id || data.status === 'success')) {
-        console.log(`[WealthPulse Email] Successfully delivered email to ${to} via Google Apps Script HTTPS Bridge.`);
+        console.log(`[Kuberis Email] Successfully delivered email to ${to} via Google Apps Script HTTPS Bridge.`);
         return true;
       } else {
-        console.warn(`[WealthPulse Email] Google Apps Script returned status ${res.status}:`, data);
+        console.warn(`[Kuberis Email] Google Apps Script returned status ${res.status}:`, data);
       }
     } catch (e) {
-      console.warn('[WealthPulse Email] Google Apps Script HTTPS transport failed:', e.message);
+      console.warn('[Kuberis Email] Google Apps Script HTTPS transport failed:', e.message);
     }
   }
 
@@ -368,7 +368,7 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
           'Authorization': `Bearer ${resendKey}`
         },
         body: JSON.stringify({
-          from: `WealthPulse Security <onboarding@resend.dev>`,
+          from: `Kuberis Security <onboarding@resend.dev>`,
           to: [to.trim()],
           subject,
           text: text || '',
@@ -377,13 +377,13 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
       });
       const data = await res.json();
       if (res.ok && (data.id || data.status === 'success')) {
-        console.log(`[WealthPulse Email] Successfully delivered email to ${to} via Resend HTTPS API. ID: ${data.id}`);
+        console.log(`[Kuberis Email] Successfully delivered email to ${to} via Resend HTTPS API. ID: ${data.id}`);
         return true;
       } else {
-        console.warn(`[WealthPulse Email] Resend API returned status ${res.status}:`, data);
+        console.warn(`[Kuberis Email] Resend API returned status ${res.status}:`, data);
       }
     } catch (e) {
-      console.warn('[WealthPulse Email] Resend HTTPS API transport failed:', e.message);
+      console.warn('[Kuberis Email] Resend HTTPS API transport failed:', e.message);
     }
   }
 
@@ -398,7 +398,7 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
           'api-key': brevoKey
         },
         body: JSON.stringify({
-          sender: { name: 'WealthPulse Security', email: user },
+          sender: { name: 'Kuberis Security', email: user },
           to: [{ email: to.trim() }],
           subject,
           htmlContent: html,
@@ -407,16 +407,16 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
       });
       const data = await res.json();
       if (res.ok && (data.messageId || data.messageIds)) {
-        console.log(`[WealthPulse Email] Successfully delivered email to ${to} via Brevo HTTPS API.`);
+        console.log(`[Kuberis Email] Successfully delivered email to ${to} via Brevo HTTPS API.`);
         return true;
       }
     } catch (e) {
-      console.warn('[WealthPulse Email] Brevo HTTPS API transport failed:', e.message);
+      console.warn('[Kuberis Email] Brevo HTTPS API transport failed:', e.message);
     }
   }
 
   if (!user || !pass || !to) {
-    console.error('[WealthPulse Email Error] Missing SMTP credentials or recipient email');
+    console.error('[Kuberis Email Error] Missing SMTP credentials or recipient email');
     return false;
   }
 
@@ -434,16 +434,16 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
       socketTimeout: 20000
     });
     const info = await transporter.sendMail({
-      from: `"WealthPulse Security" <${user}>`,
+      from: `"Kuberis Security" <${user}>`,
       to: to.trim(),
       subject,
       text: text || '',
       html
     });
-    console.log(`[WealthPulse Email] Successfully delivered email to ${to} via Gmail Service. MessageId: ${info.messageId}`);
+    console.log(`[Kuberis Email] Successfully delivered email to ${to} via Gmail Service. MessageId: ${info.messageId}`);
     return true;
   } catch (err1) {
-    console.warn(`[WealthPulse Email] Primary Gmail transport failed (${err1.message}). Trying Direct SSL transport...`);
+    console.warn(`[Kuberis Email] Primary Gmail transport failed (${err1.message}). Trying Direct SSL transport...`);
   }
 
   // Attempt 5: Direct SMTP SSL (port 465)
@@ -462,16 +462,16 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
       socketTimeout: 20000
     });
     const info = await transporter.sendMail({
-      from: `"WealthPulse Security" <${user}>`,
+      from: `"Kuberis Security" <${user}>`,
       to: to.trim(),
       subject,
       text: text || '',
       html
     });
-    console.log(`[WealthPulse Email] Successfully delivered email to ${to} via SSL 465. MessageId: ${info.messageId}`);
+    console.log(`[Kuberis Email] Successfully delivered email to ${to} via SSL 465. MessageId: ${info.messageId}`);
     return true;
   } catch (err2) {
-    console.warn(`[WealthPulse Email] SSL transport failed (${err2.message}). Trying STARTTLS 587...`);
+    console.warn(`[Kuberis Email] SSL transport failed (${err2.message}). Trying STARTTLS 587...`);
   }
 
   // Attempt 6: Direct SMTP TLS on port 587
@@ -491,33 +491,33 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
       socketTimeout: 20000
     });
     const info = await transporter.sendMail({
-      from: `"WealthPulse Security" <${user}>`,
+      from: `"Kuberis Security" <${user}>`,
       to: to.trim(),
       subject,
       text: text || '',
       html
     });
-    console.log(`[WealthPulse Email] Successfully delivered email to ${to} via Port 587. MessageId: ${info.messageId}`);
+    console.log(`[Kuberis Email] Successfully delivered email to ${to} via Port 587. MessageId: ${info.messageId}`);
     return true;
   } catch (err3) {
-    console.error(`[WealthPulse Email Error] All SMTP transports failed: ${err3.message}`);
+    console.error(`[Kuberis Email Error] All SMTP transports failed: ${err3.message}`);
     return false;
   }
 }
 
 async function sendResetEmail(toEmail, resetUrl) {
-  const subject = 'Reset Your WealthPulse Password';
-  const text = `You requested a password reset for your WealthPulse account (${toEmail}).\n\nClick the link below to reset your password:\n${resetUrl}\n\nIf you did not request this, you can safely ignore this email. This link will expire in 1 hour.`;
+  const subject = 'Reset Your Kuberis Password';
+  const text = `You requested a password reset for your Kuberis account (${toEmail}).\n\nClick the link below to reset your password:\n${resetUrl}\n\nIf you did not request this, you can safely ignore this email. This link will expire in 1 hour.`;
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 28px; border: 1px solid #10B981; border-radius: 18px; background: #040D1A; color: #FFFFFF;">
       <div style="text-align: center; margin-bottom: 24px;">
-        <h2 style="color: #10B981; margin: 0 0 6px 0; font-size: 24px; font-weight: 800;">⚡ WealthPulse</h2>
+        <h2 style="color: #10B981; margin: 0 0 6px 0; font-size: 24px; font-weight: 800;">⚡ Kuberis</h2>
         <div style="font-size: 13px; color: #94A3B8;">Real-Time Personal Wealth OS</div>
       </div>
 
       <h3 style="color: #FFFFFF; margin-top: 0; font-size: 18px;">Password Reset Request</h3>
       <p style="color: #CBD5E1; font-size: 14px; line-height: 1.6;">
-        You requested a password reset for your WealthPulse account (<strong>${toEmail}</strong>).
+        You requested a password reset for your Kuberis account (<strong>${toEmail}</strong>).
       </p>
 
       <div style="text-align: center; margin: 32px 0;">
@@ -537,15 +537,15 @@ async function sendResetEmail(toEmail, resetUrl) {
 
 async function sendMpinResetEmail(toEmail, resetMpinUrl, isLocked = false) {
   const subject = isLocked 
-    ? 'WealthPulse Security Alert: Account Locked' 
-    : 'Reset Your WealthPulse 4-Digit MPIN';
+    ? 'Kuberis Security Alert: Account Locked' 
+    : 'Reset Your Kuberis 4-Digit MPIN';
   const text = isLocked
-    ? `Your WealthPulse account (${toEmail}) was locked due to incorrect MPIN attempts.\n\nReset link: ${resetMpinUrl}\n\nLink expires in 1 hour.`
-    : `You requested to reset your 4-digit MPIN for WealthPulse (${toEmail}).\n\nReset link: ${resetMpinUrl}\n\nLink expires in 1 hour.`;
+    ? `Your Kuberis account (${toEmail}) was locked due to incorrect MPIN attempts.\n\nReset link: ${resetMpinUrl}\n\nLink expires in 1 hour.`
+    : `You requested to reset your 4-digit MPIN for Kuberis (${toEmail}).\n\nReset link: ${resetMpinUrl}\n\nLink expires in 1 hour.`;
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 28px; border: 1px solid #10B981; border-radius: 18px; background: #040D1A; color: #FFFFFF;">
       <div style="text-align: center; margin-bottom: 24px;">
-        <h2 style="color: #10B981; margin: 0 0 6px 0; font-size: 24px; font-weight: 800;">⚡ WealthPulse</h2>
+        <h2 style="color: #10B981; margin: 0 0 6px 0; font-size: 24px; font-weight: 800;">⚡ Kuberis</h2>
         <div style="font-size: 13px; color: #94A3B8;">Real-Time Personal Wealth OS</div>
       </div>
 
@@ -554,8 +554,8 @@ async function sendMpinResetEmail(toEmail, resetMpinUrl, isLocked = false) {
       </h3>
       <p style="color: #CBD5E1; font-size: 14px; line-height: 1.6;">
         ${isLocked 
-          ? `Your WealthPulse account (<strong>${toEmail}</strong>) was temporarily locked due to multiple incorrect MPIN attempts. Click below to verify your identity and set a new MPIN.` 
-          : `You requested to reset the 4-digit MPIN for your WealthPulse account (<strong>${toEmail}</strong>).`}
+          ? `Your Kuberis account (<strong>${toEmail}</strong>) was temporarily locked due to multiple incorrect MPIN attempts. Click below to verify your identity and set a new MPIN.` 
+          : `You requested to reset the 4-digit MPIN for your Kuberis account (<strong>${toEmail}</strong>).`}
       </p>
 
       <div style="text-align: center; margin: 32px 0;">
@@ -1563,5 +1563,5 @@ if (fs.existsSync(DIST_DIR)) {
 }
 
 app.listen(PORT, () => {
-  console.log(`[WealthPulse] API Server running on port ${PORT}`);
+  console.log(`[Kuberis] API Server running on port ${PORT}`);
 });

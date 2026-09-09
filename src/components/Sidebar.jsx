@@ -40,8 +40,8 @@ export default function Sidebar({ activeTab, onSelectTab }) {
           onClick={() => onSelectTab('home')}
           title="Go to Home / Landing Page"
         >
-          <img src="/favicon.svg" alt="WealthPulse" style={{ width: '30px', height: '30px', filter: 'drop-shadow(0 0 8px var(--primary-glow))' }} />
-          <span>WealthPulse</span>
+          <img src="/favicon.svg" alt="Kuberis" style={{ width: '30px', height: '30px', filter: 'drop-shadow(0 0 8px var(--primary-glow))' }} />
+          <span>Kuberis</span>
         </button>
       </div>
 

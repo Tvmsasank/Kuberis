@@ -40,12 +40,12 @@ export default function LandingPage({
 
   const FAQS = [
     {
-      q: 'What is WealthPulse and how does it work?',
-      a: 'WealthPulse is an all-in-one personal finance and investment operating system built for India. It unifies live stock market tracking (NSE/BSE), AMFI mutual fund NAVs, multi-bank UPI cash flow, automated budgets, and goal planning in ₹ (INR).'
+      q: 'What is Kuberis and how does it work?',
+      a: 'Kuberis is an all-in-one personal finance and investment operating system built for India. It unifies live stock market tracking (NSE/BSE), AMFI mutual fund NAVs, multi-bank UPI cash flow, automated budgets, and goal planning in ₹ (INR).'
     },
     {
-      q: 'How does WealthPulse track live stock and mutual fund prices?',
-      a: 'WealthPulse connects directly to live Yahoo Finance market APIs for Indian equities (e.g. RELIANCE, TCS, INFY) and official AMFI India APIs for daily mutual fund NAVs, calculating your live unrealized gains and portfolio net worth automatically.'
+      q: 'How does Kuberis track live stock and mutual fund prices?',
+      a: 'Kuberis connects directly to live Yahoo Finance market APIs for Indian equities (e.g. RELIANCE, TCS, INFY) and official AMFI India APIs for daily mutual fund NAVs, calculating your live unrealized gains and portfolio net worth automatically.'
     },
     {
       q: 'Is my financial data secure and private?',
@@ -53,14 +53,14 @@ export default function LandingPage({
     },
     {
       q: 'Can I log in using Face ID, Fingerprint, or a 4-Digit MPIN?',
-      a: 'Yes! WealthPulse supports passwordless biometric logins via your phone/laptop sensor (Touch ID, Face ID, Windows Hello) and a fast numeric 4-digit MPIN for 1-second unlocking.'
+      a: 'Yes! Kuberis supports passwordless biometric logins via your phone/laptop sensor (Touch ID, Face ID, Windows Hello) and a fast numeric 4-digit MPIN for 1-second unlocking.'
     },
     {
       q: 'Does it support Google Drive cloud backup?',
-      a: 'Yes! WealthPulse includes native Google Drive inbox integration. Simply upload PDF bank statements or receipts to your dedicated Google Drive folder, and WealthPulse synchronizes them securely.'
+      a: 'Yes! Kuberis includes native Google Drive inbox integration. Simply upload PDF bank statements or receipts to your dedicated Google Drive folder, and Kuberis synchronizes them securely.'
     },
     {
-      q: 'Is WealthPulse free to use?',
+      q: 'Is Kuberis free to use?',
       a: 'Yes! All core features including stock portfolios, mutual fund NAV trackers, UPI SMS logging, budget envelopes, and biometric passkeys are 100% free.'
     }
   ];
@@ -304,7 +304,7 @@ export default function LandingPage({
             </div>
             <h3 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '8px' }}>Google Drive Cloud Sync</h3>
             <p style={{ fontSize: '13.5px', color: 'var(--text-muted)', lineHeight: '1.6' }}>
-              Automated daily backup and statement ingestion from your private Google Drive folder ("WealthPulse Financial Inbox") combined with Supabase PostgreSQL cloud persistence.
+              Automated daily backup and statement ingestion from your private Google Drive folder ("Kuberis Financial Inbox") combined with Supabase PostgreSQL cloud persistence.
             </p>
           </div>
         </div>
@@ -356,7 +356,7 @@ export default function LandingPage({
           </h2>
 
           <p style={{ fontSize: '14px', color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '24px' }}>
-            Your privacy is our priority. WealthPulse operates on a non-custodial architecture — we never store your netbanking passwords or debit card PINs. All data is encrypted and isolated per user in Supabase PostgreSQL.
+            Your privacy is our priority. Kuberis operates on a non-custodial architecture — we never store your netbanking passwords or debit card PINs. All data is encrypted and isolated per user in Supabase PostgreSQL.
           </p>
 
           <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', flexWrap: 'wrap', fontSize: '12px', fontWeight: '700', color: 'var(--text-main)' }}>
@@ -465,11 +465,11 @@ export default function LandingPage({
       {/* 📄 FOOTER */}
       <footer style={{ marginTop: '60px', paddingTop: '24px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', fontSize: '12px', color: 'var(--text-muted)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <img src="/favicon.svg" alt="WealthPulse" style={{ width: '22px', height: '22px' }} />
-          <span style={{ fontWeight: '800', color: 'var(--text-main)' }}>WealthPulse Financial OS</span> • Built with React & Node.js
+          <img src="/favicon.svg" alt="Kuberis" style={{ width: '22px', height: '22px' }} />
+          <span style={{ fontWeight: '800', color: 'var(--text-main)' }}>Kuberis Financial OS</span> • Built with React & Node.js
         </div>
         <div>
-          © {new Date().getFullYear()} WealthPulse. All rights reserved. Real-time Indian Financial Intelligence.
+          © {new Date().getFullYear()} Kuberis. All rights reserved. Real-time Indian Financial Intelligence.
         </div>
       </footer>
     </div>

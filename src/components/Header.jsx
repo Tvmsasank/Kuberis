@@ -209,9 +209,9 @@ export default function Header({
         <div className="page-title-area" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {!user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <img src="/favicon.svg" alt="WealthPulse" style={{ width: '28px', height: '28px', filter: 'drop-shadow(0 0 8px var(--primary-glow))' }} />
+              <img src="/favicon.svg" alt="Kuberis" style={{ width: '28px', height: '28px', filter: 'drop-shadow(0 0 8px var(--primary-glow))' }} />
               <span style={{ fontSize: '18px', fontWeight: '900', letterSpacing: '-0.5px', color: 'var(--text-main)' }}>
-                WealthPulse
+                Kuberis
               </span>
             </div>
           ) : (
