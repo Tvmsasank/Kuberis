@@ -225,6 +225,7 @@ export default function MpinModal({
   };
 
   const getHeaderTitle = () => {
+    if (isResetTokenMode) return 'Reset 4-Digit Security MPIN';
     if (mode === 'verify') return '4-Digit MPIN Authentication';
     if (stage === 'verify_current') return 'Verify Current 4-Digit MPIN';
     if (stage === 'confirm_new') return 'Confirm New 4-Digit MPIN';
@@ -233,6 +234,10 @@ export default function MpinModal({
   };
 
   const getSubtitle = () => {
+    if (isResetTokenMode) {
+      if (stage === 'confirm_new') return 'Re-type your new 4-digit PIN to confirm reset';
+      return 'Enter a new 4-digit security PIN for your account';
+    }
     if (mode === 'verify') return `Type or tap your 4-digit MPIN for ${email || 'your account'}`;
     if (stage === 'verify_current') return 'Type your existing 4-digit MPIN to authorize change';
     if (stage === 'enter_new') return 'Type your new 4-digit security PIN';

@@ -274,7 +274,7 @@ export default function UserProfileModal({
                 {user.hasMpin ? 'Change' : 'Set MPIN'}
               </button>
               {user.hasMpin && (
-                <button type="button" className="btn btn-sm" style={{ fontSize: '11px', fontWeight: '700', padding: '6px 10px', color: '#F87171', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.08)' }} onClick={handleRequestMpinReset}>
+                <button type="button" className="btn btn-sm" style={{ fontSize: '11px', fontWeight: '700', padding: '6px 10px', color: '#F87171', borderRadius: '12px', border: '1px solid rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.08)' }} onClick={() => { onClose(); onOpenMpinModal('set'); }}>
                   Reset
                 </button>
               )}
