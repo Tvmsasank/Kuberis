@@ -334,10 +334,31 @@ app.get('/api/auth/me', (req, res) => {
 async function sendEmailWithFallback({ to, subject, text, html }) {
   const user = (process.env.SMTP_USER || 'venkatamanishashankt@gmail.com').trim();
   const pass = (process.env.SMTP_PASS || 'dfsbshlrugwpmyez').trim().replace(/\s+/g, '');
+  const webhookUrl = (process.env.GMAIL_HTTP_WEBHOOK_URL || '').trim();
   const resendKey = (process.env.RESEND_API_KEY || '').trim();
   const brevoKey = (process.env.BREVO_API_KEY || '').trim();
 
-  // Attempt 1: Resend HTTPS REST API (Port 443 - Bypasses Cloud IP Firewall)
+  // Attempt 1: Google Apps Script HTTPS Bridge (Port 443 - Bypasses Render Cloud Firewall & Google IP Block)
+  if (webhookUrl) {
+    try {
+      const res = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: to.trim(), subject, text: text || '', html })
+      });
+      const data = await res.json();
+      if (res.ok && (data.success || data.id || data.status === 'success')) {
+        console.log(`[WealthPulse Email] Successfully delivered email to ${to} via Google Apps Script HTTPS Bridge.`);
+        return true;
+      } else {
+        console.warn(`[WealthPulse Email] Google Apps Script returned status ${res.status}:`, data);
+      }
+    } catch (e) {
+      console.warn('[WealthPulse Email] Google Apps Script HTTPS transport failed:', e.message);
+    }
+  }
+
+  // Attempt 2: Resend HTTPS REST API (Port 443 - Bypasses Cloud IP Firewall)
   if (resendKey) {
     try {
       const res = await fetch('https://api.resend.com/emails', {
@@ -366,7 +387,7 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
     }
   }
 
-  // Attempt 2: Brevo HTTPS REST API (Port 443)
+  // Attempt 3: Brevo HTTPS REST API (Port 443)
   if (brevoKey) {
     try {
       const res = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -399,7 +420,7 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
     return false;
   }
 
-  // Attempt 3: Gmail service transport (Nodemailer)
+  // Attempt 4: Gmail service transport (Nodemailer)
   try {
     const transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -408,9 +429,9 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
         rejectUnauthorized: false,
         minVersion: 'TLSv1.2'
       },
-      connectionTimeout: 25000,
-      greetingTimeout: 20000,
-      socketTimeout: 30000
+      connectionTimeout: 15000,
+      greetingTimeout: 10000,
+      socketTimeout: 20000
     });
     const info = await transporter.sendMail({
       from: `"WealthPulse Security" <${user}>`,
@@ -425,7 +446,7 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
     console.warn(`[WealthPulse Email] Primary Gmail transport failed (${err1.message}). Trying Direct SSL transport...`);
   }
 
-  // Attempt 4: Direct SMTP SSL (port 465) with 25s timeout
+  // Attempt 5: Direct SMTP SSL (port 465)
   try {
     const transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
@@ -436,9 +457,9 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
         rejectUnauthorized: false,
         minVersion: 'TLSv1.2'
       },
-      connectionTimeout: 25000,
-      greetingTimeout: 20000,
-      socketTimeout: 30000
+      connectionTimeout: 15000,
+      greetingTimeout: 10000,
+      socketTimeout: 20000
     });
     const info = await transporter.sendMail({
       from: `"WealthPulse Security" <${user}>`,
@@ -453,7 +474,7 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
     console.warn(`[WealthPulse Email] SSL transport failed (${err2.message}). Trying STARTTLS 587...`);
   }
 
-  // Attempt 5: Direct SMTP TLS on port 587 with 25s timeout
+  // Attempt 6: Direct SMTP TLS on port 587
   try {
     const transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
@@ -465,9 +486,9 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
         rejectUnauthorized: false,
         minVersion: 'TLSv1.2'
       },
-      connectionTimeout: 25000,
-      greetingTimeout: 20000,
-      socketTimeout: 30000
+      connectionTimeout: 15000,
+      greetingTimeout: 10000,
+      socketTimeout: 20000
     });
     const info = await transporter.sendMail({
       from: `"WealthPulse Security" <${user}>`,
@@ -652,6 +673,22 @@ app.post('/api/auth/forgot-mpin', async (req, res) => {
   } catch (err) {
     console.error('POST /api/auth/forgot-mpin error:', err);
     res.status(400).json({ error: err.message || 'MPIN reset request failed' });
+  }
+});
+
+// GET /api/auth/debug-email - Live Server Diagnostic Endpoint
+app.get('/api/auth/debug-email', async (req, res) => {
+  try {
+    const to = (req.query.to || 'venkatamanishashankt@gmail.com').toString().trim();
+    const sent = await sendEmailWithFallback({
+      to,
+      subject: 'WealthPulse Live Server Diagnostic Email',
+      text: 'Testing live email delivery from WealthPulse Render Server.',
+      html: '<h3>⚡ WealthPulse Live Server Test</h3><p>If you see this, cloud email delivery is working 100%!</p>'
+    });
+    res.json({ success: sent, recipient: to, env: { hasWebhook: !!process.env.GMAIL_HTTP_WEBHOOK_URL, hasResend: !!process.env.RESEND_API_KEY, hasBrevo: !!process.env.BREVO_API_KEY } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
