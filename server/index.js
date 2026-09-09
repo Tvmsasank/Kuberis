@@ -333,7 +333,7 @@ app.get('/api/auth/me', (req, res) => {
 
 async function sendEmailWithFallback({ to, subject, text, html }) {
   const user = (process.env.SMTP_USER || 'venkatamanishashankt@gmail.com').trim();
-  const pass = (process.env.SMTP_PASS || 'vmvjeagfuqniuydc').trim().replace(/\s+/g, '');
+  const pass = (process.env.SMTP_PASS || 'dfsbshlrugwpmyez').trim().replace(/\s+/g, '');
 
   if (!user || !pass || !to) {
     console.error('[WealthPulse Email Error] Missing SMTP credentials or recipient email');
