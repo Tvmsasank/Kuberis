@@ -439,20 +439,20 @@ export default function DashboardTab({
           )}
         </div>
 
-        {/* WealthPulse Insights & Coming Up */}
+        {/* Kuberis Insights & Coming Up */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* WealthPulse Insight Panel */}
+          {/* Kuberis Insight Panel */}
           <div className="card card-navy">
-            <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '8px', color: 'white' }}>
-              WealthPulse Insight
+            <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '8px', color: 'white' }}>
+              Kuberis Insight
             </h3>
             {needsReviewCount > 0 ? (
-              <div style={{ fontSize: '14px', color: '#CBD5E1', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <AlertCircle size={18} style={{ color: '#F97316' }} />
-                <span>You have <strong>{needsReviewCount}</strong> transactions flagged as <em>Needs review</em>. Review them in Transactions.</span>
+              <div style={{ fontSize: '13px', color: '#CBD5E1', display: 'flex', alignItems: 'flex-start', gap: '8px', lineHeight: '1.4' }}>
+                <AlertCircle size={18} style={{ color: '#F97316', flexShrink: 0, marginTop: '2px' }} />
+                <span>You have <strong>{needsReviewCount}</strong> transaction{needsReviewCount > 1 ? 's' : ''} flagged as <em>Needs review</em>. Review them in the Transactions tab.</span>
               </div>
             ) : (
-              <div style={{ fontSize: '14px', color: '#CBD5E1' }}>
+              <div style={{ fontSize: '13px', color: '#CBD5E1' }}>
                 All saved transactions have assigned categories. Excellent organization!
               </div>
             )}

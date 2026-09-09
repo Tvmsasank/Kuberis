@@ -56,7 +56,7 @@ export default function HomeTab({ onNavigateTab, onOpenRegister, user }) {
         </h1>
 
         <p style={{ fontSize: '16px', color: 'var(--text-muted)', maxWidth: '720px', margin: '0 auto 32px auto', lineHeight: '1.6' }}>
-          WealthPulse tracks live NSE/BSE stock prices and AMFI mutual fund NAVs every 3 seconds, automates bank statement imports, calculates accurate net worth, and secures your wealth in <strong>₹ (INR)</strong>.
+          Kuberis tracks live NSE/BSE stock prices and AMFI mutual fund NAVs every 3 seconds, automates bank statement imports, calculates accurate net worth, and secures your wealth in <strong>₹ (INR)</strong>.
         </p>
 
         <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', flexWrap: 'wrap' }}>
@@ -78,7 +78,7 @@ export default function HomeTab({ onNavigateTab, onOpenRegister, user }) {
 
       {/* 💡 Feature Cards Grid */}
       <h2 style={{ fontSize: '22px', fontWeight: '800', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <Zap style={{ color: 'var(--primary)' }} /> Why WealthPulse?
+        <Zap style={{ color: 'var(--primary)' }} /> Why Kuberis?
       </h2>
 
       <div className="grid-3" style={{ marginBottom: '36px' }}>
@@ -119,7 +119,7 @@ export default function HomeTab({ onNavigateTab, onOpenRegister, user }) {
       {/* 📖 How To Use Guide */}
       <div className="card" style={{ padding: '32px', marginBottom: '32px' }}>
         <h2 style={{ fontSize: '22px', fontWeight: '800', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <CheckCircle2 style={{ color: 'var(--primary)' }} /> How To Use WealthPulse in 3 Easy Steps
+          <CheckCircle2 style={{ color: 'var(--primary)' }} /> How To Use Kuberis in 3 Easy Steps
         </h2>
 
         <div className="grid-3" style={{ gap: '20px' }}>

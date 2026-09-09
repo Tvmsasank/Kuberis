@@ -693,8 +693,13 @@ select.form-control option {
 }
 
 @media (max-width: 768px) {
+  html, body, #root, .app-container, .main-content {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+  }
+
   .sidebar { display: none; }
-  .main-content { margin-left: 0; width: 100%; }
+  .main-content { margin-left: 0; width: 100%; max-width: 100vw; }
   
   /* Compact 2x2 Grid for 4 Summary Cards on Mobile */
   .grid-4 {
@@ -711,13 +716,25 @@ select.form-control option {
   .card {
     padding: 16px 14px;
     border-radius: 16px;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
   }
 
   .desktop-table-view { display: none; }
-  .mobile-cards-view { display: block; }
+  .mobile-cards-view {
+    display: block;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .mobile-cards-view > div {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
 
   .page-body {
-    padding: 14px 14px 84px 14px;
+    padding: 12px 12px 96px 12px;
   }
 
   .top-bar {
@@ -793,6 +810,10 @@ select.form-control option {
 
   .grid-4 .card span[style*="font-size: 13px"] {
     font-size: 11px !important;
+  }
+
+  .page-body {
+    padding: 10px 10px 96px 10px !important;
   }
 }
 
