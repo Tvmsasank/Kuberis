@@ -193,8 +193,31 @@ export default function ForgotPasswordModal({ isOpen, onClose, onOpenLogin, onLo
             </div>
 
             <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '12px' }} disabled={loading}>
-              {loading ? 'Sending Email Link...' : 'Send Password Reset Link'}
+              {loading ? 'Generating Reset Link...' : 'Send Password Reset Link'}
             </button>
+
+            {resetToken && (
+              <button
+                type="button"
+                className="btn btn-success"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  fontSize: '14px',
+                  fontWeight: '800',
+                  marginTop: '12px',
+                  background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                  color: '#000000',
+                  border: 'none',
+                  borderRadius: '12px',
+                  boxShadow: '0 4px 16px rgba(16, 185, 129, 0.4)',
+                  cursor: 'pointer'
+                }}
+                onClick={() => setStep(2)}
+              >
+                ⚡ Reset Password Right Now →
+              </button>
+            )}
           </form>
         ) : (
           <form onSubmit={handleResetPassword}>
