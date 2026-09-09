@@ -39,13 +39,15 @@ import { CheckCircle2, FolderSync, X, Shield, Lock, UserPlus, LogIn, Fingerprint
 
 const getInitialTab = () => {
   try {
-    const hash = window.location.hash.replace('#/', '').replace('#', '').trim();
+    const rawPath = window.location.pathname.replace('/', '').trim();
+    const rawHash = window.location.hash.replace('#/', '').replace('#', '').trim();
+    const currentTab = rawPath || rawHash;
     const validTabs = [
       'home', 'dashboard', 'investments', 'transactions', 'calculators',
       'recurring', 'subscriptions', 'budgets', 'goals', 'documents', 'rules', 'settings'
     ];
-    if (hash && validTabs.includes(hash)) {
-      return hash;
+    if (currentTab && validTabs.includes(currentTab)) {
+      return currentTab;
     }
     const savedTab = localStorage.getItem('wealthpulse_active_tab');
     if (savedTab && validTabs.includes(savedTab)) {
@@ -119,29 +121,38 @@ export default function App() {
     }
   }, []);
 
-  // Sync activeTab state to URL Hash & LocalStorage
+  // Sync activeTab state to clean URL Path & LocalStorage (Removes # from URL)
   useEffect(() => {
     if (activeTab) {
-      window.location.hash = '#/' + activeTab;
+      const targetPath = activeTab === 'home' ? '/' : '/' + activeTab;
+      if (window.location.pathname !== targetPath) {
+        window.history.pushState(null, '', targetPath);
+      }
       localStorage.setItem('wealthpulse_active_tab', activeTab);
     }
   }, [activeTab]);
 
-  // Handle Browser Back/Forward buttons and Hash changes
+  // Handle Browser Back/Forward buttons and URL changes
   useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash.replace('#/', '').replace('#', '').trim();
+    const handleUrlChange = () => {
+      const rawPath = window.location.pathname.replace('/', '').trim();
+      const rawHash = window.location.hash.replace('#/', '').replace('#', '').trim();
+      const currentTab = rawPath || rawHash;
       const validTabs = [
         'home', 'dashboard', 'investments', 'transactions', 'calculators',
         'recurring', 'subscriptions', 'budgets', 'goals', 'documents', 'rules', 'settings'
       ];
-      if (hash && validTabs.includes(hash)) {
-        setActiveTab(hash);
+      if (currentTab && validTabs.includes(currentTab)) {
+        setActiveTab(currentTab);
       }
     };
 
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('hashchange', handleUrlChange);
+    };
   }, []);
 
   // Cross-Tab Multi-Session Synchronization
