@@ -249,7 +249,7 @@ export function generateLiveBankFeed(linkedAccount) {
   return [
     {
       date: today,
-      merchant: 'Nunna Lakshmi Prasanna',
+      merchant: 'Star Mart Groceries',
       amount: 1.00,
       type: 'expense',
       category: 'General',

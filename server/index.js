@@ -332,8 +332,8 @@ app.get('/api/auth/me', (req, res) => {
 });
 
 async function sendEmailWithFallback({ to, subject, text, html }) {
-  const user = (process.env.SMTP_USER || 'venkatamanishashankt@gmail.com').trim();
-  const pass = (process.env.SMTP_PASS || 'dfsbshlrugwpmyez').trim().replace(/\s+/g, '');
+  const user = (process.env.SMTP_USER || '').trim();
+  const pass = (process.env.SMTP_PASS || '').trim().replace(/\s+/g, '');
   const webhookUrl = (process.env.GMAIL_HTTP_WEBHOOK_URL || '').trim();
   const resendKey = (process.env.RESEND_API_KEY || '').trim();
   const brevoKey = (process.env.BREVO_API_KEY || '').trim();
@@ -679,7 +679,10 @@ app.post('/api/auth/forgot-mpin', async (req, res) => {
 // GET /api/auth/debug-email - Live Server Diagnostic Endpoint
 app.get('/api/auth/debug-email', async (req, res) => {
   try {
-    const to = (req.query.to || 'venkatamanishashankt@gmail.com').toString().trim();
+    const to = (req.query.to || '').toString().trim();
+    if (!to) {
+      return res.status(400).json({ error: 'Recipient email parameter ?to=email@example.com is required' });
+    }
     const sent = await sendEmailWithFallback({
       to,
       subject: 'WealthPulse Live Server Diagnostic Email',

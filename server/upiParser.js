@@ -164,7 +164,7 @@ export function parseUpiTransactionText(text = '') {
     const match = raw.match(mPattern);
     if (match && match[1]) {
       let candidate = match[1].trim();
-      // If candidate is a VPA like "nunnalakshmiprasanna-2@okhdfcbank", clean it into readable name
+      // If candidate is a VPA like "merchant-name-2@okhdfcbank", clean it into readable name
       if (candidate.includes('@')) {
         candidate = candidate.split('@')[0].replace(/[-_0-9]+/g, ' ').trim();
       }
