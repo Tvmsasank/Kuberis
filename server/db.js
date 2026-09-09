@@ -239,6 +239,7 @@ export const dbEngine = {
       name: user.name,
       email: user.email,
       hasMpin: !!user.mpinHash,
+      twoFactorEnabled: !!user.twoFactorEnabled,
       createdAt: user.createdAt
     };
   },
@@ -258,8 +259,69 @@ export const dbEngine = {
       name: user.name,
       email: user.email,
       createdAt: user.createdAt,
-      hasMpin: !!user.mpinHash
+      hasMpin: !!user.mpinHash,
+      twoFactorEnabled: !!user.twoFactorEnabled
     };
+  },
+
+  setTempTwoFactorSecret(userId, tempSecret) {
+    const db = loadDb();
+    const user = db.users.find(u => u.id === userId);
+    if (!user) throw new Error('User not found');
+    user.twoFactorTempSecret = tempSecret;
+    saveDb();
+    return true;
+  },
+
+  enableTwoFactor(userId, secret, recoveryCodes) {
+    const db = loadDb();
+    const user = db.users.find(u => u.id === userId);
+    if (!user) throw new Error('User not found');
+    user.twoFactorSecret = secret;
+    user.twoFactorRecoveryCodes = recoveryCodes;
+    user.twoFactorEnabled = true;
+    user.twoFactorTempSecret = null;
+    saveDb();
+    return true;
+  },
+
+  disableTwoFactor(userId) {
+    const db = loadDb();
+    const user = db.users.find(u => u.id === userId);
+    if (!user) throw new Error('User not found');
+    user.twoFactorEnabled = false;
+    user.twoFactorSecret = null;
+    user.twoFactorTempSecret = null;
+    user.twoFactorRecoveryCodes = [];
+    saveDb();
+    return true;
+  },
+
+  getUserTwoFactorSecret(userId) {
+    const db = loadDb();
+    const user = db.users.find(u => u.id === userId);
+    if (!user) return null;
+    return {
+      secret: user.twoFactorSecret,
+      tempSecret: user.twoFactorTempSecret,
+      enabled: !!user.twoFactorEnabled,
+      recoveryCodes: user.twoFactorRecoveryCodes || []
+    };
+  },
+
+  useRecoveryCode(userId, code) {
+    const db = loadDb();
+    const user = db.users.find(u => u.id === userId);
+    if (!user || !user.twoFactorRecoveryCodes) return false;
+
+    const cleanCode = (code || '').trim();
+    const idx = user.twoFactorRecoveryCodes.findIndex(c => c.trim() === cleanCode);
+    if (idx !== -1) {
+      user.twoFactorRecoveryCodes.splice(idx, 1);
+      saveDb();
+      return true;
+    }
+    return false;
   },
 
   deleteUserAccount(userId) {

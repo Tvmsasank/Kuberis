@@ -29,7 +29,8 @@ export default function UserProfileModal({
   transactionCount = 0,
   onLogout,
   onOpenForgotPassword,
-  onOpenMpinModal
+  onOpenMpinModal,
+  onOpenTwoFactorModal
 }) {
   if (!isOpen || !user) return null;
 
@@ -227,6 +228,34 @@ export default function UserProfileModal({
             }}>
               Enable Passkey
             </button>
+          </div>
+
+          {/* Google Authenticator 2FA Card */}
+          <div style={{ padding: '12px 14px', borderRadius: '12px', background: 'var(--bg-app)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ padding: '8px', background: user?.twoFactorEnabled ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)', color: user?.twoFactorEnabled ? '#10B981' : '#F59E0B', borderRadius: '10px' }}>
+                <ShieldCheck size={18} />
+              </div>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  Google Authenticator 2FA
+                  <span className={`badge ${user?.twoFactorEnabled ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: '9px', padding: '1px 6px' }}>
+                    {user?.twoFactorEnabled ? 'Active 🟢' : 'Disabled 🔴'}
+                  </span>
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>AWS-style 6-Digit TOTP verification</div>
+              </div>
+            </div>
+            {onOpenTwoFactorModal && (
+              <button
+                type="button"
+                className={`btn ${user?.twoFactorEnabled ? 'btn-secondary' : 'btn-primary'} btn-sm`}
+                style={{ borderRadius: '10px', fontSize: '11px', fontWeight: '700', padding: '6px 12px' }}
+                onClick={onOpenTwoFactorModal}
+              >
+                {user?.twoFactorEnabled ? 'Manage 2FA' : 'Enable 2FA'}
+              </button>
+            )}
           </div>
 
           {/* 4-Digit MPIN Security Card */}

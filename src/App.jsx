@@ -33,6 +33,7 @@ import MpinModal from './components/MpinModal';
 import SmartUpiModal from './components/SmartUpiModal';
 import AccountAggregatorModal from './components/AccountAggregatorModal';
 import NetWorthModal from './components/NetWorthModal';
+import TwoFactorSetupModal from './components/TwoFactorSetupModal';
 import LandingPage from './components/LandingPage';
 import { CheckCircle2, FolderSync, X, Shield, Lock, UserPlus, LogIn, Fingerprint, KeyRound, Zap, Landmark } from 'lucide-react';
 
@@ -96,6 +97,9 @@ export default function App() {
 
   // RBI Account Aggregator Modal State
   const [isAaModalOpen, setIsAaModalOpen] = useState(false);
+
+  // Google Authenticator 2FA Modal State
+  const [isTwoFactorModalOpen, setIsTwoFactorModalOpen] = useState(false);
 
   // Check URL parameters for ?resetToken=... or ?resetMpinToken=... on load
   useEffect(() => {
@@ -869,6 +873,19 @@ export default function App() {
         onLogout={handleLogout}
         onOpenForgotPassword={() => setIsForgotPasswordOpen(true)}
         onOpenMpinModal={handleOpenMpinModal}
+        onOpenTwoFactorModal={() => setIsTwoFactorModalOpen(true)}
+      />
+
+      {/* Google Authenticator 2FA Setup Modal */}
+      <TwoFactorSetupModal
+        isOpen={isTwoFactorModalOpen}
+        onClose={() => setIsTwoFactorModalOpen(false)}
+        token={token}
+        user={user}
+        onUpdateUser={(updatedUser) => {
+          setUser(updatedUser);
+          localStorage.setItem('wealthpulse_user', JSON.stringify(updatedUser));
+        }}
       />
 
       {/* Auth Modals */}

@@ -11,6 +11,8 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
+import speakeasy from 'speakeasy';
+import QRCode from 'qrcode';
 import 'dotenv/config';
 import { dbEngine } from './db.js';
 import { refreshHoldingsPrices } from './investments.js';
@@ -113,6 +115,22 @@ app.post('/api/auth/login', (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    // Check if Google Authenticator 2FA is enabled for this user
+    const twoFactorDetails = dbEngine.getUserTwoFactorSecret(user.id);
+    if (twoFactorDetails && twoFactorDetails.enabled) {
+      const tempToken = jwt.sign(
+        { tempUserId: user.id, email: user.email, rememberMe: !!rememberMe },
+        JWT_SECRET,
+        { expiresIn: '10m' }
+      );
+      return res.json({
+        require2FA: true,
+        message: 'Google Authenticator 2FA verification required',
+        tempToken,
+        email: user.email
+      });
+    }
+
     const expiresIn = rememberMe ? '30d' : '1d';
     const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn });
 
@@ -124,6 +142,177 @@ app.post('/api/auth/login', (req, res) => {
   } catch (err) {
     console.error('POST /api/auth/login error:', err);
     res.status(500).json({ error: 'Authentication failed' });
+  }
+});
+
+// ==========================================
+// GOOGLE AUTHENTICATOR 2FA ENDPOINTS
+// ==========================================
+
+// POST /api/auth/2fa/setup - Initialize 2FA Setup (Generate QR Code & Secret)
+app.post('/api/auth/2fa/setup', authenticateToken, async (req, res) => {
+  try {
+    const user = dbEngine.getUserById(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const secret = speakeasy.generateSecret({
+      name: `WealthPulse (${user.email})`,
+      issuer: 'WealthPulse Security'
+    });
+
+    dbEngine.setTempTwoFactorSecret(user.id, secret.base32);
+
+    const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url);
+
+    res.json({
+      message: '2FA setup initialized',
+      secretKey: secret.base32,
+      qrCodeUrl,
+      otpauthUrl: secret.otpauth_url
+    });
+  } catch (err) {
+    console.error('POST /api/auth/2fa/setup error:', err);
+    res.status(500).json({ error: 'Failed to initialize 2FA setup' });
+  }
+});
+
+// POST /api/auth/2fa/verify-setup - Verify 6-digit TOTP code and Activate 2FA
+app.post('/api/auth/2fa/verify-setup', authenticateToken, (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code || code.trim().length !== 6) {
+      return res.status(400).json({ error: '6-digit authenticator code required' });
+    }
+
+    const twoFactorDetails = dbEngine.getUserTwoFactorSecret(req.userId);
+    if (!twoFactorDetails || !twoFactorDetails.tempSecret) {
+      return res.status(400).json({ error: 'No active 2FA setup found. Please start setup again.' });
+    }
+
+    const verified = speakeasy.totp.verify({
+      secret: twoFactorDetails.tempSecret,
+      encoding: 'base32',
+      token: code.trim(),
+      window: 2
+    });
+
+    if (!verified) {
+      return res.status(400).json({ error: 'Invalid 6-digit code. Check your Google Authenticator app clock and try again.' });
+    }
+
+    // Generate 5 Emergency Backup Recovery Codes
+    const recoveryCodes = Array.from({ length: 5 }, () =>
+      `${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(1000 + Math.random() * 9000)}`
+    );
+
+    dbEngine.enableTwoFactor(req.userId, twoFactorDetails.tempSecret, recoveryCodes);
+    const updatedUser = dbEngine.getUserById(req.userId);
+
+    res.json({
+      message: 'Google Authenticator 2FA enabled successfully!',
+      user: updatedUser,
+      recoveryCodes
+    });
+  } catch (err) {
+    console.error('POST /api/auth/2fa/verify-setup error:', err);
+    res.status(500).json({ error: 'Failed to verify 2FA setup' });
+  }
+});
+
+// POST /api/auth/2fa/verify-login - AWS-style 2FA Challenge Verification during login
+app.post('/api/auth/2fa/verify-login', (req, res) => {
+  try {
+    const { tempToken, code } = req.body;
+    if (!tempToken || !code) {
+      return res.status(400).json({ error: 'Temporary token and verification code required' });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(tempToken, JWT_SECRET);
+    } catch (err) {
+      return res.status(401).json({ error: '2FA session expired. Please log in again.' });
+    }
+
+    const userId = decoded.tempUserId;
+    const user = dbEngine.getUserById(userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const twoFactorDetails = dbEngine.getUserTwoFactorSecret(userId);
+    if (!twoFactorDetails || !twoFactorDetails.secret || !twoFactorDetails.enabled) {
+      return res.status(400).json({ error: '2FA is not enabled for this account' });
+    }
+
+    const cleanCode = code.trim();
+    let isValid = false;
+
+    // Verify 6-digit TOTP code
+    if (/^\d{6}$/.test(cleanCode)) {
+      isValid = speakeasy.totp.verify({
+        secret: twoFactorDetails.secret,
+        encoding: 'base32',
+        token: cleanCode,
+        window: 2
+      });
+    }
+
+    // Fallback: Check Emergency Backup Recovery Code
+    if (!isValid && twoFactorDetails.recoveryCodes && twoFactorDetails.recoveryCodes.length > 0) {
+      isValid = dbEngine.useRecoveryCode(userId, cleanCode);
+    }
+
+    if (!isValid) {
+      return res.status(401).json({ error: 'Invalid 6-digit Google Authenticator code or recovery code' });
+    }
+
+    const expiresIn = decoded.rememberMe ? '30d' : '1d';
+    const finalToken = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn });
+
+    res.json({
+      message: '2FA verification successful!',
+      token: finalToken,
+      user
+    });
+  } catch (err) {
+    console.error('POST /api/auth/2fa/verify-login error:', err);
+    res.status(500).json({ error: '2FA verification failed' });
+  }
+});
+
+// POST /api/auth/2fa/disable - Disable 2FA
+app.post('/api/auth/2fa/disable', authenticateToken, (req, res) => {
+  try {
+    const { code } = req.body;
+    const twoFactorDetails = dbEngine.getUserTwoFactorSecret(req.userId);
+
+    if (!twoFactorDetails || !twoFactorDetails.enabled) {
+      return res.status(400).json({ error: '2FA is not enabled' });
+    }
+
+    if (code) {
+      const cleanCode = code.trim();
+      const verified = speakeasy.totp.verify({
+        secret: twoFactorDetails.secret,
+        encoding: 'base32',
+        token: cleanCode,
+        window: 2
+      }) || dbEngine.useRecoveryCode(req.userId, cleanCode);
+
+      if (!verified) {
+        return res.status(400).json({ error: 'Invalid authenticator code or recovery code' });
+      }
+    }
+
+    dbEngine.disableTwoFactor(req.userId);
+    const updatedUser = dbEngine.getUserById(req.userId);
+
+    res.json({
+      message: 'Google Authenticator 2FA disabled',
+      user: updatedUser
+    });
+  } catch (err) {
+    console.error('POST /api/auth/2fa/disable error:', err);
+    res.status(500).json({ error: 'Failed to disable 2FA' });
   }
 });
 

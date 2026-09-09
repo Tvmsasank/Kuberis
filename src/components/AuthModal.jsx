@@ -222,6 +222,9 @@ export default function AuthModal({
     }
   };
 
+  const [totpTempToken, setTotpTempToken] = useState('');
+  const [totpCode, setTotpCode] = useState('');
+
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
     setError('');
@@ -236,6 +239,13 @@ export default function AuthModal({
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Sign in failed');
 
+      if (json.require2FA) {
+        setTotpTempToken(json.tempToken);
+        setAuthMethod('2fa_challenge');
+        setSuccess('Google Authenticator 2FA verification required');
+        return;
+      }
+
       if (rememberMe) {
         localStorage.setItem('wealthpulse_remembered_email', email.trim());
       }
@@ -247,6 +257,39 @@ export default function AuthModal({
       }, 400);
     } catch (err) {
       setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTwoFactorLoginSubmit = async (e) => {
+    e.preventDefault();
+    if (!totpCode || !totpCode.trim()) {
+      setError('Please enter your 6-digit Google Authenticator code');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/auth/2fa/verify-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tempToken: totpTempToken, code: totpCode.trim() })
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || '2FA verification failed');
+
+      if (rememberMe) {
+        localStorage.setItem('wealthpulse_remembered_email', email.trim());
+      }
+
+      setSuccess('2FA Verified! Signing in...');
+      setTimeout(() => {
+        onLoginSuccess(json.user, json.token, rememberMe);
+        onClose();
+      }, 400);
+    } catch (err) {
+      setError(err.message || '2FA verification failed');
     } finally {
       setLoading(false);
     }
@@ -813,6 +856,69 @@ export default function AuthModal({
                 }}
               >
                 Password Login
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* MODE 5: 2FA GOOGLE AUTHENTICATOR CHALLENGE */}
+        {authMethod === '2fa_challenge' && (
+          <form onSubmit={handleTwoFactorLoginSubmit}>
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'rgba(16, 185, 129, 0.15)', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px auto' }}>
+                <Shield size={28} />
+              </div>
+              <h3 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
+                Two-Factor Verification
+              </h3>
+              <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: '1.4' }}>
+                Open <strong>Google Authenticator</strong> on your phone and enter the 6-digit code for <strong>{email}</strong>
+              </p>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: '20px' }}>
+              <label className="form-label" style={{ fontSize: '12px', fontWeight: '700' }}>
+                6-Digit Authenticator Code (or Recovery Code)
+              </label>
+              <input
+                type="text"
+                autoFocus
+                className="form-control"
+                placeholder="e.g. 582910"
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value)}
+                style={{
+                  fontSize: '22px',
+                  fontWeight: '900',
+                  letterSpacing: '6px',
+                  textAlign: 'center',
+                  padding: '12px',
+                  color: 'var(--primary)'
+                }}
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={loading || !totpCode.trim()}
+              style={{ width: '100%', padding: '12px', fontSize: '15px', fontWeight: '800', marginBottom: '14px' }}
+            >
+              {loading ? 'Verifying 2FA Code...' : 'Verify & Sign In'}
+            </button>
+
+            <div style={{ textAlign: 'center' }}>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                style={{ fontSize: '12px', color: 'var(--text-muted)' }}
+                onClick={() => {
+                  setError('');
+                  setSuccess('');
+                  setAuthMethod('password');
+                }}
+              >
+                ← Back to Password Sign In
               </button>
             </div>
           </form>
