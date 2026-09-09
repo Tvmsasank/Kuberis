@@ -167,6 +167,21 @@ function saveDb() {
       'INSERT INTO public.wealthpulse_store (id, data) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = NOW()',
       ['main_store', JSON.stringify(memoryDb)]
     ).catch(err => console.error('[Supabase PostgreSQL] Auto-sync write error:', err.message));
+
+    if (Array.isArray(memoryDb.users)) {
+      for (const u of memoryDb.users) {
+        pgPool.query(
+          `INSERT INTO public.wealthpulse_users (id, name, email, password_hash, mpin_hash, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT (id) DO UPDATE SET
+             name = EXCLUDED.name,
+             email = EXCLUDED.email,
+             password_hash = EXCLUDED.password_hash,
+             mpin_hash = EXCLUDED.mpin_hash`,
+          [u.id, u.name, u.email, u.passwordHash || null, u.mpinHash || null, u.createdAt || new Date().toISOString()]
+        ).catch(err => console.error('[Supabase PostgreSQL] User relational sync error:', err.message));
+      }
+    }
   }
 }
 
@@ -432,6 +447,13 @@ export const dbEngine = {
     user.resetTokenExpiry = null;
     saveDb();
 
+    if (pgPool) {
+      pgPool.query(
+        'UPDATE public.wealthpulse_users SET password_hash = $1 WHERE id = $2 OR LOWER(email) = LOWER($3)',
+        [user.passwordHash, user.id, user.email]
+      ).catch(e => console.error('[Supabase PostgreSQL] User Password reset sync error:', e.message));
+    }
+
     return true;
   },
 
@@ -463,6 +485,13 @@ export const dbEngine = {
     user.resetMpinTokenExpiry = null;
     user.failedMpinAttempts = 0;
     saveDb();
+
+    if (pgPool) {
+      pgPool.query(
+        'UPDATE public.wealthpulse_users SET mpin_hash = $1 WHERE id = $2 OR LOWER(email) = LOWER($3)',
+        [user.mpinHash, user.id, user.email]
+      ).catch(e => console.error('[Supabase PostgreSQL] User MPIN reset sync error:', e.message));
+    }
 
     return true;
   },
