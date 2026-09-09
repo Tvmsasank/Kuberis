@@ -334,13 +334,72 @@ app.get('/api/auth/me', (req, res) => {
 async function sendEmailWithFallback({ to, subject, text, html }) {
   const user = (process.env.SMTP_USER || 'venkatamanishashankt@gmail.com').trim();
   const pass = (process.env.SMTP_PASS || 'dfsbshlrugwpmyez').trim().replace(/\s+/g, '');
+  const resendKey = (process.env.RESEND_API_KEY || '').trim();
+  const brevoKey = (process.env.BREVO_API_KEY || '').trim();
+
+  // Attempt 1: Resend HTTPS REST API (Port 443 - Bypasses Cloud IP Firewall)
+  if (resendKey) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${resendKey}`
+        },
+        body: JSON.stringify({
+          from: `WealthPulse Security <onboarding@resend.dev>`,
+          to: [to.trim()],
+          subject,
+          text: text || '',
+          html
+        })
+      });
+      const data = await res.json();
+      if (res.ok && (data.id || data.status === 'success')) {
+        console.log(`[WealthPulse Email] Successfully delivered email to ${to} via Resend HTTPS API. ID: ${data.id}`);
+        return true;
+      } else {
+        console.warn(`[WealthPulse Email] Resend API returned status ${res.status}:`, data);
+      }
+    } catch (e) {
+      console.warn('[WealthPulse Email] Resend HTTPS API transport failed:', e.message);
+    }
+  }
+
+  // Attempt 2: Brevo HTTPS REST API (Port 443)
+  if (brevoKey) {
+    try {
+      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'accept': 'application/json',
+          'content-type': 'application/json',
+          'api-key': brevoKey
+        },
+        body: JSON.stringify({
+          sender: { name: 'WealthPulse Security', email: user },
+          to: [{ email: to.trim() }],
+          subject,
+          htmlContent: html,
+          textContent: text || ''
+        })
+      });
+      const data = await res.json();
+      if (res.ok && (data.messageId || data.messageIds)) {
+        console.log(`[WealthPulse Email] Successfully delivered email to ${to} via Brevo HTTPS API.`);
+        return true;
+      }
+    } catch (e) {
+      console.warn('[WealthPulse Email] Brevo HTTPS API transport failed:', e.message);
+    }
+  }
 
   if (!user || !pass || !to) {
     console.error('[WealthPulse Email Error] Missing SMTP credentials or recipient email');
     return false;
   }
 
-  // Attempt 1: Gmail service transport (Cloud-optimized 25s timeout)
+  // Attempt 3: Gmail service transport (Nodemailer)
   try {
     const transporter = nodemailer.createTransport({
       service: 'gmail',
@@ -362,7 +421,7 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
     console.warn(`[WealthPulse Email] Primary Gmail transport failed (${err1.message}). Trying Direct SSL transport...`);
   }
 
-  // Attempt 2: Direct SMTP SSL (port 465) with 25s timeout
+  // Attempt 4: Direct SMTP SSL (port 465) with 25s timeout
   try {
     const transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
@@ -386,7 +445,7 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
     console.warn(`[WealthPulse Email] SSL transport failed (${err2.message}). Trying STARTTLS 587...`);
   }
 
-  // Attempt 3: Direct SMTP TLS on port 587 with 25s timeout
+  // Attempt 5: Direct SMTP TLS on port 587 with 25s timeout
   try {
     const transporter = nodemailer.createTransport({
       host: 'smtp.gmail.com',
