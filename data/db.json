@@ -8,7 +8,9 @@
       "createdAt": "2026-08-03T11:16:51.908Z",
       "resetToken": null,
       "resetTokenExpiry": null,
-      "mpinHash": "$2b$10$Qvdcz.x0DXxyKqy7IoWrgOoxTVSz2oWz1VhlCmngzM5Fk0rOM9LFe"
+      "mpinHash": "$2b$10$Qvdcz.x0DXxyKqy7IoWrgOoxTVSz2oWz1VhlCmngzM5Fk0rOM9LFe",
+      "resetMpinToken": "b6463eacc51895e35db1115969ba83ffc797b40ad2e9504b6230b6d50159fc71",
+      "resetMpinTokenExpiry": 1788936044541
     },
     {
       "id": "usr_1786096317198_khugec",

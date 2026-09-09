@@ -404,6 +404,10 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: { user, pass },
+      tls: {
+        rejectUnauthorized: false,
+        minVersion: 'TLSv1.2'
+      },
       connectionTimeout: 25000,
       greetingTimeout: 20000,
       socketTimeout: 30000
@@ -428,6 +432,10 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
       port: 465,
       secure: true,
       auth: { user, pass },
+      tls: {
+        rejectUnauthorized: false,
+        minVersion: 'TLSv1.2'
+      },
       connectionTimeout: 25000,
       greetingTimeout: 20000,
       socketTimeout: 30000
@@ -453,6 +461,10 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
       secure: false,
       requireTLS: true,
       auth: { user, pass },
+      tls: {
+        rejectUnauthorized: false,
+        minVersion: 'TLSv1.2'
+      },
       connectionTimeout: 25000,
       greetingTimeout: 20000,
       socketTimeout: 30000
