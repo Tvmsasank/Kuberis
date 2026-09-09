@@ -118,6 +118,24 @@ if (process.env.DATABASE_URL) {
           memoryDb = res.rows[0].data;
           fs.writeFileSync(DB_FILE, JSON.stringify(memoryDb, null, 2), 'utf-8');
           console.log('[Supabase PostgreSQL] Loaded live cloud data into memory!');
+
+          // Sync all existing users to public.wealthpulse_users relational table
+          if (Array.isArray(memoryDb.users)) {
+            for (const u of memoryDb.users) {
+              executeProcedureOrQuery(
+                'SELECT public.sp_upsert_wealthpulse_user($1, $2, $3, $4, $5, $6)',
+                [u.id, u.name, u.email, u.passwordHash || null, u.mpinHash || null, u.createdAt || new Date().toISOString()],
+                `INSERT INTO public.wealthpulse_users (id, name, email, password_hash, mpin_hash, created_at)
+                 VALUES ($1, $2, $3, $4, $5, $6)
+                 ON CONFLICT (id) DO UPDATE SET
+                   name = EXCLUDED.name,
+                   email = EXCLUDED.email,
+                   password_hash = EXCLUDED.password_hash,
+                   mpin_hash = EXCLUDED.mpin_hash`,
+                [u.id, u.name, u.email, u.passwordHash || null, u.mpinHash || null, u.createdAt || new Date().toISOString()]
+              );
+            }
+          }
         } else {
           const current = loadDb();
           await pgPool.query(

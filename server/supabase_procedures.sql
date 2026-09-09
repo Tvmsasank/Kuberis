@@ -116,7 +116,8 @@ AS $$
 BEGIN
   UPDATE public.wealthpulse_users
   SET mpin_hash = p_mpin_hash
-  WHERE id = p_user_id OR LOWER(email) = LOWER(TRIM(p_email));
+  WHERE (p_user_id IS NOT NULL AND id = p_user_id)
+     OR (p_email IS NOT NULL AND LOWER(email) = LOWER(TRIM(p_email)));
 END;
 $$;
 
@@ -133,7 +134,8 @@ AS $$
 BEGIN
   UPDATE public.wealthpulse_users
   SET password_hash = p_password_hash
-  WHERE id = p_user_id OR LOWER(email) = LOWER(TRIM(p_email));
+  WHERE (p_user_id IS NOT NULL AND id = p_user_id)
+     OR (p_email IS NOT NULL AND LOWER(email) = LOWER(TRIM(p_email)));
 END;
 $$;
 
@@ -207,5 +209,5 @@ BEGIN
 END;
 $$;
 
--- Grant Execution Permissions to Postgres & Anon Roles
+-- Grant Execution Permissions
 GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO postgres, anon, authenticated, service_role;
