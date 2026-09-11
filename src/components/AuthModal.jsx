@@ -36,6 +36,7 @@ export default function AuthModal({
   const [biometricSupported, setBiometricSupported] = useState(false);
   const [emailHasMpin, setEmailHasMpin] = useState(false);
   const [emailHasBiometrics, setEmailHasBiometrics] = useState(false);
+  const [pendingSessionOverride, setPendingSessionOverride] = useState(null);
 
   useEffect(() => {
     const savedEmail = localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email') || '';
