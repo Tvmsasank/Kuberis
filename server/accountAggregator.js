@@ -116,13 +116,13 @@ async function sendBankOtpEmail(toEmail, bankName, otp) {
       });
 
       await transporter.sendMail({
-        from: `"WealthPulse RBI Banking Gateway" <${user}>`,
+        from: `"Kuberis RBI Banking Gateway" <${user}>`,
         to: toEmail,
         subject: `🏦 ${bankName} - Account Aggregator OTP: ${otp}`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 520px; padding: 24px; border: 1px solid #10B981; border-radius: 16px; background: #0A192F; color: #FFFFFF;">
             <h2 style="color: #10B981; margin-top: 0;">RBI Account Aggregator Linking</h2>
-            <p style="color: #CBD5E1; font-size: 14px;">Your 6-digit Bank OTP to connect <strong>${bankName}</strong> to WealthPulse is:</p>
+            <p style="color: #CBD5E1; font-size: 14px;">Your 6-digit Bank OTP to connect <strong>${bankName}</strong> to Kuberis is:</p>
             <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid #10B981; padding: 16px; text-align: center; border-radius: 12px; margin: 20px 0;">
               <span style="font-size: 32px; font-weight: 900; letter-spacing: 8px; color: #10B981;">${otp}</span>
             </div>

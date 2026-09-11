@@ -4,7 +4,7 @@ const raw = JSON.parse(fs.readFileSync('./data/db.json', 'utf-8'));
 const jsonEscaped = JSON.stringify(raw).replace(/'/g, "''");
 
 const sql = `-- ==========================================================
--- 📈 WealthPulse Complete Supabase Schema & Data Migration
+-- ⚡ Kuberis Complete Supabase Schema & Data Migration
 -- ==========================================================
 
 -- 1. Create Core Key-Value Store Table (Used by Node.js Backend)

@@ -24,7 +24,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const JWT_SECRET = process.env.JWT_SECRET || 'ledgerly_super_secret_jwt_key_2026';
+const JWT_SECRET = process.env.JWT_SECRET || 'kuberis_super_secret_jwt_key_2026';
 
 app.use(cors());
 app.use(express.json({ limit: '25mb' }));
@@ -625,7 +625,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     const cleanEmail = email.trim().toLowerCase();
     const existingUser = dbEngine.getUserByEmail(cleanEmail);
     if (!existingUser) {
-      return res.status(404).json({ error: 'No account found with this email. Please enter the email associated with your WealthPulse account.' });
+      return res.status(404).json({ error: 'No account found with this email. Please enter the email associated with your Kuberis account.' });
     }
 
     const result = dbEngine.createPasswordResetToken(cleanEmail);
@@ -638,7 +638,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       } catch (e) {}
     }
     if (!origin) {
-      const host = req.headers.host || 'wealthpulse-financial-service.onrender.com';
+      const host = req.headers.host || 'kuberis.onrender.com';
       const protocol = host.includes('localhost') ? 'http' : 'https';
       origin = `${protocol}://${host}`;
     }
@@ -688,7 +688,7 @@ app.post('/api/auth/forgot-mpin', async (req, res) => {
     const cleanEmail = email.trim().toLowerCase();
     const existingUser = dbEngine.getUserByEmail(cleanEmail);
     if (!existingUser) {
-      return res.status(404).json({ error: 'No account found with this email. Please enter your registered WealthPulse email.' });
+      return res.status(404).json({ error: 'No account found with this email. Please enter your registered Kuberis email.' });
     }
 
     const result = dbEngine.createMpinResetToken(cleanEmail);
@@ -698,7 +698,7 @@ app.post('/api/auth/forgot-mpin', async (req, res) => {
       try { origin = new URL(origin).origin; } catch (e) {}
     }
     if (!origin) {
-      const host = req.headers.host || 'wealthpulse-financial-service.onrender.com';
+      const host = req.headers.host || 'kuberis.onrender.com';
       origin = `${host.includes('localhost') ? 'http' : 'https'}://${host}`;
     }
 
@@ -728,9 +728,9 @@ app.get('/api/auth/debug-email', async (req, res) => {
     }
     const sent = await sendEmailWithFallback({
       to,
-      subject: 'WealthPulse Live Server Diagnostic Email',
-      text: 'Testing live email delivery from WealthPulse Render Server.',
-      html: '<h3>⚡ WealthPulse Live Server Test</h3><p>If you see this, cloud email delivery is working 100%!</p>'
+      subject: 'Kuberis Live Server Diagnostic Email',
+      text: 'Testing live email delivery from Kuberis Render Server.',
+      html: '<h3>⚡ Kuberis Live Server Test</h3><p>If you see this, cloud email delivery is working 100%!</p>'
     });
     res.json({ success: sent, recipient: to, env: { hasWebhook: !!process.env.GMAIL_HTTP_WEBHOOK_URL, hasResend: !!process.env.RESEND_API_KEY, hasBrevo: !!process.env.BREVO_API_KEY } });
   } catch (err) {
@@ -1021,11 +1021,11 @@ app.get('/api/export', authenticateToken, (req, res) => {
         csv += `${t.date},${merchantEsc},${t.amount},${t.type},${catEsc},${accEsc},"${tagsStr}",${t.source},${t.receipt}\n`;
       }
       res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename="Ledgerly_Transactions_${dateStr}.csv"`);
+      res.setHeader('Content-Disposition', `attachment; filename="Kuberis_Transactions_${dateStr}.csv"`);
       return res.send(csv);
     } else {
       res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', `attachment; filename="Ledgerly_Backup_${dateStr}.json"`);
+      res.setHeader('Content-Disposition', `attachment; filename="Kuberis_Backup_${dateStr}.json"`);
       return res.json(state);
     }
   } catch (err) {
@@ -1205,7 +1205,7 @@ app.get('/api/user/webhook-config', (req, res) => {
         "2. Add Trigger: SMS Received (Sender: *HDFC*, *SBI*, *ICICI*, *AXIS*, *GPAY*, *PAYTM*).",
         "3. Add Action: HTTP Request -> POST to your Webhook URL.",
         "4. Body: { \"rawText\": \"{sms_body}\" }",
-        "5. Result: Every ₹10 merchant payment or UPI transfer instantly logs into WealthPulse in 0.1s!"
+        "5. Result: Every ₹10 merchant payment or UPI transfer instantly logs into Kuberis in 0.1s!"
       ]
     });
   } catch (err) {
@@ -1561,8 +1561,8 @@ app.get('/api/drive-sync', (req, res) => {
   const state = dbEngine.getState(userId);
   res.json({
     folder: state.settings.driveFolder || {
-      name: 'Ledgerly Financial Inbox',
-      url: 'https://drive.google.com/drive/folders/ledgerly-inbox'
+      name: 'Kuberis Financial Inbox',
+      url: 'https://drive.google.com/drive/folders/kuberis-inbox'
     },
     sync: state.settings.driveSync || { schedule: '08:00 AM Daily', timezone: 'Asia/Kolkata', status: 'idle' }
   });
@@ -1616,14 +1616,14 @@ app.delete('/api/state', (req, res) => {
   try {
     const userId = getUserIdFromReq(req);
     const { confirmation } = req.body;
-    if (confirmation !== 'DELETE ALL WEALTHPULSE DATA' && confirmation !== 'DELETE ALL LEDGERLY DATA') {
+    if (confirmation !== 'DELETE ALL KUBERIS DATA' && confirmation !== 'DELETE ALL WEALTHPULSE DATA' && confirmation !== 'DELETE ALL LEDGERLY DATA') {
       return res.status(400).json({ error: 'Exact confirmation phrase required' });
     }
 
     dbEngine.wipeAllData(userId);
     res.json({
       success: true,
-      message: 'All WealthPulse data erased successfully.'
+      message: 'All Kuberis data erased successfully.'
     });
   } catch (err) {
     console.error('DELETE /api/state error:', err);

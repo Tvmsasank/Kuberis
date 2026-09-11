@@ -45,7 +45,7 @@ export default function UserProfileModal({
   const [deleteError, setDeleteError] = useState('');
 
   const handleRequestMpinReset = async () => {
-    const emailToUse = (user?.email || localStorage.getItem('wealthpulse_remembered_email') || '').trim();
+    const emailToUse = (user?.email || localStorage.getItem('kuberis_remembered_email') || localStorage.getItem('wealthpulse_remembered_email') || '').trim();
     if (!emailToUse) {
       setMpinResetMessage('User email not found. Please log in again.');
       return;
@@ -128,6 +128,10 @@ export default function UserProfileModal({
         throw new Error(json.error || 'Failed to delete account');
       }
 
+      localStorage.removeItem('kuberis_token');
+      localStorage.removeItem('kuberis_user');
+      localStorage.removeItem('kuberis_remembered_email');
+      localStorage.removeItem('kuberis_has_mpin');
       localStorage.removeItem('wealthpulse_token');
       localStorage.removeItem('wealthpulse_user');
       localStorage.removeItem('wealthpulse_remembered_email');

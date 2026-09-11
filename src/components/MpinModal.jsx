@@ -107,7 +107,7 @@ export default function MpinModal({
   const handleVerifyCurrentForChange = async (currentPin) => {
     setLoading(true);
     try {
-      const targetEmail = email || localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email');
+      const targetEmail = email || localStorage.getItem('kuberis_remembered_email') || localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email');
       const res = await fetch('/api/auth/mpin/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -135,7 +135,7 @@ export default function MpinModal({
   const handleVerifyMpin = async (completedPin) => {
     setLoading(true);
     try {
-      const targetEmail = email || localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email');
+      const targetEmail = email || localStorage.getItem('kuberis_remembered_email') || localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email');
       if (!targetEmail) {
         throw new Error('Please enter your account email address first');
       }
@@ -184,7 +184,7 @@ export default function MpinModal({
         const json = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(json.error || 'Failed to reset MPIN');
 
-        localStorage.setItem('wealthpulse_has_mpin', 'true');
+        localStorage.setItem('kuberis_has_mpin', 'true');
         setSuccess('4-Digit MPIN Reset Successfully! Please Sign In.');
         setTimeout(() => {
           onClose();
@@ -192,8 +192,8 @@ export default function MpinModal({
         return;
       }
 
-      const targetEmail = (email || localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email') || '').trim();
-      const activeToken = token || localStorage.getItem('wealthpulse_token') || sessionStorage.getItem('wealthpulse_token') || localStorage.getItem('ledgerly_token') || '';
+      const targetEmail = (email || localStorage.getItem('kuberis_remembered_email') || localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email') || '').trim();
+      const activeToken = token || localStorage.getItem('kuberis_token') || localStorage.getItem('wealthpulse_token') || sessionStorage.getItem('kuberis_token') || sessionStorage.getItem('wealthpulse_token') || localStorage.getItem('ledgerly_token') || '';
 
       const res = await fetch('/api/auth/mpin/set', {
         method: 'POST',
@@ -208,7 +208,7 @@ export default function MpinModal({
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json.error || 'Failed to set MPIN');
 
-      localStorage.setItem('wealthpulse_has_mpin', 'true');
+      localStorage.setItem('kuberis_has_mpin', 'true');
       setSuccess(mode === 'change' ? '4-Digit MPIN Changed Successfully!' : '4-Digit Security MPIN Set Successfully!');
       setTimeout(() => {
         if (onSuccess) onSuccess(json.user, activeToken);

@@ -1,6 +1,6 @@
 /**
  * Helper utility to calculate dynamic Net Worth, Total Assets, and Total Liabilities
- * consistently across the entire WealthPulse application without double-counting.
+ * consistently across the entire Kuberis application without double-counting.
  */
 export function calculateDynamicNetWorth(investments = [], settings = {}) {
   const safeInvestments = Array.isArray(investments) ? investments : [];

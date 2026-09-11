@@ -28,7 +28,7 @@
   <line x1="96" y1="256" x2="416" y2="256" stroke="rgba(255, 255, 255, 0.08)" stroke-width="4" stroke-dasharray="8 8" />
   <line x1="96" y1="152" x2="416" y2="152" stroke="rgba(255, 255, 255, 0.08)" stroke-width="4" stroke-dasharray="8 8" />
 
-  <!-- WealthPulse Financial Growth Waveform Line -->
+  <!-- Kuberis Financial Growth Waveform Line -->
   <path d="M 88 340 L 160 340 L 200 240 L 240 380 L 290 180 L 340 260 L 424 120" fill="none" stroke="url(#pulseGrad)" stroke-width="28" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)" />
 
   <!-- Arrow Growth Tip -->

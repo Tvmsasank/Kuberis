@@ -44,8 +44,8 @@ const getInitialUserSettings = () => ({
   netWorthConfigured: false,
   selectedPeriod: 'all-time',
   driveFolder: {
-    name: 'WealthPulse Financial Inbox',
-    id: 'folder-wealthpulse-inbox-01',
+    name: 'Kuberis Financial Inbox',
+    id: 'folder-kuberis-inbox-01',
     url: 'https://drive.google.com/drive/my-drive'
   },
   driveSync: {

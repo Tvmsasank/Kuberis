@@ -12,9 +12,9 @@ export default function AuthModal({
 }) {
   if (!isOpen) return null;
 
-  const rememberedEmail = localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email') || '';
-  const hasMpin = localStorage.getItem('wealthpulse_has_mpin') === 'true' || localStorage.getItem('ledgerly_has_mpin') === 'true';
-  const hasBiometrics = localStorage.getItem('wealthpulse_has_biometrics') === 'true' || localStorage.getItem('ledgerly_has_biometrics') === 'true';
+  const rememberedEmail = localStorage.getItem('kuberis_remembered_email') || localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email') || '';
+  const hasMpin = localStorage.getItem('kuberis_has_mpin') === 'true' || localStorage.getItem('wealthpulse_has_mpin') === 'true' || localStorage.getItem('ledgerly_has_mpin') === 'true';
+  const hasBiometrics = localStorage.getItem('kuberis_has_biometrics') === 'true' || localStorage.getItem('wealthpulse_has_biometrics') === 'true' || localStorage.getItem('ledgerly_has_biometrics') === 'true';
 
   const getInitialAuthMethod = () => {
     if (initialMode === 'register') return 'register';
@@ -39,7 +39,7 @@ export default function AuthModal({
   const [pendingSessionOverride, setPendingSessionOverride] = useState(null);
 
   useEffect(() => {
-    const savedEmail = localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email') || '';
+    const savedEmail = localStorage.getItem('kuberis_remembered_email') || localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email') || '';
     setMpin('');
     setError('');
     setSuccess('');
@@ -399,6 +399,7 @@ export default function AuthModal({
   };
 
   const handleSwitchAccount = () => {
+    localStorage.removeItem('kuberis_remembered_email');
     localStorage.removeItem('wealthpulse_remembered_email');
     localStorage.removeItem('ledgerly_remembered_email');
     setEmail('');
@@ -854,7 +855,7 @@ export default function AuthModal({
                 className="btn btn-ghost btn-sm"
                 style={{ padding: 0, color: 'var(--primary)', fontWeight: '700' }}
                 onClick={() => {
-                  const savedEmail = localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email') || '';
+                  const savedEmail = localStorage.getItem('kuberis_remembered_email') || localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email') || '';
                   setEmail(savedEmail);
                   setAuthMethod('password');
                   setError('');

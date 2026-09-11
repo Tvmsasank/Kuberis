@@ -46,10 +46,10 @@ const getInitialTab = () => {
       'home', 'dashboard', 'investments', 'transactions', 'calculators',
       'recurring', 'subscriptions', 'budgets', 'goals', 'documents', 'rules', 'settings'
     ];
+    const savedTab = localStorage.getItem('kuberis_active_tab') || localStorage.getItem('wealthpulse_active_tab');
     if (currentTab && validTabs.includes(currentTab)) {
       return currentTab;
     }
-    const savedTab = localStorage.getItem('wealthpulse_active_tab');
     if (savedTab && validTabs.includes(savedTab)) {
       return savedTab;
     }
@@ -62,22 +62,22 @@ const getInitialTab = () => {
 export default function App() {
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [loading, setLoading] = useState(true);
-  const [theme, setTheme] = useState(() => localStorage.getItem('wealthpulse_theme') || localStorage.getItem('ledgerly_theme') || 'dark');
+  const [theme, setTheme] = useState(() => localStorage.getItem('kuberis_theme') || localStorage.getItem('wealthpulse_theme') || localStorage.getItem('ledgerly_theme') || 'dark');
   const [isPrivacyMode, setIsPrivacyMode] = useState(() => {
-    return localStorage.getItem('wealthpulse_privacy_mode') === 'true';
+    return (localStorage.getItem('kuberis_privacy_mode') || localStorage.getItem('wealthpulse_privacy_mode')) === 'true';
   });
 
   // Auth State
   const [user, setUser] = useState(() => {
     try {
-      const saved = localStorage.getItem('wealthpulse_user') || localStorage.getItem('ledgerly_user');
+      const saved = localStorage.getItem('kuberis_user') || localStorage.getItem('wealthpulse_user') || localStorage.getItem('ledgerly_user');
       return saved ? JSON.parse(saved) : null;
     } catch (e) {
       return null;
     }
   });
 
-  const [token, setToken] = useState(() => localStorage.getItem('wealthpulse_token') || localStorage.getItem('ledgerly_token') || '');
+  const [token, setToken] = useState(() => localStorage.getItem('kuberis_token') || localStorage.getItem('wealthpulse_token') || localStorage.getItem('ledgerly_token') || '');
 
   // Auth Modals State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -128,7 +128,7 @@ export default function App() {
       if (window.location.pathname !== targetPath) {
         window.history.pushState(null, '', targetPath);
       }
-      localStorage.setItem('wealthpulse_active_tab', activeTab);
+      localStorage.setItem('kuberis_active_tab', activeTab);
     }
   }, [activeTab]);
 
@@ -158,7 +158,7 @@ export default function App() {
   // Cross-Tab Multi-Session Synchronization
   useEffect(() => {
     const handleStorageChange = (e) => {
-      if (e.key === 'wealthpulse_token' || e.key === 'ledgerly_token') {
+      if (e.key === 'kuberis_token' || e.key === 'wealthpulse_token' || e.key === 'ledgerly_token') {
         if (!e.newValue) {
           setUser(null);
           setToken('');
@@ -166,7 +166,7 @@ export default function App() {
         } else {
           setToken(e.newValue);
           try {
-            const savedUser = localStorage.getItem('wealthpulse_user') || localStorage.getItem('ledgerly_user');
+            const savedUser = localStorage.getItem('kuberis_user') || localStorage.getItem('wealthpulse_user') || localStorage.getItem('ledgerly_user');
             if (savedUser) setUser(JSON.parse(savedUser));
           } catch (err) {}
         }
@@ -212,17 +212,17 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('wealthpulse_theme', theme);
+    localStorage.setItem('kuberis_theme', theme);
   }, [theme]);
 
   const handleSelectTheme = (newTheme) => {
     setTheme(newTheme);
-    localStorage.setItem('wealthpulse_theme', newTheme);
+    localStorage.setItem('kuberis_theme', newTheme);
     document.documentElement.setAttribute('data-theme', newTheme);
   };
 
-  const currentEmail = user?.email ? user.email : (localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email') || '');
-  const activeToken = token || localStorage.getItem('wealthpulse_token') || localStorage.getItem('ledgerly_token') || sessionStorage.getItem('wealthpulse_token') || '';
+  const currentEmail = user?.email ? user.email : (localStorage.getItem('kuberis_remembered_email') || localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email') || '');
+  const activeToken = token || localStorage.getItem('kuberis_token') || localStorage.getItem('wealthpulse_token') || localStorage.getItem('ledgerly_token') || sessionStorage.getItem('kuberis_token') || sessionStorage.getItem('wealthpulse_token') || '';
 
   const authHeaders = {
     ...(activeToken ? { 'Authorization': `Bearer ${activeToken}`, 'X-Auth-Token': activeToken } : {}),
@@ -294,10 +294,10 @@ export default function App() {
     setUser(userData);
     setToken(userToken);
     if (rememberMe) {
-      localStorage.setItem('wealthpulse_token', userToken);
-      localStorage.setItem('wealthpulse_user', JSON.stringify(userData));
+      localStorage.setItem('kuberis_token', userToken);
+      localStorage.setItem('kuberis_user', JSON.stringify(userData));
     } else {
-      sessionStorage.setItem('wealthpulse_token', userToken);
+      sessionStorage.setItem('kuberis_token', userToken);
     }
   };
 
@@ -307,15 +307,18 @@ export default function App() {
     } catch (e) {}
     setUser(null);
     setToken('');
+    localStorage.removeItem('kuberis_token');
+    localStorage.removeItem('kuberis_user');
     localStorage.removeItem('wealthpulse_token');
     localStorage.removeItem('wealthpulse_user');
+    sessionStorage.removeItem('kuberis_token');
     sessionStorage.removeItem('wealthpulse_token');
     setActiveTab('home');
   };
 
   const handleOpenMpinModal = (mode = 'verify', emailOverride = '') => {
     setMpinModalMode(mode);
-    setMpinModalEmail(emailOverride || (user ? user.email : localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email') || ''));
+    setMpinModalEmail(emailOverride || (user ? user.email : localStorage.getItem('kuberis_remembered_email') || localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email') || ''));
     setIsMpinModalOpen(true);
   };
 
@@ -598,7 +601,7 @@ export default function App() {
 
   // Interactive Drive Sync Trigger Action with Status Modal Feedback
   const handleTriggerDriveSync = async () => {
-    setDriveSyncStatus({ syncState: 'syncing', message: 'Scanning WealthPulse Financial Inbox folder...' });
+    setDriveSyncStatus({ syncState: 'syncing', message: 'Scanning Kuberis Financial Inbox folder...' });
 
     try {
       const res = await fetch('/api/drive-sync', {
@@ -623,7 +626,7 @@ export default function App() {
     } catch (err) {
       setDriveSyncStatus({
         syncState: 'success',
-        message: 'Checked WealthPulse Financial Inbox. No new files pending import.'
+        message: 'Checked Kuberis Financial Inbox. No new files pending import.'
       });
     }
   };
@@ -633,7 +636,7 @@ export default function App() {
     const res = await fetch('/api/state', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json', ...authHeaders },
-      body: JSON.stringify({ confirmation: 'DELETE ALL WEALTHPULSE DATA' })
+      body: JSON.stringify({ confirmation: 'DELETE ALL KUBERIS DATA' })
     });
     if (!res.ok) {
       const json = await res.json();
@@ -651,7 +654,7 @@ export default function App() {
   const handleTogglePrivacyMode = () => {
     if (!isPrivacyMode) {
       setIsPrivacyMode(true);
-      localStorage.setItem('wealthpulse_privacy_mode', 'true');
+      localStorage.setItem('kuberis_privacy_mode', 'true');
     } else {
       if (user?.hasMpin) {
         setMpinModalMode('verify');
@@ -659,7 +662,7 @@ export default function App() {
         setIsMpinModalOpen(true);
       } else {
         setIsPrivacyMode(false);
-        localStorage.setItem('wealthpulse_privacy_mode', 'false');
+        localStorage.setItem('kuberis_privacy_mode', 'false');
       }
     }
   };
@@ -711,7 +714,7 @@ export default function App() {
         <main className="page-body">
           {loading ? (
             <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
-              Loading WealthPulse state...
+              Loading Kuberis state...
             </div>
           ) : !user ? (
             <LandingPage
@@ -909,7 +912,7 @@ export default function App() {
         user={user}
         onUpdateUser={(updatedUser) => {
           setUser(updatedUser);
-          localStorage.setItem('wealthpulse_user', JSON.stringify(updatedUser));
+          localStorage.setItem('kuberis_user', JSON.stringify(updatedUser));
         }}
       />
 
@@ -944,7 +947,7 @@ export default function App() {
         onSuccess={(u, t) => {
           if (isPrivacyMode) {
             setIsPrivacyMode(false);
-            localStorage.setItem('wealthpulse_privacy_mode', 'false');
+            localStorage.setItem('kuberis_privacy_mode', 'false');
           }
           if (u && t) handleLoginSuccess(u, t, true);
         }}
@@ -979,7 +982,7 @@ export default function App() {
                     {driveSyncStatus.message}
                   </p>
                   <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '12px' }}>
-                    Dedicated Folder: <strong>WealthPulse Financial Inbox</strong> • Scheduled daily at 8:00 AM IST
+                    Dedicated Folder: <strong>Kuberis Financial Inbox</strong> • Scheduled daily at 8:00 AM IST
                   </p>
                 </div>
               )}

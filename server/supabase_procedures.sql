@@ -1,5 +1,5 @@
 -- ============================================================================
--- WEALTHPULSE SECURE STORED PROCEDURES & DATABASE SCHEMA FOR SUPABASE
+-- KUBERIS SECURE STORED PROCEDURES & DATABASE SCHEMA FOR SUPABASE
 -- Run this script in the Supabase SQL Editor (https://supabase.com/dashboard)
 -- ============================================================================
 

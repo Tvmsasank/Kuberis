@@ -1,5 +1,5 @@
 /**
- * WealthPulse AI Smart UPI & Indian Bank SMS Parser
+ * Kuberis AI Smart UPI & Indian Bank SMS Parser
  * Extracts Amount, Merchant/Beneficiary, Bank Account, Notes, Category, UPI Ref, and Timestamp
  */
 

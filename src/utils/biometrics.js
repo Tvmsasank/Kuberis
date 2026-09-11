@@ -54,7 +54,7 @@ export async function registerBiometricPasskey(user, token) {
   const creationOptions = {
     publicKey: {
       rp: {
-        name: 'WealthPulse Financial Portfolio',
+        name: 'Kuberis Financial OS',
         ...(isLocalhost ? {} : { id: hostname })
       },
       user: {
@@ -114,17 +114,17 @@ export async function registerBiometricPasskey(user, token) {
 
   if (!res.ok) throw new Error(json.error || 'Failed to register biometrics');
 
-  localStorage.setItem('wealthpulse_biometric_credential', credentialId);
-  localStorage.setItem('wealthpulse_biometric_raw_id', rawIdBase64);
-  localStorage.setItem('wealthpulse_has_biometrics', 'true');
-  localStorage.setItem('wealthpulse_remembered_email', user.email);
+  localStorage.setItem('kuberis_biometric_credential', credentialId);
+  localStorage.setItem('kuberis_biometric_raw_id', rawIdBase64);
+  localStorage.setItem('kuberis_has_biometrics', 'true');
+  localStorage.setItem('kuberis_remembered_email', user.email);
   return json;
 }
 
 export async function authenticateWithBiometrics(targetEmail) {
-  const email = targetEmail || localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email');
-  const rawIdBase64 = localStorage.getItem('wealthpulse_biometric_raw_id');
-  const credentialId = localStorage.getItem('wealthpulse_biometric_credential') || localStorage.getItem('ledgerly_biometric_credential');
+  const email = targetEmail || localStorage.getItem('kuberis_remembered_email') || localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email');
+  const rawIdBase64 = localStorage.getItem('kuberis_biometric_raw_id') || localStorage.getItem('wealthpulse_biometric_raw_id');
+  const credentialId = localStorage.getItem('kuberis_biometric_credential') || localStorage.getItem('wealthpulse_biometric_credential') || localStorage.getItem('ledgerly_biometric_credential');
 
   if (!window.PublicKeyCredential) {
     throw new Error('Biometric WebAuthn passkeys are not supported on this device/browser');

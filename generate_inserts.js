@@ -2,7 +2,7 @@ import fs from 'fs';
 
 const raw = JSON.parse(fs.readFileSync('./data/db.json', 'utf-8'));
 let sql = `-- ==========================================================
--- 📈 WealthPulse: Insert All Initial Data into Supabase Tables
+-- ⚡ Kuberis: Insert All Initial Data into Supabase Tables
 -- ==========================================================
 
 -- 1. Insert Users
