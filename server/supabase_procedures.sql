@@ -161,7 +161,7 @@ BEGIN
   VALUES (
     p_id,
     p_user_id,
-    p_date,
+    CASE WHEN p_date IS NULL OR TRIM(p_date) = '' THEN NULL ELSE p_date::date END,
     p_merchant,
     p_amount,
     p_type,
@@ -171,7 +171,7 @@ BEGIN
     COALESCE(p_created_at, NOW())
   )
   ON CONFLICT (id) DO UPDATE SET
-    date = EXCLUDED.date,
+    date = CASE WHEN EXCLUDED.date IS NULL THEN public.wealthpulse_transactions.date ELSE EXCLUDED.date END,
     merchant = EXCLUDED.merchant,
     amount = EXCLUDED.amount,
     type = EXCLUDED.type,
@@ -201,7 +201,7 @@ BEGIN
   SET merchant = p_merchant,
       amount = p_amount,
       type = p_type,
-      date = p_date,
+      date = CASE WHEN p_date IS NULL OR TRIM(p_date) = '' THEN date ELSE p_date::date END,
       category = p_category,
       account = p_account,
       tags = COALESCE(p_tags, '[]'::jsonb)

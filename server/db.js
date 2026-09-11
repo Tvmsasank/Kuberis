@@ -183,14 +183,15 @@ function syncRelationalTables(db) {
       const userId = tx.userId || tx.user_id || null;
       const tagsJson = typeof tx.tags === 'string' ? tx.tags : JSON.stringify(Array.isArray(tx.tags) ? tx.tags : []);
       const createdAt = tx.createdAt || tx.created_at || new Date().toISOString();
+      const dateVal = (tx.date && String(tx.date).trim()) ? String(tx.date).trim() : null;
 
       executeProcedureOrQuery(
         'SELECT public.sp_upsert_wealthpulse_transaction($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10)',
-        [tx.id, userId, tx.date || '', tx.merchant || '', Number(tx.amount) || 0, tx.type || 'expense', tx.category || 'Other', tx.account || 'Main Checking', tagsJson, createdAt],
+        [tx.id, userId, dateVal, tx.merchant || '', Number(tx.amount) || 0, tx.type || 'expense', tx.category || 'Other', tx.account || 'Main Checking', tagsJson, createdAt],
         `INSERT INTO public.wealthpulse_transactions (id, user_id, date, merchant, amount, type, category, account, tags, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10)
-         ON CONFLICT (id) DO UPDATE SET date = $3, merchant = $4, amount = $5, type = $6, category = $7, account = $8, tags = $9::jsonb`,
-        [tx.id, userId, tx.date || '', tx.merchant || '', Number(tx.amount) || 0, tx.type || 'expense', tx.category || 'Other', tx.account || 'Main Checking', tagsJson, createdAt]
+         VALUES ($1, $2, NULLIF($3, '')::date, $4, $5, $6, $7, $8, $9::jsonb, $10)
+         ON CONFLICT (id) DO UPDATE SET date = NULLIF($3, '')::date, merchant = $4, amount = $5, type = $6, category = $7, account = $8, tags = $9::jsonb`,
+        [tx.id, userId, dateVal, tx.merchant || '', Number(tx.amount) || 0, tx.type || 'expense', tx.category || 'Other', tx.account || 'Main Checking', tagsJson, createdAt]
       );
     }
   }
