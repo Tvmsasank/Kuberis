@@ -118,30 +118,14 @@ if (process.env.DATABASE_URL) {
           memoryDb = res.rows[0].data;
           fs.writeFileSync(DB_FILE, JSON.stringify(memoryDb, null, 2), 'utf-8');
           console.log('[Supabase PostgreSQL] Loaded live cloud data into memory!');
-
-          // Sync all existing users to public.wealthpulse_users relational table
-          if (Array.isArray(memoryDb.users)) {
-            for (const u of memoryDb.users) {
-              executeProcedureOrQuery(
-                'SELECT public.sp_upsert_wealthpulse_user($1, $2, $3, $4, $5, $6)',
-                [u.id, u.name, u.email, u.passwordHash || null, u.mpinHash || null, u.createdAt || new Date().toISOString()],
-                `INSERT INTO public.wealthpulse_users (id, name, email, password_hash, mpin_hash, created_at)
-                 VALUES ($1, $2, $3, $4, $5, $6)
-                 ON CONFLICT (id) DO UPDATE SET
-                   name = EXCLUDED.name,
-                   email = EXCLUDED.email,
-                   password_hash = EXCLUDED.password_hash,
-                   mpin_hash = EXCLUDED.mpin_hash`,
-                [u.id, u.name, u.email, u.passwordHash || null, u.mpinHash || null, u.createdAt || new Date().toISOString()]
-              );
-            }
-          }
+          syncRelationalTables(memoryDb);
         } else {
           const current = loadDb();
           await pgPool.query(
             'INSERT INTO public.wealthpulse_store (id, data) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = NOW()',
             ['main_store', JSON.stringify(current)]
           );
+          syncRelationalTables(current);
           console.log('[Supabase PostgreSQL] Seeded local database to Supabase cloud!');
         }
       } catch (e) {
@@ -166,6 +150,48 @@ async function executeProcedureOrQuery(spQuery, spParams, fallbackQuery, fallbac
       await pgPool.query(fallbackQuery, fallbackParams).catch(e => console.error('[Supabase PostgreSQL] Fallback query error:', e.message));
     } else {
       console.error('[Supabase PostgreSQL] Stored Procedure execution error:', err.message);
+    }
+  }
+}
+
+function syncRelationalTables(db) {
+  if (!pgPool || !db) return;
+
+  // 1. Sync Users to public.wealthpulse_users
+  if (Array.isArray(db.users)) {
+    for (const u of db.users) {
+      if (!u || !u.id) continue;
+      executeProcedureOrQuery(
+        'SELECT public.sp_upsert_wealthpulse_user($1, $2, $3, $4, $5, $6)',
+        [u.id, u.name || '', u.email || '', u.passwordHash || null, u.mpinHash || null, u.createdAt || new Date().toISOString()],
+        `INSERT INTO public.wealthpulse_users (id, name, email, password_hash, mpin_hash, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (id) DO UPDATE SET
+           name = EXCLUDED.name,
+           email = EXCLUDED.email,
+           password_hash = EXCLUDED.password_hash,
+           mpin_hash = EXCLUDED.mpin_hash`,
+        [u.id, u.name || '', u.email || '', u.passwordHash || null, u.mpinHash || null, u.createdAt || new Date().toISOString()]
+      );
+    }
+  }
+
+  // 2. Sync Transactions to public.wealthpulse_transactions
+  if (Array.isArray(db.transactions)) {
+    for (const tx of db.transactions) {
+      if (!tx || !tx.id) continue;
+      const userId = tx.userId || tx.user_id || null;
+      const tagsJson = typeof tx.tags === 'string' ? tx.tags : JSON.stringify(Array.isArray(tx.tags) ? tx.tags : []);
+      const createdAt = tx.createdAt || tx.created_at || new Date().toISOString();
+
+      executeProcedureOrQuery(
+        'SELECT public.sp_upsert_wealthpulse_transaction($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10)',
+        [tx.id, userId, tx.date || '', tx.merchant || '', Number(tx.amount) || 0, tx.type || 'expense', tx.category || 'Other', tx.account || 'Main Checking', tagsJson, createdAt],
+        `INSERT INTO public.wealthpulse_transactions (id, user_id, date, merchant, amount, type, category, account, tags, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10)
+         ON CONFLICT (id) DO UPDATE SET date = $3, merchant = $4, amount = $5, type = $6, category = $7, account = $8, tags = $9::jsonb`,
+        [tx.id, userId, tx.date || '', tx.merchant || '', Number(tx.amount) || 0, tx.type || 'expense', tx.category || 'Other', tx.account || 'Main Checking', tagsJson, createdAt]
+      );
     }
   }
 }
@@ -203,22 +229,7 @@ function saveDb() {
       ['main_store', JSON.stringify(memoryDb)]
     );
 
-    if (Array.isArray(memoryDb.users)) {
-      for (const u of memoryDb.users) {
-        executeProcedureOrQuery(
-          'SELECT public.sp_upsert_wealthpulse_user($1, $2, $3, $4, $5, $6)',
-          [u.id, u.name, u.email, u.passwordHash || null, u.mpinHash || null, u.createdAt || new Date().toISOString()],
-          `INSERT INTO public.wealthpulse_users (id, name, email, password_hash, mpin_hash, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6)
-           ON CONFLICT (id) DO UPDATE SET
-             name = EXCLUDED.name,
-             email = EXCLUDED.email,
-             password_hash = EXCLUDED.password_hash,
-             mpin_hash = EXCLUDED.mpin_hash`,
-          [u.id, u.name, u.email, u.passwordHash || null, u.mpinHash || null, u.createdAt || new Date().toISOString()]
-        );
-      }
-    }
+    syncRelationalTables(memoryDb);
   }
 }
 
