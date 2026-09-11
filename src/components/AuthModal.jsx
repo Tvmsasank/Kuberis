@@ -314,8 +314,8 @@ export default function AuthModal({
         return;
       }
 
-      localStorage.setItem('wealthpulse_remembered_email', payload.email);
-      if (type === 'mpin') localStorage.setItem('wealthpulse_has_mpin', 'true');
+      localStorage.setItem('kuberis_remembered_email', payload.email);
+      if (type === 'mpin') localStorage.setItem('kuberis_has_mpin', 'true');
 
       setSuccess('Signed in successfully! Previous session closed.');
       setTimeout(() => {
