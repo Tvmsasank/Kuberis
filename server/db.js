@@ -104,14 +104,8 @@ if (process.env.DATABASE_URL) {
       }
     });
 
-    pgPool.query(`
-      CREATE TABLE IF NOT EXISTS public.wealthpulse_store (
-        id VARCHAR(50) PRIMARY KEY,
-        data JSONB NOT NULL,
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
-    `).then(async () => {
-      console.log('[Supabase PostgreSQL] Connected & table initialized successfully!');
+    initDbTablesAndProcedures().then(async () => {
+      console.log('[Supabase PostgreSQL] Connected & table/procedures initialized successfully!');
       try {
         const res = await pgPool.query('SELECT data FROM public.wealthpulse_store WHERE id = $1', ['main_store']);
         if (res.rows.length > 0 && res.rows[0].data) {
@@ -139,17 +133,121 @@ if (process.env.DATABASE_URL) {
   }
 }
 
+async function initDbTablesAndProcedures() {
+  if (!pgPool) return;
+  try {
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS public.wealthpulse_store (
+        id VARCHAR(50) PRIMARY KEY,
+        data JSONB NOT NULL,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS public.wealthpulse_users (
+        id VARCHAR(50) PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash TEXT,
+        mpin_hash TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS public.wealthpulse_transactions (
+        id VARCHAR(50) PRIMARY KEY,
+        user_id VARCHAR(50) REFERENCES public.wealthpulse_users(id) ON DELETE CASCADE,
+        date DATE,
+        merchant VARCHAR(255),
+        amount NUMERIC(15, 2),
+        type VARCHAR(50),
+        category VARCHAR(100),
+        account VARCHAR(100),
+        tags JSONB DEFAULT '[]'::jsonb,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE OR REPLACE FUNCTION public.sp_upsert_wealthpulse_transaction(
+        p_id VARCHAR(50),
+        p_user_id VARCHAR(50),
+        p_date VARCHAR(50),
+        p_merchant VARCHAR(255),
+        p_amount NUMERIC(15, 2),
+        p_type VARCHAR(50),
+        p_category VARCHAR(100),
+        p_account VARCHAR(100),
+        p_tags JSONB DEFAULT '[]'::jsonb,
+        p_created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+      RETURNS VOID
+      LANGUAGE plpgsql
+      SECURITY DEFINER
+      AS $$
+      BEGIN
+        INSERT INTO public.wealthpulse_transactions (id, user_id, date, merchant, amount, type, category, account, tags, created_at)
+        VALUES (
+          p_id,
+          p_user_id,
+          CASE WHEN p_date IS NULL OR TRIM(p_date) = '' THEN NULL ELSE p_date::date END,
+          p_merchant,
+          p_amount,
+          p_type,
+          p_category,
+          p_account,
+          COALESCE(p_tags, '[]'::jsonb),
+          COALESCE(p_created_at, NOW())
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          date = CASE WHEN EXCLUDED.date IS NULL THEN public.wealthpulse_transactions.date ELSE EXCLUDED.date END,
+          merchant = EXCLUDED.merchant,
+          amount = EXCLUDED.amount,
+          type = EXCLUDED.type,
+          category = EXCLUDED.category,
+          account = EXCLUDED.account,
+          tags = EXCLUDED.tags;
+      END;
+      $$;
+
+      CREATE OR REPLACE FUNCTION public.sp_update_wealthpulse_transaction(
+        p_id VARCHAR(50),
+        p_merchant VARCHAR(255),
+        p_amount NUMERIC(15, 2),
+        p_type VARCHAR(50),
+        p_date VARCHAR(50),
+        p_category VARCHAR(100),
+        p_account VARCHAR(100),
+        p_tags JSONB DEFAULT '[]'::jsonb
+      )
+      RETURNS VOID
+      LANGUAGE plpgsql
+      SECURITY DEFINER
+      AS $$
+      BEGIN
+        UPDATE public.wealthpulse_transactions
+        SET merchant = p_merchant,
+            amount = p_amount,
+            type = p_type,
+            date = CASE WHEN p_date IS NULL OR TRIM(p_date) = '' THEN date ELSE p_date::date END,
+            category = p_category,
+            account = p_account,
+            tags = COALESCE(p_tags, '[]'::jsonb)
+        WHERE id = p_id;
+      END;
+      $$;
+    `);
+  } catch (err) {
+    console.error('[Supabase PostgreSQL] Table/Procedure init error:', err.message);
+  }
+}
+
 // Helper: Securely execute Stored Procedure with automatic fallback
 async function executeProcedureOrQuery(spQuery, spParams, fallbackQuery, fallbackParams) {
   if (!pgPool) return;
   try {
     await pgPool.query(spQuery, spParams);
   } catch (err) {
-    if (err.code === '42883' || err.message.includes('function') || err.message.includes('does not exist')) {
-      // Stored Procedure not yet created in Supabase SQL Editor; use fallback
-      await pgPool.query(fallbackQuery, fallbackParams).catch(e => console.error('[Supabase PostgreSQL] Fallback query error:', e.message));
-    } else {
-      console.error('[Supabase PostgreSQL] Stored Procedure execution error:', err.message);
+    try {
+      await pgPool.query(fallbackQuery, fallbackParams);
+    } catch (fallbackErr) {
+      console.error('[Supabase PostgreSQL] Query execution error:', fallbackErr.message);
     }
   }
 }
