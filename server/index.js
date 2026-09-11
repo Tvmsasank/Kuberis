@@ -69,6 +69,24 @@ const authenticateToken = (req, res, next) => {
   if (!userId) {
     return res.status(401).json({ error: 'Authentication token required' });
   }
+
+  // Active Session validation for multi-device session control (HDFC pattern)
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
+      if (decoded && decoded.sessionId) {
+        const activeSessionId = dbEngine.getUserActiveSession(userId);
+        if (activeSessionId && activeSessionId !== decoded.sessionId) {
+          return res.status(401).json({
+            code: 'SESSION_TERMINATED',
+            error: 'Another login was detected on a different device or browser.'
+          });
+        }
+      }
+    } catch (e) {}
+  }
+
   req.userId = userId;
   next();
 };
@@ -89,7 +107,9 @@ app.post('/api/auth/register', (req, res) => {
     }
 
     const user = dbEngine.createUser({ name, email, password });
-    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn: '30d' });
+    const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    dbEngine.setUserActiveSession(user.id, sessionId);
+    const token = jwt.sign({ userId: user.id, email: user.email, sessionId }, JWT_SECRET, { expiresIn: '30d' });
 
     res.json({
       message: 'Account created successfully',
@@ -105,7 +125,7 @@ app.post('/api/auth/register', (req, res) => {
 // POST /api/auth/login
 app.post('/api/auth/login', (req, res) => {
   try {
-    const { email, password, rememberMe } = req.body;
+    const { email, password, rememberMe, forceLogin } = req.body;
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
@@ -113,6 +133,15 @@ app.post('/api/auth/login', (req, res) => {
     const user = dbEngine.verifyUserCredentials({ email, password });
     if (!user) {
       return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Check Active Session for Multi-Device Session Detection (HDFC Pattern)
+    const existingSessionId = dbEngine.getUserActiveSession(user.id);
+    if (existingSessionId && !forceLogin) {
+      return res.json({
+        activeSessionExists: true,
+        message: "Looks like you're already logged in with another device. Please close the other session to continue here."
+      });
     }
 
     // Check if Google Authenticator 2FA is enabled for this user
@@ -131,8 +160,11 @@ app.post('/api/auth/login', (req, res) => {
       });
     }
 
+    const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    dbEngine.setUserActiveSession(user.id, sessionId);
+
     const expiresIn = rememberMe ? '30d' : '1d';
-    const token = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn });
+    const token = jwt.sign({ userId: user.id, email: user.email, sessionId }, JWT_SECRET, { expiresIn });
 
     res.json({
       message: 'Signed in successfully',
@@ -774,7 +806,7 @@ app.post('/api/auth/mpin/set', (req, res) => {
 // POST /api/auth/mpin/verify
 app.post('/api/auth/mpin/verify', async (req, res) => {
   try {
-    const { email, mpin } = req.body;
+    const { email, mpin, forceLogin } = req.body;
     if (!email || !mpin) {
       return res.status(400).json({ error: 'Email and MPIN are required' });
     }
@@ -819,6 +851,15 @@ app.post('/api/auth/mpin/verify', async (req, res) => {
     // Reset failed attempts on success
     dbUser.failedMpinAttempts = 0;
 
+    // Check Active Session for Multi-Device Session Detection (HDFC Pattern)
+    const existingSessionId = dbEngine.getUserActiveSession(user.id);
+    if (existingSessionId && !forceLogin) {
+      return res.json({
+        activeSessionExists: true,
+        message: "Looks like you're already logged in with another device. Please close the other session to continue here."
+      });
+    }
+
     // Check if Google Authenticator 2FA is enabled
     const twoFactorDetails = dbEngine.getUserTwoFactorSecret(user.id);
     if (twoFactorDetails && twoFactorDetails.enabled) {
@@ -835,8 +876,11 @@ app.post('/api/auth/mpin/verify', async (req, res) => {
       });
     }
 
+    const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    dbEngine.setUserActiveSession(user.id, sessionId);
+
     const token = jwt.sign(
-      { userId: user.id, email: user.email },
+      { userId: user.id, email: user.email, sessionId },
       JWT_SECRET,
       { expiresIn: '30d' }
     );
@@ -845,6 +889,19 @@ app.post('/api/auth/mpin/verify', async (req, res) => {
   } catch (err) {
     console.error('POST /api/auth/mpin/verify error:', err);
     res.status(400).json({ error: err.message || 'MPIN authentication failed' });
+  }
+});
+
+// POST /api/auth/logout
+app.post('/api/auth/logout', (req, res) => {
+  try {
+    const userId = getUserIdFromReq(req);
+    if (userId) {
+      dbEngine.clearUserActiveSession(userId);
+    }
+    res.json({ success: true, message: 'Logged out successfully' });
+  } catch (e) {
+    res.json({ success: true });
   }
 });
 

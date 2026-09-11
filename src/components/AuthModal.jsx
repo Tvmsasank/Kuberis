@@ -163,6 +163,14 @@ export default function AuthModal({
         throw new Error(json.error || 'Invalid 4-Digit MPIN');
       }
 
+      if (json.activeSessionExists) {
+        setPendingSessionOverride({
+          type: 'mpin',
+          payload: { email: targetEmail, mpin: completedMpin }
+        });
+        return;
+      }
+
       localStorage.setItem('wealthpulse_remembered_email', targetEmail);
       localStorage.setItem('wealthpulse_has_mpin', 'true');
 
@@ -249,6 +257,14 @@ export default function AuthModal({
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Sign in failed');
 
+      if (json.activeSessionExists) {
+        setPendingSessionOverride({
+          type: 'password',
+          payload: { email: email.trim(), password }
+        });
+        return;
+      }
+
       if (json.require2FA) {
         setTotpTempToken(json.tempToken);
         setAuthMethod('2fa_challenge');
@@ -267,6 +283,46 @@ export default function AuthModal({
       }, 400);
     } catch (err) {
       setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConfirmSessionOverride = async () => {
+    if (!pendingSessionOverride) return;
+    setLoading(true);
+    setError('');
+    const { type, payload } = pendingSessionOverride;
+    setPendingSessionOverride(null);
+
+    try {
+      const endpoint = type === 'mpin' ? '/api/auth/mpin/verify' : '/api/auth/login';
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, forceLogin: true })
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Sign in failed');
+
+      if (json.require2FA) {
+        setTotpTempToken(json.tempToken);
+        setAuthMethod('2fa_challenge');
+        setSuccess('Google Authenticator 2FA verification required');
+        return;
+      }
+
+      localStorage.setItem('wealthpulse_remembered_email', payload.email);
+      if (type === 'mpin') localStorage.setItem('wealthpulse_has_mpin', 'true');
+
+      setSuccess('Signed in successfully! Previous session closed.');
+      setTimeout(() => {
+        onLoginSuccess(json.user, json.token, true);
+        onClose();
+      }, 400);
+    } catch (err) {
+      setError(err.message || 'Sign in failed');
     } finally {
       setLoading(false);
     }
@@ -932,6 +988,49 @@ export default function AuthModal({
               </button>
             </div>
           </form>
+        )}
+
+        {/* HDFC-Style Another Login Detected Modal */}
+        {pendingSessionOverride && (
+          <div className="modal-backdrop" style={{ zIndex: 1100 }}>
+            <div className="modal-content" style={{ maxWidth: '440px', textAlign: 'center', padding: '32px 24px' }}>
+              <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px auto', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+                <Shield size={32} />
+              </div>
+
+              <h3 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '12px' }}>
+                Another Login Detected
+              </h3>
+
+              <p style={{ fontSize: '13.5px', color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '24px' }}>
+                Looks like you're already logged in with another device. Please close the other session to continue here.
+              </p>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ flex: 1, padding: '12px', borderRadius: '12px', fontWeight: '700' }}
+                  onClick={() => {
+                    setPendingSessionOverride(null);
+                    setError('Sign in cancelled. Your existing session remains active.');
+                    setLoading(false);
+                  }}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ flex: 1, padding: '12px', borderRadius: '12px', fontWeight: '800' }}
+                  onClick={handleConfirmSessionOverride}
+                >
+                  Okay
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

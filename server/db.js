@@ -325,8 +325,34 @@ export const dbEngine = {
       email: user.email,
       createdAt: user.createdAt,
       hasMpin: !!user.mpinHash,
-      twoFactorEnabled: !!user.twoFactorEnabled
+      twoFactorEnabled: !!user.twoFactorEnabled,
+      activeSessionId: user.activeSessionId || null
     };
+  },
+
+  setUserActiveSession(userId, sessionId) {
+    const db = loadDb();
+    const user = db.users.find(u => u.id === userId);
+    if (!user) return false;
+    user.activeSessionId = sessionId;
+    saveDb();
+    return true;
+  },
+
+  getUserActiveSession(userId) {
+    const db = loadDb();
+    const user = db.users.find(u => u.id === userId);
+    return user ? user.activeSessionId || null : null;
+  },
+
+  clearUserActiveSession(userId) {
+    const db = loadDb();
+    const user = db.users.find(u => u.id === userId);
+    if (user) {
+      user.activeSessionId = null;
+      saveDb();
+    }
+    return true;
   },
 
   setTempTwoFactorSecret(userId, tempSecret) {

@@ -208,6 +208,7 @@ export default function App() {
 
   // Drive Sync Notification Modal State
   const [driveSyncStatus, setDriveSyncStatus] = useState(null);
+  const [sessionTerminatedModalOpen, setSessionTerminatedModalOpen] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -245,6 +246,10 @@ export default function App() {
           }));
         }
       } else if (res.status === 401) {
+        const json = await res.json().catch(() => ({}));
+        if (json.code === 'SESSION_TERMINATED') {
+          setSessionTerminatedModalOpen(true);
+        }
         handleLogout();
       }
     } catch (err) {
@@ -290,13 +295,16 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', headers: authHeaders });
+    } catch (e) {}
     setUser(null);
     setToken('');
     localStorage.removeItem('wealthpulse_token');
     localStorage.removeItem('wealthpulse_user');
     sessionStorage.removeItem('wealthpulse_token');
-    setActiveTab('dashboard');
+    setActiveTab('home');
   };
 
   const handleOpenMpinModal = (mode = 'verify', emailOverride = '') => {
@@ -1060,6 +1068,40 @@ export default function App() {
         token={token}
         onSyncCompleted={fetchState}
       />
+
+      {/* Session Terminated Notification Modal */}
+      {sessionTerminatedModalOpen && (
+        <div className="modal-backdrop" style={{ zIndex: 1200 }}>
+          <div className="modal-content" style={{ maxWidth: '440px', textAlign: 'center', padding: '32px 24px' }}>
+            <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.15)', color: '#EF4444', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px auto', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+              <Lock size={32} />
+            </div>
+
+            <h3 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '10px' }}>
+              Session Terminated
+            </h3>
+
+            <p style={{ fontSize: '13.5px', color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '24px' }}>
+              Your account was signed into from another device or browser.
+              <br /><br />
+              This active session has been automatically logged out to protect your account.
+            </p>
+
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ width: '100%', padding: '12px', borderRadius: '12px', fontWeight: '800' }}
+              onClick={() => {
+                setSessionTerminatedModalOpen(false);
+                setAuthModalMode('login');
+                setIsAuthModalOpen(true);
+              }}
+            >
+              Sign In Again
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
