@@ -71,20 +71,28 @@ const authenticateToken = (req, res, next) => {
   }
 
   // Active Session validation for multi-device session control (HDFC pattern)
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    try {
-      const decoded = jwt.verify(authHeader.split(' ')[1], JWT_SECRET);
-      if (decoded && decoded.sessionId) {
-        const activeSessionId = dbEngine.getUserActiveSession(userId);
-        if (activeSessionId && activeSessionId !== decoded.sessionId) {
-          return res.status(401).json({
-            code: 'SESSION_TERMINATED',
-            error: 'Another login was detected on a different device or browser.'
-          });
-        }
-      }
-    } catch (e) {}
+  const authHeader = req.headers.authorization || req.headers['x-auth-token'];
+  let rawToken = null;
+  if (authHeader) {
+    rawToken = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : authHeader;
+  }
+
+  const activeSessionId = dbEngine.getUserActiveSession(userId);
+  if (activeSessionId) {
+    let requestSessionId = null;
+    if (rawToken) {
+      try {
+        const decoded = jwt.verify(rawToken, JWT_SECRET);
+        requestSessionId = decoded ? decoded.sessionId : null;
+      } catch (e) {}
+    }
+
+    if (!requestSessionId || requestSessionId !== activeSessionId) {
+      return res.status(401).json({
+        code: 'SESSION_TERMINATED',
+        error: 'Another login was detected on a different device or browser.'
+      });
+    }
   }
 
   req.userId = userId;

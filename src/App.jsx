@@ -269,7 +269,13 @@ export default function App() {
     const interval = setInterval(async () => {
       try {
         const res = await fetch('/api/investments', { headers: authHeaders });
-        if (res.ok) {
+        if (res.status === 401) {
+          const json = await res.json().catch(() => ({}));
+          if (json.code === 'SESSION_TERMINATED') {
+            setSessionTerminatedModalOpen(true);
+            handleLogout();
+          }
+        } else if (res.ok) {
           const invData = await res.json();
           if (Array.isArray(invData) && invData.length > 0) {
             setInvestments(invData);
