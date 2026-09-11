@@ -305,8 +305,11 @@ app.post('/api/auth/2fa/verify-login', (req, res) => {
       return res.status(401).json({ error: 'Invalid 6-digit Google Authenticator code or recovery code' });
     }
 
+    const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    dbEngine.setUserActiveSession(user.id, sessionId);
+
     const expiresIn = decoded.rememberMe ? '30d' : '1d';
-    const finalToken = jwt.sign({ userId: user.id, email: user.email }, JWT_SECRET, { expiresIn });
+    const finalToken = jwt.sign({ userId: user.id, email: user.email, sessionId }, JWT_SECRET, { expiresIn });
 
     res.json({
       message: '2FA verification successful!',
@@ -932,7 +935,7 @@ app.post('/api/auth/webauthn/register', (req, res) => {
 // POST /api/auth/webauthn/verify
 app.post('/api/auth/webauthn/verify', (req, res) => {
   try {
-    const { credentialId } = req.body;
+    const { credentialId, forceLogin } = req.body;
     if (!credentialId) {
       return res.status(400).json({ error: 'Biometric credential ID required' });
     }
@@ -940,6 +943,15 @@ app.post('/api/auth/webauthn/verify', (req, res) => {
     const user = dbEngine.verifyWebAuthnCredential({ credentialId });
     if (!user) {
       return res.status(401).json({ error: 'Biometric verification failed' });
+    }
+
+    // Check Active Session for Multi-Device Session Detection (HDFC Pattern)
+    const existingSessionId = dbEngine.getUserActiveSession(user.id);
+    if (existingSessionId && !forceLogin) {
+      return res.json({
+        activeSessionExists: true,
+        message: "Looks like you're already logged in with another device. Please close the other session to continue here."
+      });
     }
 
     // Check if Google Authenticator 2FA is enabled
@@ -958,8 +970,11 @@ app.post('/api/auth/webauthn/verify', (req, res) => {
       });
     }
 
+    const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    dbEngine.setUserActiveSession(user.id, sessionId);
+
     const token = jwt.sign(
-      { userId: user.id, email: user.email },
+      { userId: user.id, email: user.email, sessionId },
       JWT_SECRET,
       { expiresIn: '30d' }
     );
@@ -976,9 +991,9 @@ app.post('/api/auth/webauthn/verify', (req, res) => {
 // ==========================================
 
 // GET /api/state
-app.get('/api/state', (req, res) => {
+app.get('/api/state', authenticateToken, (req, res) => {
   try {
-    const userId = getUserIdFromReq(req);
+    const userId = req.userId;
     const state = dbEngine.getState(userId);
     res.json(state);
   } catch (err) {
@@ -988,9 +1003,9 @@ app.get('/api/state', (req, res) => {
 });
 
 // GET /api/export
-app.get('/api/export', (req, res) => {
+app.get('/api/export', authenticateToken, (req, res) => {
   try {
-    const userId = getUserIdFromReq(req);
+    const userId = req.userId;
     const { format } = req.query;
     const state = dbEngine.getState(userId);
     const dateStr = new Date().toISOString().split('T')[0];
@@ -1020,9 +1035,9 @@ app.get('/api/export', (req, res) => {
 });
 
 // POST /api/transactions
-app.post('/api/transactions', (req, res) => {
+app.post('/api/transactions', authenticateToken, (req, res) => {
   try {
-    const userId = getUserIdFromReq(req);
+    const userId = req.userId;
     const batch = req.body;
     if (!batch) {
       return res.status(400).json({ error: 'Payload required' });
@@ -1036,9 +1051,9 @@ app.post('/api/transactions', (req, res) => {
 });
 
 // PATCH /api/transactions
-app.patch('/api/transactions', (req, res) => {
+app.patch('/api/transactions', authenticateToken, (req, res) => {
   try {
-    const userId = getUserIdFromReq(req);
+    const userId = req.userId;
     const { id, merchant, amount, type, date, category, account, tags } = req.body;
     if (!id) {
       return res.status(400).json({ error: 'Transaction ID required' });
@@ -1055,9 +1070,9 @@ app.patch('/api/transactions', (req, res) => {
 });
 
 // DELETE /api/transactions
-app.delete('/api/transactions', (req, res) => {
+app.delete('/api/transactions', authenticateToken, (req, res) => {
   try {
-    const userId = getUserIdFromReq(req);
+    const userId = req.userId;
     const id = req.query.id || req.body.id;
     if (!id) {
       return res.status(400).json({ error: 'Transaction ID required' });
@@ -1322,9 +1337,9 @@ app.delete('/api/aa/unlink', (req, res) => {
 });
 
 // PUT /api/preferences
-app.put('/api/preferences', (req, res) => {
+app.put('/api/preferences', authenticateToken, (req, res) => {
   try {
-    const userId = getUserIdFromReq(req);
+    const userId = req.userId;
     const updates = req.body;
     if (!updates) {
       return res.status(400).json({ error: 'Payload required' });
@@ -1342,9 +1357,9 @@ app.put('/api/preferences', (req, res) => {
 // ==========================================
 
 // GET /api/investments
-app.get('/api/investments', async (req, res) => {
+app.get('/api/investments', authenticateToken, async (req, res) => {
   try {
-    const userId = getUserIdFromReq(req);
+    const userId = req.userId;
     const investments = dbEngine.getInvestments(userId);
     const updated = await refreshHoldingsPrices(investments);
     dbEngine.saveInvestments(userId, updated);
@@ -1356,9 +1371,9 @@ app.get('/api/investments', async (req, res) => {
 });
 
 // POST /api/investments
-app.post('/api/investments', (req, res) => {
+app.post('/api/investments', authenticateToken, (req, res) => {
   try {
-    const userId = getUserIdFromReq(req);
+    const userId = req.userId;
     const holding = req.body;
     if (!holding || !holding.name) {
       return res.status(400).json({ error: 'Asset name required' });
@@ -1372,9 +1387,9 @@ app.post('/api/investments', (req, res) => {
 });
 
 // PATCH /api/investments
-app.patch('/api/investments', (req, res) => {
+app.patch('/api/investments', authenticateToken, (req, res) => {
   try {
-    const userId = getUserIdFromReq(req);
+    const userId = req.userId;
     const { id, ...updates } = req.body;
     if (!id) {
       return res.status(400).json({ error: 'Investment ID required' });
@@ -1388,9 +1403,9 @@ app.patch('/api/investments', (req, res) => {
 });
 
 // DELETE /api/investments
-app.delete('/api/investments', (req, res) => {
+app.delete('/api/investments', authenticateToken, (req, res) => {
   try {
-    const userId = getUserIdFromReq(req);
+    const userId = req.userId;
     const id = req.query.id || req.body.id;
     if (!id) {
       return res.status(400).json({ error: 'Investment ID required' });
@@ -1404,9 +1419,9 @@ app.delete('/api/investments', (req, res) => {
 });
 
 // POST /api/investments/refresh-prices (Live market price sync)
-app.post('/api/investments/refresh-prices', async (req, res) => {
+app.post('/api/investments/refresh-prices', authenticateToken, async (req, res) => {
   try {
-    const userId = getUserIdFromReq(req);
+    const userId = req.userId;
     const currentInvestments = dbEngine.getInvestments(userId);
     const updatedInvestments = await refreshHoldingsPrices(currentInvestments);
     dbEngine.saveInvestments(userId, updatedInvestments);
