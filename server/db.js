@@ -182,14 +182,15 @@ function syncRelationalTables(db) {
       const userId = tx.userId || tx.user_id || null;
       const tagsJson = typeof tx.tags === 'string' ? tx.tags : JSON.stringify(Array.isArray(tx.tags) ? tx.tags : []);
       const createdAt = tx.createdAt || tx.created_at || new Date().toISOString();
-      const dateVal = (tx.date && String(tx.date).trim()) ? String(tx.date).trim() : null;
+      const rawDate = (tx.date && String(tx.date).trim()) ? String(tx.date).trim() : null;
+      const dateVal = (rawDate && !isNaN(Date.parse(rawDate))) ? rawDate : new Date().toISOString().split('T')[0];
 
       executeProcedureOrQuery(
         'SELECT public.sp_upsert_wealthpulse_transaction($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10)',
         [tx.id, userId, dateVal, tx.merchant || '', Number(tx.amount) || 0, tx.type || 'expense', tx.category || 'Other', tx.account || 'Main Checking', tagsJson, createdAt],
         `INSERT INTO public.wealthpulse_transactions (id, user_id, date, merchant, amount, type, category, account, tags, created_at)
-         VALUES ($1, $2, NULLIF($3, '')::date, $4, $5, $6, $7, $8, $9::jsonb, $10)
-         ON CONFLICT (id) DO UPDATE SET date = NULLIF($3, '')::date, merchant = $4, amount = $5, type = $6, category = $7, account = $8, tags = $9::jsonb`,
+         VALUES ($1, $2, COALESCE(NULLIF($3, '')::date, CURRENT_DATE), $4, $5, $6, $7, $8, $9::jsonb, $10)
+         ON CONFLICT (id) DO UPDATE SET date = COALESCE(NULLIF($3, '')::date, CURRENT_DATE), merchant = $4, amount = $5, type = $6, category = $7, account = $8, tags = $9::jsonb`,
         [tx.id, userId, dateVal, tx.merchant || '', Number(tx.amount) || 0, tx.type || 'expense', tx.category || 'Other', tx.account || 'Main Checking', tagsJson, createdAt]
       );
     }
@@ -656,10 +657,13 @@ export const dbEngine = {
 
   addTransaction(userId, transaction) {
     const db = loadDb();
+    const rawTxDate = (transaction.date && String(transaction.date).trim()) ? String(transaction.date).trim() : null;
+    const safeTxDate = (rawTxDate && !isNaN(Date.parse(rawTxDate))) ? rawTxDate : new Date().toISOString().split('T')[0];
+
     const newTx = {
       id: `tx_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
       userId,
-      date: transaction.date || new Date().toISOString().split('T')[0],
+      date: safeTxDate,
       merchant: transaction.merchant || 'Unknown Merchant',
       amount: Number(transaction.amount) || 0,
       category: transaction.category || 'Other',
@@ -678,11 +682,11 @@ export const dbEngine = {
     // Dual-sync to relational table if pgPool is connected
     if (pgPool) {
       executeProcedureOrQuery(
-        'SELECT public.sp_upsert_wealthpulse_transaction($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+        'SELECT public.sp_upsert_wealthpulse_transaction($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10)',
         [newTx.id, newTx.userId, newTx.date, newTx.merchant, newTx.amount, newTx.type, newTx.category, newTx.account, JSON.stringify(newTx.tags), newTx.createdAt],
         `INSERT INTO public.wealthpulse_transactions (id, user_id, date, merchant, amount, type, category, account, tags, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-         ON CONFLICT (id) DO UPDATE SET date = $3, merchant = $4, amount = $5, type = $6, category = $7, account = $8, tags = $9`,
+         VALUES ($1, $2, COALESCE(NULLIF($3, '')::date, CURRENT_DATE), $4, $5, $6, $7, $8, $9::jsonb, $10)
+         ON CONFLICT (id) DO UPDATE SET date = COALESCE(NULLIF($3, '')::date, CURRENT_DATE), merchant = $4, amount = $5, type = $6, category = $7, account = $8, tags = $9::jsonb`,
         [newTx.id, newTx.userId, newTx.date, newTx.merchant, newTx.amount, newTx.type, newTx.category, newTx.account, JSON.stringify(newTx.tags), newTx.createdAt]
       );
     }
@@ -695,9 +699,13 @@ export const dbEngine = {
     const index = (db.transactions || []).findIndex(t => t.id === id && (t.userId === userId || !t.userId));
     if (index === -1) throw new Error('Transaction not found');
 
+    const updatedRawDate = updates.date ? String(updates.date).trim() : db.transactions[index].date;
+    const safeUpdatedDate = (updatedRawDate && !isNaN(Date.parse(updatedRawDate))) ? updatedRawDate : new Date().toISOString().split('T')[0];
+
     db.transactions[index] = {
       ...db.transactions[index],
       ...updates,
+      date: safeUpdatedDate,
       amount: updates.amount !== undefined ? Number(updates.amount) : db.transactions[index].amount,
       updatedAt: new Date().toISOString()
     };
@@ -706,10 +714,10 @@ export const dbEngine = {
     if (pgPool) {
       const tx = db.transactions[index];
       executeProcedureOrQuery(
-        'SELECT public.sp_update_wealthpulse_transaction($1, $2, $3, $4, $5, $6, $7, $8)',
+        'SELECT public.sp_update_wealthpulse_transaction($1, $2, $3, $4, $5, $6, $7, $8::jsonb)',
         [tx.id, tx.merchant, tx.amount, tx.type, tx.date, tx.category, tx.account, JSON.stringify(tx.tags)],
         `UPDATE public.wealthpulse_transactions
-         SET merchant = $1, amount = $2, type = $3, date = $4, category = $5, account = $6, tags = $7
+         SET merchant = $1, amount = $2, type = $3, date = COALESCE(NULLIF($4, '')::date, CURRENT_DATE), category = $5, account = $6, tags = $7::jsonb
          WHERE id = $8`,
         [tx.merchant, tx.amount, tx.type, tx.date, tx.category, tx.account, JSON.stringify(tx.tags), tx.id]
       );

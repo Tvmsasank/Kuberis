@@ -156,12 +156,24 @@ RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
+DECLARE
+  v_date DATE;
 BEGIN
+  BEGIN
+    IF p_date IS NULL OR TRIM(p_date) = '' THEN
+      v_date := CURRENT_DATE;
+    ELSE
+      v_date := p_date::date;
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    v_date := CURRENT_DATE;
+  END;
+
   INSERT INTO public.wealthpulse_transactions (id, user_id, date, merchant, amount, type, category, account, tags, created_at)
   VALUES (
     p_id,
     p_user_id,
-    CASE WHEN p_date IS NULL OR TRIM(p_date) = '' THEN NULL ELSE p_date::date END,
+    v_date,
     p_merchant,
     p_amount,
     p_type,
@@ -171,7 +183,7 @@ BEGIN
     COALESCE(p_created_at, NOW())
   )
   ON CONFLICT (id) DO UPDATE SET
-    date = CASE WHEN EXCLUDED.date IS NULL THEN public.wealthpulse_transactions.date ELSE EXCLUDED.date END,
+    date = EXCLUDED.date,
     merchant = EXCLUDED.merchant,
     amount = EXCLUDED.amount,
     type = EXCLUDED.type,
@@ -196,12 +208,24 @@ RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
+DECLARE
+  v_date DATE;
 BEGIN
+  BEGIN
+    IF p_date IS NULL OR TRIM(p_date) = '' THEN
+      v_date := CURRENT_DATE;
+    ELSE
+      v_date := p_date::date;
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    v_date := CURRENT_DATE;
+  END;
+
   UPDATE public.wealthpulse_transactions
   SET merchant = p_merchant,
       amount = p_amount,
       type = p_type,
-      date = CASE WHEN p_date IS NULL OR TRIM(p_date) = '' THEN date ELSE p_date::date END,
+      date = v_date,
       category = p_category,
       account = p_account,
       tags = COALESCE(p_tags, '[]'::jsonb)
