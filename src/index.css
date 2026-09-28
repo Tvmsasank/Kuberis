@@ -550,18 +550,27 @@ select.form-control option {
 /* Data Tables */
 .table-container {
   width: 100%;
+  max-height: 620px;
   overflow-x: auto;
+  overflow-y: auto;
+  position: relative;
+  border-radius: var(--radius-lg);
 }
 
 .data-table {
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
+  border-collapse: collapse;
   text-align: left;
 }
 
+.data-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
 .data-table th {
-  padding: 12px 14px;
+  padding: 14px 16px;
   font-size: 12px;
   font-weight: 700;
   color: var(--text-muted);
@@ -569,9 +578,9 @@ select.form-control option {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   position: sticky;
-  top: 80px; /* 28px Ticker + 52px Header = 80px */
-  z-index: 100;
-  background: #0A192F;
+  top: 0;
+  z-index: 20;
+  background: var(--bg-navy-card);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 

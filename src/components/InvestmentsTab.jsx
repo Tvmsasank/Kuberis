@@ -469,11 +469,11 @@ export default function InvestmentsTab({
           </div>
 
           {/* 📋 Exact Zerodha Holdings Table */}
-          <div className="card card-table" style={{ padding: '0', borderRadius: '20px', overflow: 'visible', border: '1px solid var(--border-color)', marginBottom: '24px' }}>
+          <div className="card card-table" style={{ padding: '0', borderRadius: '20px', overflow: 'hidden', border: '1px solid var(--border-color)', marginBottom: '24px' }}>
             <div className="table-container">
-              <table className="data-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0' }}>
+              <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ background: 'rgba(255, 255, 255, 0.02)' }}>
+                  <tr style={{ background: 'var(--bg-navy-card)' }}>
                     <th style={{ padding: '14px 16px', borderTopLeftRadius: '20px' }}>Instrument</th>
                     <th>Qty.</th>
                     <th>Avg. Cost</th>
