@@ -266,15 +266,16 @@ body::after {
 .global-header-sticky {
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 9999;
   width: 100%;
+  height: 80px;
   background: var(--bg-app);
   border-bottom: 1px solid var(--border-color);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 .top-bar {
-  height: 60px;
+  height: 52px;
   background: var(--bg-app);
   display: flex;
   align-items: center;
@@ -318,6 +319,20 @@ body::after {
   transform: translateY(-6px) scale(1.012);
   border-color: var(--border-glass);
   box-shadow: var(--shadow-glow), var(--shadow-md), 0 20px 40px -10px rgba(0, 0, 0, 0.4);
+}
+
+/* Special Table Container Card (No transform to prevent breaking z-index stacking context) */
+.card-table {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 0;
+  box-shadow: var(--shadow-sm);
+  will-change: auto !important;
+}
+
+.card-table:hover {
+  transform: none !important;
 }
 
 /* 🔴 Live Streaming Marquee Ticker */
@@ -554,8 +569,8 @@ select.form-control option {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   position: sticky;
-  top: 88px; /* 28px Ticker + 60px Header = 88px */
-  z-index: 40;
+  top: 80px; /* 28px Ticker + 52px Header = 80px */
+  z-index: 100;
   background: #0A192F;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }

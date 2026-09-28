@@ -194,7 +194,7 @@ export default function TransactionsTab({
       {filtered.length > 0 ? (
         <>
           {/* Desktop Table View */}
-          <div className="table-container desktop-table-view">
+          <div className="table-container desktop-table-view card-table">
             <table className="data-table">
               <thead>
                 <tr>

@@ -206,7 +206,7 @@ export default function Header({
       </div>
 
       {/* Main Top Header Bar */}
-      <header className="top-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px', height: '60px', background: isDark ? '#040D1A' : '#FFFFFF' }}>
+      <header className="top-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px', height: '52px', background: isDark ? '#040D1A' : '#FFFFFF' }}>
         <div className="page-title-area" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {!user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
