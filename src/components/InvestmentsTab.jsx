@@ -469,12 +469,12 @@ export default function InvestmentsTab({
           </div>
 
           {/* 📋 Exact Zerodha Holdings Table */}
-          <div className="card" style={{ padding: '0', borderRadius: '20px', overflow: 'hidden', border: '1px solid var(--border-color)', marginBottom: '24px' }}>
+          <div className="card" style={{ padding: '0', borderRadius: '20px', overflow: 'visible', border: '1px solid var(--border-color)', marginBottom: '24px' }}>
             <div className="table-container">
-              <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <table className="data-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0' }}>
                 <thead>
                   <tr style={{ background: 'rgba(255, 255, 255, 0.02)' }}>
-                    <th style={{ padding: '14px 16px' }}>Instrument</th>
+                    <th style={{ padding: '14px 16px', borderTopLeftRadius: '20px' }}>Instrument</th>
                     <th>Qty.</th>
                     <th>Avg. Cost</th>
                     <th>LTP</th>
@@ -483,7 +483,7 @@ export default function InvestmentsTab({
                     <th style={{ textAlign: 'right' }}>P&L</th>
                     <th style={{ textAlign: 'right' }}>Net Chg.</th>
                     <th style={{ textAlign: 'right' }}>Day Chg.</th>
-                    <th style={{ textAlign: 'center', padding: '14px 16px' }}>Actions</th>
+                    <th style={{ textAlign: 'center', padding: '14px 16px', borderTopRightRadius: '20px' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>

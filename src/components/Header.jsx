@@ -159,7 +159,7 @@ export default function Header({
   );
 
   return (
-    <div style={{ width: '100%' }}>
+    <div className="global-header-sticky">
       {/* 🔴 Top Live Streaming Marquee Ticker Bar */}
       <div
         style={{

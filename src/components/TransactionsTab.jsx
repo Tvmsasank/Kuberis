@@ -198,12 +198,12 @@ export default function TransactionsTab({
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Date & Merchant</th>
+                  <th style={{ borderTopLeftRadius: '16px' }}>Date & Merchant</th>
                   <th>Category (Inline edit)</th>
                   <th>Account</th>
                   <th>Tags</th>
                   <th style={{ textAlign: 'right' }}>Amount</th>
-                  <th style={{ textAlign: 'center' }}>Actions</th>
+                  <th style={{ textAlign: 'center', borderTopRightRadius: '16px' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
