@@ -164,9 +164,10 @@ export default function Header({
       <div
         style={{
           width: '100%',
-          background: isDark ? 'rgba(3, 10, 22, 0.95)' : '#F1F5F9',
+          height: '28px',
+          background: isDark ? '#040D1A' : '#F1F5F9',
           borderBottom: '1px solid var(--border-color)',
-          padding: '5px 0',
+          padding: '0',
           display: 'flex',
           alignItems: 'center',
           position: 'relative',
@@ -185,7 +186,7 @@ export default function Header({
             padding: '0 16px',
             fontWeight: '900',
             flexShrink: 0,
-            background: isDark ? 'rgba(3, 10, 22, 0.98)' : '#F1F5F9',
+            background: isDark ? '#040D1A' : '#F1F5F9',
             boxShadow: '10px 0 20px rgba(0,0,0,0.3)',
             zIndex: 10
           }}
@@ -205,7 +206,7 @@ export default function Header({
       </div>
 
       {/* Main Top Header Bar */}
-      <header className="top-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px' }}>
+      <header className="top-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 20px', height: '60px', background: isDark ? '#040D1A' : '#FFFFFF' }}>
         <div className="page-title-area" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {!user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

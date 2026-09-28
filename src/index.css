@@ -262,23 +262,20 @@ body::after {
   width: 100% !important;
 }
 
-/* Top Header Sticky Wrapper & Bar (Liquid Glassmorphism) */
+/* Top Header Sticky Wrapper & Bar (Solid Non-Bleeding Header) */
 .global-header-sticky {
   position: sticky;
   top: 0;
   z-index: 100;
   width: 100%;
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
   background: var(--bg-app);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 
 .top-bar {
-  height: var(--header-height);
-  background: var(--bg-sidebar);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  border-bottom: 1px solid var(--border-color);
+  height: 60px;
+  background: var(--bg-app);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -557,11 +554,14 @@ select.form-control option {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   position: sticky;
-  top: 86px;
-  z-index: 25;
-  background: var(--bg-navy-card);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  top: 88px; /* 28px Ticker + 60px Header = 88px */
+  z-index: 40;
+  background: #0A192F;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+[data-theme='light'] .data-table th {
+  background: #FFFFFF;
 }
 
 .data-table td {
