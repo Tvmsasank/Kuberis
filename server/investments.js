@@ -163,7 +163,7 @@ async function querySingleYahooSymbol(symbol) {
   const cacheKey = `price_${symbol}`;
   const cached = priceCache.get(cacheKey);
   if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
-    return cached.price;
+    return cached;
   }
 
   try {
@@ -176,9 +176,14 @@ async function querySingleYahooSymbol(symbol) {
       const data = await res.json();
       const meta = data?.chart?.result?.[0]?.meta;
       const livePrice = meta?.regularMarketPrice || meta?.chartPreviousClose || meta?.previousClose;
+      const previousClose = meta?.chartPreviousClose || meta?.previousClose || livePrice;
+      const dayChange = (typeof livePrice === 'number' && typeof previousClose === 'number') ? livePrice - previousClose : 0;
+      const dayPercentage = (previousClose > 0) ? (dayChange / previousClose) * 100 : 0;
+
       if (livePrice && typeof livePrice === 'number' && livePrice > 0) {
-        priceCache.set(cacheKey, { price: livePrice, timestamp: Date.now() });
-        return livePrice;
+        const result = { price: livePrice, previousClose, dayChange, dayPercentage };
+        priceCache.set(cacheKey, { ...result, timestamp: Date.now() });
+        return result;
       }
     }
   } catch (err) {
@@ -191,61 +196,67 @@ async function querySingleYahooSymbol(symbol) {
  * Fetch live stock price with dual NSE (.NS) and BSE (.BO) fallback resolution
  */
 export async function fetchStockPrice(symbolOrName) {
-  if (!symbolOrName) return { price: null, symbol: null };
+  if (!symbolOrName) return { price: null, symbol: null, previousClose: null, dayChange: 0, dayPercentage: 0 };
   const primarySymbol = resolveStockSymbol(symbolOrName);
 
   // 1. Try Primary Symbol (e.g. TMCV.NS, TMPV.NS, DBEIL.NS)
-  let price = await querySingleYahooSymbol(primarySymbol);
-  if (price !== null) {
-    return { price, symbol: primarySymbol };
+  let quote = await querySingleYahooSymbol(primarySymbol);
+  if (quote && quote.price !== null) {
+    return { ...quote, symbol: primarySymbol };
   }
 
   // 2. Fallback: If .NS failed, try .BO (BSE India)
   if (primarySymbol && primarySymbol.endsWith('.NS')) {
     const bseSymbol = primarySymbol.replace(/\.NS$/, '.BO');
-    price = await querySingleYahooSymbol(bseSymbol);
-    if (price !== null) {
-      return { price, symbol: bseSymbol };
+    quote = await querySingleYahooSymbol(bseSymbol);
+    if (quote && quote.price !== null) {
+      return { ...quote, symbol: bseSymbol };
     }
   }
 
   // 3. Fallback: If clean name without extension
   const rawClean = symbolOrName.trim().replace(/[^A-Z0-9]/gi, '').toUpperCase();
   if (rawClean && rawClean !== primarySymbol.replace(/\.NS$/, '')) {
-    price = await querySingleYahooSymbol(`${rawClean}.NS`);
-    if (price !== null) {
-      return { price, symbol: `${rawClean}.NS` };
+    quote = await querySingleYahooSymbol(`${rawClean}.NS`);
+    if (quote && quote.price !== null) {
+      return { ...quote, symbol: `${rawClean}.NS` };
     }
-    price = await querySingleYahooSymbol(`${rawClean}.BO`);
-    if (price !== null) {
-      return { price, symbol: `${rawClean}.BO` };
+    quote = await querySingleYahooSymbol(`${rawClean}.BO`);
+    if (quote && quote.price !== null) {
+      return { ...quote, symbol: `${rawClean}.BO` };
     }
   }
 
-  return { price: null, symbol: primarySymbol };
+  return { price: null, symbol: primarySymbol, previousClose: null, dayChange: 0, dayPercentage: 0 };
 }
 
 /**
  * Fetch live Cryptocurrency price in INR
  */
 export async function fetchCryptoPrice(symbolOrName) {
-  if (!symbolOrName) return { price: null, symbol: null };
+  if (!symbolOrName) return { price: null, symbol: null, previousClose: null, dayChange: 0, dayPercentage: 0 };
   const resolved = resolveCryptoSymbol(symbolOrName);
 
-  let price = await querySingleYahooSymbol(resolved);
-  if (price !== null) {
-    return { price, symbol: resolved };
+  let quote = await querySingleYahooSymbol(resolved);
+  if (quote && quote.price !== null) {
+    return { ...quote, symbol: resolved };
   }
 
   // Fallback: Try -USD converted to INR (~ ₹87)
   const usdSymbol = resolved.replace('-INR', '-USD');
-  const usdPrice = await querySingleYahooSymbol(usdSymbol);
-  if (usdPrice !== null) {
+  const usdQuote = await querySingleYahooSymbol(usdSymbol);
+  if (usdQuote && usdQuote.price !== null) {
     const inrRate = 87.0;
-    return { price: Math.round(usdPrice * inrRate * 100) / 100, symbol: resolved };
+    return {
+      price: Math.round(usdQuote.price * inrRate * 100) / 100,
+      previousClose: Math.round(usdQuote.previousClose * inrRate * 100) / 100,
+      dayChange: Math.round(usdQuote.dayChange * inrRate * 100) / 100,
+      dayPercentage: usdQuote.dayPercentage,
+      symbol: resolved
+    };
   }
 
-  return { price: null, symbol: resolved };
+  return { price: null, symbol: resolved, previousClose: null, dayChange: 0, dayPercentage: 0 };
 }
 
 /**
@@ -268,6 +279,9 @@ function cleanMFSearchQuery(rawText) {
 /**
  * Fetch live Mutual Fund NAV from mfapi.in (100% accurate Indian MF API down to 4 decimal places)
  */
+/**
+ * Fetch live Mutual Fund NAV from mfapi.in (100% accurate Indian MF API down to 4 decimal places)
+ */
 export async function fetchMutualFundNav(schemeNameOrCode) {
   if (!schemeNameOrCode) return null;
   const rawQuery = schemeNameOrCode.trim();
@@ -278,14 +292,34 @@ export async function fetchMutualFundNav(schemeNameOrCode) {
     return cached;
   }
 
+  const parseNavData = (data, code, name) => {
+    const list = data?.data || [];
+    if (list.length === 0) return null;
+    const latestNav = parseFloat(list[0]?.nav);
+    if (isNaN(latestNav) || latestNav <= 0) return null;
+    const prevNav = parseFloat(list[1]?.nav || list[0]?.nav);
+    const navDate = list[0]?.date || '';
+    const dayChange = !isNaN(prevNav) ? latestNav - prevNav : 0;
+    const dayPercentage = prevNav > 0 ? (dayChange / prevNav) * 100 : 0;
+
+    return {
+      price: latestNav,
+      previousClose: prevNav,
+      dayChange: Math.round(dayChange * 10000) / 10000,
+      dayPercentage: Math.round(dayPercentage * 100) / 100,
+      navDate,
+      schemeCode: String(code),
+      schemeName: name || data?.meta?.scheme_name
+    };
+  };
+
   if (/^\d+$/.test(rawQuery)) {
     try {
       const res = await fetch(`https://api.mfapi.in/mf/${rawQuery}`);
       if (res.ok) {
         const data = await res.json();
-        const latestNav = parseFloat(data?.data?.[0]?.nav);
-        if (!isNaN(latestNav) && latestNav > 0) {
-          const result = { price: latestNav, schemeCode: rawQuery, schemeName: data?.meta?.scheme_name };
+        const result = parseNavData(data, rawQuery, data?.meta?.scheme_name);
+        if (result) {
           priceCache.set(cacheKey, { ...result, timestamp: Date.now() });
           return result;
         }
@@ -315,9 +349,8 @@ export async function fetchMutualFundNav(schemeNameOrCode) {
           const detailRes = await fetch(`https://api.mfapi.in/mf/${bestMatch.schemeCode}`);
           if (detailRes.ok) {
             const detailData = await detailRes.json();
-            const latestNav = parseFloat(detailData?.data?.[0]?.nav);
-            if (!isNaN(latestNav) && latestNav > 0) {
-              const result = { price: latestNav, schemeCode: String(bestMatch.schemeCode), schemeName: bestMatch.schemeName };
+            const result = parseNavData(detailData, bestMatch.schemeCode, bestMatch.schemeName);
+            if (result) {
               priceCache.set(cacheKey, { ...result, timestamp: Date.now() });
               return result;
             }
@@ -339,41 +372,58 @@ export async function refreshHoldingsPrices(holdings = []) {
   const updatedHoldings = [];
 
   for (const h of holdings) {
-    let liveData = null;
+    let quote = null;
     let livePrice = null;
+    let previousClose = null;
+    let dayChange = 0;
+    let dayPercentage = 0;
+    let navDate = null;
     let resolvedSymbol = h.symbol || '';
     let priceStatus = 'ok';
 
     if (h.type === 'stock') {
-      const stockResult = await fetchStockPrice(h.symbol || h.name);
-      livePrice = stockResult.price;
-      if (stockResult.symbol) {
-        resolvedSymbol = stockResult.symbol;
-      }
+      quote = await fetchStockPrice(h.symbol || h.name);
+      livePrice = quote.price;
+      previousClose = quote.previousClose;
+      dayChange = quote.dayChange;
+      dayPercentage = quote.dayPercentage;
+      if (quote.symbol) resolvedSymbol = quote.symbol;
     } else if (h.type === 'crypto' || h.type === 'cryptocurrency') {
-      const cryptoResult = await fetchCryptoPrice(h.symbol || h.name);
-      livePrice = cryptoResult.price;
-      if (cryptoResult.symbol) {
-        resolvedSymbol = cryptoResult.symbol;
-      }
+      quote = await fetchCryptoPrice(h.symbol || h.name);
+      livePrice = quote.price;
+      previousClose = quote.previousClose;
+      dayChange = quote.dayChange;
+      dayPercentage = quote.dayPercentage;
+      if (quote.symbol) resolvedSymbol = quote.symbol;
     } else if (h.type === 'mutual_fund') {
-      liveData = await fetchMutualFundNav(h.symbol || h.name);
-      livePrice = typeof liveData === 'object' && liveData ? liveData.price : liveData;
-      if (typeof liveData === 'object' && liveData?.schemeCode) {
-        resolvedSymbol = String(liveData.schemeCode);
-      }
+      quote = await fetchMutualFundNav(h.symbol || h.name);
+      livePrice = quote?.price ?? null;
+      previousClose = quote?.previousClose ?? null;
+      dayChange = quote?.dayChange ?? 0;
+      dayPercentage = quote?.dayPercentage ?? 0;
+      navDate = quote?.navDate ?? null;
+      if (quote?.schemeCode) resolvedSymbol = String(quote.schemeCode);
     }
 
+    const qty = Number(h.quantity || 1);
+
     if (livePrice !== null && !isNaN(livePrice) && livePrice > 0) {
-      const currentValuation = Math.round((livePrice * (h.quantity || 1)) * 100) / 100;
-      const totalCost = Math.round(((h.buyPrice || livePrice) * (h.quantity || 1)) * 100) / 100;
+      const currentValuation = Math.round((livePrice * qty) * 100) / 100;
+      const totalCost = Math.round(((Number(h.buyPrice) || livePrice) * qty) * 100) / 100;
       const unrealizedPnL = Math.round((currentValuation - totalCost) * 100) / 100;
       const pnlPercentage = totalCost > 0 ? Math.round(((unrealizedPnL / totalCost) * 100) * 100) / 100 : 0;
+      const dayRupees = Math.round((dayChange * qty) * 100) / 100;
+      const roundedDayPct = Math.round(dayPercentage * 100) / 100;
 
       updatedHoldings.push({
         ...h,
         symbol: resolvedSymbol || h.symbol || '',
         currentPrice: livePrice,
+        previousClose: previousClose || livePrice,
+        dayChange,
+        dayPercentage: roundedDayPct,
+        dayRupees,
+        navDate: navDate || h.navDate || null,
         currentValuation,
         unrealizedPnL,
         pnlPercentage,
@@ -382,9 +432,9 @@ export async function refreshHoldingsPrices(holdings = []) {
       });
     } else {
       priceStatus = (h.type === 'stock' || h.type === 'mutual_fund' || h.type === 'crypto') ? 'invalid_symbol' : 'manual';
-      const currentPrice = h.currentPrice || h.buyPrice || 0;
-      const currentValuation = Math.round((currentPrice * (h.quantity || 1)) * 100) / 100;
-      const totalCost = Math.round(((h.buyPrice || currentPrice) * (h.quantity || 1)) * 100) / 100;
+      const currentPrice = Number(h.currentPrice || h.buyPrice || 0);
+      const currentValuation = Math.round((currentPrice * qty) * 100) / 100;
+      const totalCost = Math.round(((Number(h.buyPrice) || currentPrice) * qty) * 100) / 100;
       const unrealizedPnL = Math.round((currentValuation - totalCost) * 100) / 100;
       const pnlPercentage = totalCost > 0 ? Math.round(((unrealizedPnL / totalCost) * 100) * 100) / 100 : 0;
 
@@ -392,6 +442,11 @@ export async function refreshHoldingsPrices(holdings = []) {
         ...h,
         symbol: resolvedSymbol || h.symbol || '',
         currentPrice,
+        previousClose: h.previousClose || currentPrice,
+        dayChange: h.dayChange || 0,
+        dayPercentage: h.dayPercentage || 0,
+        dayRupees: h.dayRupees || 0,
+        navDate: h.navDate || null,
         currentValuation,
         unrealizedPnL,
         pnlPercentage,

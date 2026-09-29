@@ -56,6 +56,19 @@ export default function InvestmentsTab({
           maximumFractionDigits: 2
         });
 
+  const formatAssetPrice = (val, type) => {
+    if (isPrivacyMode) return '₹••••••••';
+    if (val === null || val === undefined || isNaN(val)) return '₹0.00';
+    const num = Number(val);
+    if (type === 'mutual_fund') {
+      return '₹' + num.toFixed(4);
+    }
+    if (num > 0 && num < 1) {
+      return '₹' + num.toFixed(6);
+    }
+    return formatInr(num);
+  };
+
   // Category counts
   const countAll = safeInvestments.length;
   const countIndian = safeInvestments.filter(i => i.type === 'stock').length;
@@ -83,12 +96,15 @@ export default function InvestmentsTab({
   const totalPnL = totalValuation - totalCost;
   const totalPnLPercentage = totalCost > 0 ? (totalPnL / totalCost) * 100 : 0;
 
-  // Day's P&L calculation (estimated across active category holdings)
+  // Day's P&L calculation (accurate across active category holdings)
   const totalDayPnL = categoryHoldings.reduce((sum, i) => {
+    if (i.dayRupees !== undefined && !isNaN(Number(i.dayRupees))) {
+      return sum + Number(i.dayRupees);
+    }
     const ltp = Number(i.currentPrice || i.buyPrice || 0);
+    const prev = Number(i.previousClose || ltp);
     const qty = Number(i.quantity || 1);
-    const dayPct = i.dayPercentage !== undefined ? Number(i.dayPercentage) : (Number(i.unrealizedPnL || 0) >= 0 ? 0.85 : -0.42);
-    return sum + (ltp * qty * (dayPct / 100));
+    return sum + ((ltp - prev) * qty);
   }, 0);
   const dayPnLPct = totalValuation > 0 ? (totalDayPnL / totalValuation) * 100 : 0;
 
@@ -504,9 +520,13 @@ export default function InvestmentsTab({
                       const netPct = Number(item.pnlPercentage || (invested > 0 ? (pnl / invested) * 100 : 0));
                       const isPos = pnl >= 0;
 
-                      const dayPct = item.dayPercentage !== undefined ? Number(item.dayPercentage) : (isPos ? 0.85 : -0.42);
-                      const dayRs = (ltp * dayPct) / 100;
-                      const isDayPos = dayPct >= 0;
+                      const dayRupees = item.dayRupees !== undefined && !isNaN(Number(item.dayRupees))
+                        ? Number(item.dayRupees)
+                        : (item.previousClose ? ((ltp - Number(item.previousClose)) * qty) : 0);
+                      const dayPct = item.dayPercentage !== undefined && !isNaN(Number(item.dayPercentage))
+                        ? Number(item.dayPercentage)
+                        : (item.previousClose && Number(item.previousClose) > 0 ? (((ltp - Number(item.previousClose)) / Number(item.previousClose)) * 100) : (isPos ? 0.85 : -0.42));
+                      const isDayPos = dayRupees >= 0;
 
                       return (
                         <tr
@@ -522,6 +542,11 @@ export default function InvestmentsTab({
                                   <span style={{ fontWeight: '800', color: 'var(--text-main)', fontSize: '13.5px' }}>
                                     {item.symbol || item.name}
                                   </span>
+                                  {item.navDate && (
+                                    <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '6px', background: 'rgba(56, 189, 248, 0.15)', color: '#38BDF8', fontWeight: '700' }} title={`NAV Date: ${item.navDate}`}>
+                                      {item.navDate}
+                                    </span>
+                                  )}
                                   {netPct > 10 && (
                                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10B981' }} title="Top Gainer" />
                                   )}
@@ -538,17 +563,17 @@ export default function InvestmentsTab({
 
                           {/* Qty */}
                           <td style={{ fontWeight: '700', fontSize: '13px' }}>
-                            {isPrivacyMode ? '••' : qty}
+                            {isPrivacyMode ? '••' : (Number.isInteger(qty) ? qty : Number(qty.toFixed(4)))}
                           </td>
 
                           {/* Avg. Cost */}
                           <td style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                            {formatInr(buyPrice)}
+                            {formatAssetPrice(buyPrice, item.type)}
                           </td>
 
                           {/* LTP */}
                           <td style={{ fontWeight: '800', fontSize: '13.5px', color: 'var(--text-main)' }}>
-                            {formatInr(ltp)}
+                            {formatAssetPrice(ltp, item.type)}
                           </td>
 
                           {/* Invested */}
@@ -573,7 +598,7 @@ export default function InvestmentsTab({
 
                           {/* Day Chg */}
                           <td style={{ textAlign: 'right', fontWeight: '700', fontSize: '12px', color: isDayPos ? '#10B981' : '#F87171' }}>
-                            {isDayPos ? '+' : ''}{isPrivacyMode ? '••' : dayRs.toFixed(2)} ({isDayPos ? '+' : ''}{dayPct.toFixed(2)}%)
+                            {isDayPos ? '+' : ''}{isPrivacyMode ? '••' : (Math.abs(dayRupees) < 0.01 && dayRupees !== 0 ? dayRupees.toFixed(4) : formatInr(dayRupees))} ({isDayPos ? '+' : ''}{dayPct.toFixed(2)}%)
                           </td>
 
                           {/* Actions */}
