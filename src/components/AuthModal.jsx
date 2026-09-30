@@ -994,7 +994,7 @@ export default function AuthModal({
 
         {/* HDFC-Style Another Login Detected Modal */}
         {pendingSessionOverride && (
-          <div className="modal-backdrop" style={{ zIndex: 1100 }}>
+          <div className="modal-backdrop" style={{ zIndex: 10100 }}>
             <div className="modal-content" style={{ maxWidth: '440px', textAlign: 'center', padding: '32px 24px' }}>
               <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px auto', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
                 <Shield size={32} />

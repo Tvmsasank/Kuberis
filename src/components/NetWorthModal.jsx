@@ -322,20 +322,9 @@ export default function NetWorthModal({
       className="modal-backdrop"
       onClick={onClose}
       style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.82)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        zIndex: 1000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '16px',
-        overflow: 'hidden'
+        zIndex: 10000,
+        overflowY: 'auto',
+        padding: '24px 16px'
       }}
     >
       <div
@@ -351,7 +340,7 @@ export default function NetWorthModal({
           background: 'var(--bg-card)',
           backdropFilter: 'blur(28px)',
           border: '1px solid var(--border-glass)',
-          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.85)'
+          boxShadow: 'var(--shadow-lg)'
         }}
       >
         {/* Header */}
@@ -409,7 +398,7 @@ export default function NetWorthModal({
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'right' }}>
             <div style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>
-              Total Assets: <strong style={{ color: '#10B981', fontSize: '14px' }}>+{formatInr(totalAssets)}</strong>
+              Total Assets: <strong style={{ color: 'var(--success)', fontSize: '14px' }}>+{formatInr(totalAssets)}</strong>
             </div>
             <div style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>
               Total Liabilities: <strong style={{ color: 'var(--danger)', fontSize: '14px' }}>−{formatInr(totalLiabilities)}</strong>
@@ -418,9 +407,9 @@ export default function NetWorthModal({
         </div>
 
         {/* Dynamic Net Worth Explanation Box */}
-        <div style={{ padding: '14px 18px', borderRadius: '16px', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', marginBottom: '24px', fontSize: '12.5px', color: 'var(--text-muted)', lineHeight: '1.55' }}>
+        <div style={{ padding: '14px 18px', borderRadius: '16px', background: 'var(--info-light)', border: '1px solid rgba(2, 132, 199, 0.25)', marginBottom: '24px', fontSize: '12.5px', color: 'var(--text-muted)', lineHeight: '1.55' }}>
           <div style={{ fontWeight: '800', color: 'var(--text-main)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Info size={15} style={{ color: '#38BDF8' }} /> Why this exists & How it works:
+            <Info size={15} style={{ color: 'var(--info)' }} /> Why this exists & How it works:
           </div>
           <div>
             • <strong>1. Live Investments Portfolio (Auto):</strong> 100% automatically calculated live from your stocks, mutual funds, crypto, gold, and FDs in the Investments tab. It syncs in real-time as market prices update.
@@ -520,16 +509,16 @@ export default function NetWorthModal({
         <div style={{ marginBottom: '32px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
             <h3 style={{ fontSize: '16px', fontWeight: '800', margin: 0, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <TrendingUp size={18} style={{ color: '#10B981' }} /> 1. Assets Breakdown (What You Own)
+              <TrendingUp size={18} style={{ color: 'var(--success)' }} /> 1. Assets Breakdown (What You Own)
             </h3>
-            <span style={{ fontSize: '15px', fontWeight: '800', color: '#10B981' }}>
+            <span style={{ fontSize: '15px', fontWeight: '800', color: 'var(--success)' }}>
               +{formatInr(totalAssets)}
             </span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
             {/* Live Portfolio Valuation Card (Auto) */}
-            <div style={{ padding: '14px 18px', borderRadius: '16px', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.25)' }}>
+            <div style={{ padding: '14px 18px', borderRadius: '16px', background: 'var(--success-light)', border: '1px solid var(--border-glass)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -539,7 +528,7 @@ export default function NetWorthModal({
                     Indian Stocks ({formatInr(stockVal)}) • Mutual Funds ({formatInr(mfVal)}) • US/Crypto ({formatInr(usStockVal + cryptoVal)}) • Gold ({formatInr(goldVal)}) • FDs ({formatInr(fdVal)})
                   </div>
                 </div>
-                <div style={{ fontSize: '16px', fontWeight: '900', color: '#10B981' }}>
+                <div style={{ fontSize: '16px', fontWeight: '900', color: 'var(--success)' }}>
                   {formatInr(liveInvestmentsValuation)}
                 </div>
               </div>
@@ -547,9 +536,9 @@ export default function NetWorthModal({
 
             {/* Notice if unitemized manual asset balance exists */}
             {customAssetsList.length === 0 && manualAssets > 0 && (
-              <div style={{ padding: '12px 16px', borderRadius: '14px', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+              <div style={{ padding: '12px 16px', borderRadius: '14px', background: 'var(--warning-light)', border: '1px solid rgba(217, 119, 6, 0.3)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                 <div>
-                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#F59E0B' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--warning)' }}>
                     Unitemized Manual Asset Balance: {formatInr(manualAssets)}
                   </div>
                   <div style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
@@ -559,7 +548,7 @@ export default function NetWorthModal({
                 <button
                   type="button"
                   className="btn btn-secondary btn-sm"
-                  style={{ fontSize: '11px', fontWeight: '700', color: '#F59E0B', borderColor: '#F59E0B' }}
+                  style={{ fontSize: '11px', fontWeight: '700', color: 'var(--warning)', borderColor: 'var(--warning)' }}
                   onClick={handleConvertFlatAsset}
                 >
                   <Plus size={13} /> Itemize Balance
@@ -577,7 +566,7 @@ export default function NetWorthModal({
                   style={{
                     padding: '14px 16px',
                     borderRadius: '14px',
-                    background: 'rgba(255, 255, 255, 0.02)',
+                    background: 'var(--bg-app)',
                     border: '1px solid var(--border-color)',
                     display: 'flex',
                     flexDirection: 'column',
@@ -586,13 +575,13 @@ export default function NetWorthModal({
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <div style={{ padding: '6px', borderRadius: '8px', background: 'rgba(56, 189, 248, 0.1)', color: '#38BDF8' }}>
+                      <div style={{ padding: '6px', borderRadius: '8px', background: 'var(--info-light)', color: 'var(--info)' }}>
                         <CatIcon size={16} />
                       </div>
                       <div>
                         <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                           {asset.name}
-                          <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '6px', background: 'rgba(255, 255, 255, 0.06)', color: 'var(--text-muted)', fontWeight: '600' }}>
+                          <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '6px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-muted)', fontWeight: '600' }}>
                             {catObj.label}
                           </span>
                         </div>
@@ -600,7 +589,7 @@ export default function NetWorthModal({
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <span style={{ fontSize: '15px', fontWeight: '800', color: '#10B981' }}>
+                      <span style={{ fontSize: '15px', fontWeight: '800', color: 'var(--success)' }}>
                         +{formatInr(asset.value)}
                       </span>
                       <button
@@ -626,9 +615,9 @@ export default function NetWorthModal({
 
                   {/* Description / Notes Display */}
                   {asset.description ? (
-                    <div style={{ padding: '8px 12px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.2)', border: '1px solid rgba(255, 255, 255, 0.05)', fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'flex-start', gap: '6px', lineHeight: '1.4' }}>
-                      <StickyNote size={13} style={{ color: '#38BDF8', marginTop: '2px', flexShrink: 0 }} />
-                      <span>{asset.description}</span>
+                    <div style={{ padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', fontSize: '12px', color: 'var(--text-main)', display: 'flex', alignItems: 'flex-start', gap: '8px', lineHeight: '1.45' }}>
+                      <StickyNote size={14} style={{ color: 'var(--info)', marginTop: '2px', flexShrink: 0 }} />
+                      <span style={{ color: 'var(--text-muted)' }}>{asset.description}</span>
                     </div>
                   ) : (
                     <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', paddingLeft: '34px' }}>
@@ -641,7 +630,7 @@ export default function NetWorthModal({
           </div>
 
           {/* Form to Add Itemized Asset with Description */}
-          <div style={{ padding: '16px', borderRadius: '16px', background: 'rgba(255, 255, 255, 0.02)', border: '1px dashed var(--border-color)' }}>
+          <div style={{ padding: '16px', borderRadius: '16px', background: 'var(--bg-app)', border: '1px dashed var(--border-color)' }}>
             <div style={{ fontSize: '12.5px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Plus size={15} style={{ color: 'var(--primary)' }} /> Add Itemized Asset (Real Estate, Vehicle, Cash, etc.)
             </div>
@@ -728,7 +717,7 @@ export default function NetWorthModal({
             )}
 
             {customLiabilitiesList.length === 0 && manualLiabilities === 0 ? (
-              <div style={{ padding: '16px', textAlign: 'center', borderRadius: '14px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '12.5px' }}>
+              <div style={{ padding: '16px', textAlign: 'center', borderRadius: '14px', background: 'var(--bg-app)', border: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '12.5px' }}>
                 🎉 No active debts or loans recorded. Add your home loans, car loans, or credit cards below to track liabilities.
               </div>
             ) : (
@@ -741,8 +730,8 @@ export default function NetWorthModal({
                     style={{
                       padding: '14px 16px',
                       borderRadius: '14px',
-                      background: 'rgba(239, 68, 68, 0.03)',
-                      border: '1px solid rgba(239, 68, 68, 0.2)',
+                      background: 'var(--bg-app)',
+                      border: '1px solid var(--border-color)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '8px'
@@ -750,13 +739,13 @@ export default function NetWorthModal({
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ padding: '6px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)' }}>
+                        <div style={{ padding: '6px', borderRadius: '8px', background: 'var(--danger-light)', color: 'var(--danger)' }}>
                           <CatIcon size={16} />
                         </div>
                         <div>
                           <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             {liability.name}
-                            <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '6px', background: 'rgba(239, 68, 68, 0.12)', color: 'var(--danger)', fontWeight: '600' }}>
+                            <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '6px', background: 'var(--danger-light)', color: 'var(--danger)', fontWeight: '600' }}>
                               {catObj.label}
                             </span>
                           </div>
@@ -790,9 +779,9 @@ export default function NetWorthModal({
 
                     {/* Description / Notes Display */}
                     {liability.description ? (
-                      <div style={{ padding: '8px 12px', borderRadius: '8px', background: 'rgba(0, 0, 0, 0.2)', border: '1px solid rgba(239, 68, 68, 0.15)', fontSize: '12px', color: 'var(--text-muted)', display: 'flex', alignItems: 'flex-start', gap: '6px', lineHeight: '1.4' }}>
-                        <StickyNote size={13} style={{ color: 'var(--danger)', marginTop: '2px', flexShrink: 0 }} />
-                        <span>{liability.description}</span>
+                      <div style={{ padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', fontSize: '12px', color: 'var(--text-main)', display: 'flex', alignItems: 'flex-start', gap: '8px', lineHeight: '1.45' }}>
+                        <StickyNote size={14} style={{ color: 'var(--danger)', marginTop: '2px', flexShrink: 0 }} />
+                        <span style={{ color: 'var(--text-muted)' }}>{liability.description}</span>
                       </div>
                     ) : (
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', paddingLeft: '34px' }}>
@@ -806,7 +795,7 @@ export default function NetWorthModal({
           </div>
 
           {/* Form to Add Itemized Liability with Description */}
-          <div style={{ padding: '16px', borderRadius: '16px', background: 'rgba(255, 255, 255, 0.02)', border: '1px dashed rgba(239, 68, 68, 0.3)' }}>
+          <div style={{ padding: '16px', borderRadius: '16px', background: 'var(--bg-app)', border: '1px dashed rgba(220, 38, 38, 0.3)' }}>
             <div style={{ fontSize: '12.5px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Plus size={15} style={{ color: 'var(--danger)' }} /> Add Itemized Liability (Home Loan, Car Loan, Card Balance, etc.)
             </div>

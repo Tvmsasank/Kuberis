@@ -1080,7 +1080,7 @@ export default function App() {
 
       {/* Session Terminated Notification Modal */}
       {sessionTerminatedModalOpen && (
-        <div className="modal-backdrop" style={{ zIndex: 1200 }}>
+        <div className="modal-backdrop" style={{ zIndex: 10100 }}>
           <div className="modal-content" style={{ maxWidth: '440px', textAlign: 'center', padding: '32px 24px' }}>
             <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.15)', color: '#EF4444', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px auto', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
               <Lock size={32} />

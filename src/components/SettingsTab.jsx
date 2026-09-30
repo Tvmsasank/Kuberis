@@ -226,7 +226,7 @@ export default function SettingsTab({
                 <span>1. Live Portfolio (Auto)</span>
                 <span className="badge badge-success" style={{ fontSize: '8.5px', padding: '1px 5px' }}>Live Sync</span>
               </label>
-              <div style={{ padding: '10px 14px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: 'var(--radius-md)', fontSize: '15px', fontWeight: '800', color: '#10B981', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
+              <div style={{ padding: '10px 14px', background: 'var(--success-light)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', fontSize: '15px', fontWeight: '800', color: 'var(--success)', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
                 {formatInr(liveInvestmentsValuation)}
               </div>
               <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
@@ -238,7 +238,7 @@ export default function SettingsTab({
               <label className="form-label" style={{ fontSize: '12px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span>2. Manual Assets (₹)</span>
                 {Array.isArray(settings.customAssetsList) && settings.customAssetsList.length > 0 && (
-                  <span style={{ fontSize: '9px', color: '#38BDF8', fontWeight: '700' }}>{settings.customAssetsList.length} itemized</span>
+                  <span style={{ fontSize: '9px', color: 'var(--info)', fontWeight: '700' }}>{settings.customAssetsList.length} itemized</span>
                 )}
               </label>
               <input
@@ -255,10 +255,10 @@ export default function SettingsTab({
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label" style={{ fontSize: '12px', fontWeight: '700', color: '#38BDF8' }}>
+              <label className="form-label" style={{ fontSize: '12px', fontWeight: '700', color: 'var(--info)' }}>
                 3. Total Assets (Combined)
               </label>
-              <div style={{ padding: '10px 14px', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: 'var(--radius-md)', fontSize: '15px', fontWeight: '800', color: '#38BDF8', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
+              <div style={{ padding: '10px 14px', background: 'var(--info-light)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', fontSize: '15px', fontWeight: '800', color: 'var(--info)', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
                 {formatInr(calculatedAssets)}
               </div>
               <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
