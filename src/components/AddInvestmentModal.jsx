@@ -1,5 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { X, TrendingUp, Search, Plus, Check } from 'lucide-react';
+import { X, TrendingUp, Search, Plus, Check, Landmark, Coins, ShieldCheck, Building2 } from 'lucide-react';
+import CustomSelect from './CustomSelect';
+
+const INVESTMENT_TYPES = [
+  { value: 'stock', label: 'Equity Stock (NSE / BSE)', icon: TrendingUp },
+  { value: 'mutual_fund', label: 'Mutual Fund (AMFI NAV)', icon: Landmark },
+  { value: 'crypto', label: 'Cryptocurrency (Coins & Tokens)', icon: Coins },
+  { value: 'gold', label: 'Gold & Precious Metals', icon: Coins },
+  { value: 'fd', label: 'Fixed Deposit / Bond', icon: ShieldCheck },
+  { value: 'other', label: 'Other Asset / Real Estate', icon: Building2 },
+];
 
 const POPULAR_SUGGESTIONS = [
   { name: 'Canara Bank', symbol: 'CANBK.NS', type: 'stock', defaultPrice: 131.70 },
@@ -158,14 +168,12 @@ export default function AddInvestmentModal({
           {/* Asset Type */}
           <div className="form-group">
             <label className="form-label">Asset Category</label>
-            <select className="form-control" value={type} onChange={e => setType(e.target.value)}>
-              <option value="stock">Equity Stock (NSE / BSE)</option>
-              <option value="mutual_fund">Mutual Fund (AMFI NAV)</option>
-              <option value="crypto">Cryptocurrency (Coins & Tokens)</option>
-              <option value="gold">Gold & Precious Metals</option>
-              <option value="fd">Fixed Deposit / Bond</option>
-              <option value="other">Other Asset / Real Estate</option>
-            </select>
+            <CustomSelect
+              value={type}
+              onChange={e => setType(e.target.value)}
+              options={INVESTMENT_TYPES}
+              size="md"
+            />
           </div>
 
           {/* Name & Ticker */}

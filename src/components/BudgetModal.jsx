@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
+import CustomSelect from './CustomSelect';
 
 export default function BudgetModal({ isOpen, onClose, categories = [], initialBudget, onSave }) {
   if (!isOpen) return null;
@@ -37,9 +38,13 @@ export default function BudgetModal({ isOpen, onClose, categories = [], initialB
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label className="form-label">Category</label>
-            <select className="form-control" value={category} onChange={e => setCategory(e.target.value)} disabled={!!initialBudget}>
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <CustomSelect
+              value={category}
+              onChange={e => setCategory(e.target.value)}
+              options={categories}
+              disabled={!!initialBudget}
+              size="md"
+            />
           </div>
 
           <div className="form-group">

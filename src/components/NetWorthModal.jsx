@@ -26,6 +26,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { calculateDynamicNetWorth } from '../utils/netWorth';
+import CustomSelect from './CustomSelect';
 
 const ASSET_CATEGORIES = [
   { value: 'real_estate', label: 'Real Estate / Property', icon: Building2 },
@@ -467,15 +468,12 @@ export default function NetWorthModal({
 
                 <div>
                   <label className="form-label" style={{ fontSize: '11px', fontWeight: '700' }}>Category</label>
-                  <select
-                    className="form-control"
+                  <CustomSelect
                     value={editingItem.category}
                     onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value })}
-                  >
-                    {(editingItem.type === 'asset' ? ASSET_CATEGORIES : LIABILITY_CATEGORIES).map(c => (
-                      <option key={c.value} value={c.value}>{c.label}</option>
-                    ))}
-                  </select>
+                    options={editingItem.type === 'asset' ? ASSET_CATEGORIES : LIABILITY_CATEGORIES}
+                    size="md"
+                  />
                 </div>
 
                 <div>
@@ -658,16 +656,12 @@ export default function NetWorthModal({
                   style={{ fontSize: '12.5px' }}
                   required
                 />
-                <select
-                  className="form-control"
+                <CustomSelect
                   value={newAssetCategory}
                   onChange={(e) => setNewAssetCategory(e.target.value)}
-                  style={{ fontSize: '12.5px' }}
-                >
-                  {ASSET_CATEGORIES.map(c => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
-                  ))}
-                </select>
+                  options={ASSET_CATEGORIES}
+                  size="md"
+                />
                 <input
                   type="number"
                   step="any"
@@ -827,16 +821,12 @@ export default function NetWorthModal({
                   style={{ fontSize: '12.5px' }}
                   required
                 />
-                <select
-                  className="form-control"
+                <CustomSelect
                   value={newLiabilityCategory}
                   onChange={(e) => setNewLiabilityCategory(e.target.value)}
-                  style={{ fontSize: '12.5px' }}
-                >
-                  {LIABILITY_CATEGORIES.map(c => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
-                  ))}
-                </select>
+                  options={LIABILITY_CATEGORIES}
+                  size="md"
+                />
                 <input
                   type="number"
                   step="any"

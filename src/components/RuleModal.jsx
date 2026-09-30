@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
+import CustomSelect from './CustomSelect';
 
 export default function RuleModal({ isOpen, onClose, categories = [], tags = [], onSave }) {
   if (!isOpen) return null;
@@ -51,17 +52,22 @@ export default function RuleModal({ isOpen, onClose, categories = [], tags = [],
 
           <div className="form-group">
             <label className="form-label">Then set Category to:</label>
-            <select className="form-control" value={thenCategory} onChange={e => setThenCategory(e.target.value)}>
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <CustomSelect
+              value={thenCategory}
+              onChange={e => setThenCategory(e.target.value)}
+              options={categories}
+              size="md"
+            />
           </div>
 
           <div className="form-group">
             <label className="form-label">And apply Tag (Optional):</label>
-            <select className="form-control" value={thenTag} onChange={e => setThenTag(e.target.value)}>
-              <option value="">-- No Tag --</option>
-              {tags.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
+            <CustomSelect
+              value={thenTag}
+              onChange={e => setThenTag(e.target.value)}
+              options={[{ value: '', label: '-- No Tag --' }, ...tags.map(t => ({ value: t, label: t }))]}
+              size="md"
+            />
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '20px' }}>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Upload, Edit3, Check, Tag } from 'lucide-react';
+import CustomSelect from './CustomSelect';
 
 export default function AddEntryModal({
   isOpen,
@@ -245,24 +246,22 @@ export default function AddEntryModal({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div className="form-group">
               <label className="form-label">Category</label>
-              <select className="form-control" value={category} onChange={e => setCategory(e.target.value)}>
-                {categories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
+              <CustomSelect
+                value={category}
+                onChange={e => setCategory(e.target.value)}
+                options={categories}
+                size="md"
+              />
             </div>
 
             <div className="form-group">
               <label className="form-label">Account</label>
-              <select className="form-control" value={account} onChange={e => setAccount(e.target.value)}>
-                {accounts.length > 0 ? (
-                  accounts.map(acc => (
-                    <option key={acc} value={acc}>{acc}</option>
-                  ))
-                ) : (
-                  <option value="Main Checking">Main Checking</option>
-                )}
-              </select>
+              <CustomSelect
+                value={account}
+                onChange={e => setAccount(e.target.value)}
+                options={accounts.length > 0 ? accounts : ['Main Checking']}
+                size="md"
+              />
             </div>
           </div>
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Filter, Plus, FileText, Trash2, Tag, ChevronDown, Edit3, Zap, Sparkles, Landmark } from 'lucide-react';
 import ConfirmDeleteTxModal from './ConfirmDeleteTxModal';
+import CustomSelect from './CustomSelect';
 
 export default function TransactionsTab({
   transactions = [],
@@ -177,16 +178,22 @@ export default function TransactionsTab({
           </div>
 
           {/* Account Filter */}
-          <select className="form-control" value={selectedAccount} onChange={e => setSelectedAccount(e.target.value)}>
-            <option value="">All Accounts</option>
-            {accounts.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
+          <CustomSelect
+            value={selectedAccount}
+            onChange={e => setSelectedAccount(e.target.value)}
+            options={[{ value: '', label: 'All Accounts' }, ...accounts.map(a => ({ value: a, label: a }))]}
+            style={{ width: 'auto', minWidth: '160px' }}
+            size="md"
+          />
 
           {/* Category Filter */}
-          <select className="form-control" value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)}>
-            <option value="">All Categories</option>
-            {categories.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+          <CustomSelect
+            value={selectedCategory}
+            onChange={e => setSelectedCategory(e.target.value)}
+            options={[{ value: '', label: 'All Categories' }, ...categories.map(c => ({ value: c, label: c }))]}
+            style={{ width: 'auto', minWidth: '160px' }}
+            size="md"
+          />
         </div>
       </div>
 

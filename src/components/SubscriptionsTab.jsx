@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CreditCard, Plus, Check, EyeOff, Trash2, ShieldCheck } from 'lucide-react';
 import { detectRecurring } from '../utils/recurringEngine';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
+import CustomSelect from './CustomSelect';
 
 export default function SubscriptionsTab({
   transactions = [],
@@ -222,11 +223,16 @@ export default function SubscriptionsTab({
                 </div>
                 <div className="form-group">
                   <label className="form-label">Cadence</label>
-                  <select className="form-control" value={cadence} onChange={e => setCadence(e.target.value)}>
-                    <option value="monthly">Monthly</option>
-                    <option value="annual">Annual</option>
-                    <option value="weekly">Weekly</option>
-                  </select>
+                  <CustomSelect
+                    value={cadence}
+                    onChange={e => setCadence(e.target.value)}
+                    options={[
+                      { value: 'monthly', label: 'Monthly' },
+                      { value: 'annual', label: 'Annual' },
+                      { value: 'weekly', label: 'Weekly' }
+                    ]}
+                    size="md"
+                  />
                 </div>
               </div>
 

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { RefreshCw, Check, EyeOff, Plus, Trash2, Calendar, Sparkles } from 'lucide-react';
 import { detectRecurring } from '../utils/recurringEngine';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
+import CustomSelect from './CustomSelect';
 
 export default function RecurringTab({
   transactions = [],
@@ -234,13 +235,18 @@ export default function RecurringTab({
                 </div>
                 <div className="form-group">
                   <label className="form-label">Cadence</label>
-                  <select className="form-control" value={newCadence} onChange={e => setNewCadence(e.target.value)}>
-                    <option value="weekly">Weekly</option>
-                    <option value="biweekly">Biweekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="quarterly">Quarterly</option>
-                    <option value="annual">Annual</option>
-                  </select>
+                  <CustomSelect
+                    value={newCadence}
+                    onChange={e => setNewCadence(e.target.value)}
+                    options={[
+                      { value: 'weekly', label: 'Weekly' },
+                      { value: 'biweekly', label: 'Biweekly' },
+                      { value: 'monthly', label: 'Monthly' },
+                      { value: 'quarterly', label: 'Quarterly' },
+                      { value: 'annual', label: 'Annual' }
+                    ]}
+                    size="md"
+                  />
                 </div>
               </div>
 

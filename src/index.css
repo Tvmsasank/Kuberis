@@ -479,18 +479,31 @@ body::after {
 select.form-control {
   appearance: none;
   -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  color-scheme: dark;
+  background-color: var(--bg-card);
+  color: var(--text-main);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2310B981' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 14px center;
   padding-right: 38px;
   cursor: pointer;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+[data-theme='light'] select.form-control {
+  color-scheme: light;
+  background-color: #FFFFFF;
+  color: #0F172A;
+  border-color: #CBD5E1;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23059669' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
 }
 
 select.form-control option {
   background-color: #0A192F !important;
   color: #F8FAFC !important;
   padding: 12px 14px;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 500;
 }
 
@@ -507,6 +520,54 @@ select.form-control option {
 [data-theme='gold'] select.form-control option {
   background-color: #1A140B !important;
   color: #F8FAFC !important;
+}
+
+/* Custom Select Animations & Theme Tweaks */
+@keyframes customSelectFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.custom-select-trigger:hover {
+  border-color: var(--primary) !important;
+}
+
+.custom-select-menu::-webkit-scrollbar {
+  width: 5px;
+}
+.custom-select-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-select-menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+.custom-select-menu::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+[data-theme='light'] .custom-select-trigger {
+  background: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+  color: #0F172A !important;
+}
+[data-theme='light'] .custom-select-menu {
+  background: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.06) !important;
+}
+[data-theme='light'] .custom-select-option:hover {
+  background: #F1F5F9 !important;
+  color: #0F172A !important;
+}
+[data-theme='light'] .custom-select-menu::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
 }
 
 /* Modern Tag Pills */
