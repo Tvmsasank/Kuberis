@@ -29,7 +29,7 @@ export default function ConfirmWipeModal({ isOpen, onClose, onConfirmWipe }) {
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: 'var(--danger)' }}>
             <AlertTriangle size={24} />
-            <h2 style={{ fontSize: '18px', color: 'var(--danger)' }}>Erase All WealthPulse Data</h2>
+            <h2 style={{ fontSize: '18px', color: 'var(--danger)' }}>Erase All Kuberis Data</h2>
           </div>
           <button className="modal-close" onClick={onClose} aria-label="Close">
             <X size={20} />

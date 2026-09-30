@@ -358,7 +358,7 @@ export default function SmartUpiModal({
                 <li>Set Trigger: <strong>SMS Received</strong> (Select Bank/UPI senders like HDFC, SBI, ICICI, GPAY, PAYTM).</li>
                 <li>Set Action: <strong>HTTP Request (POST)</strong> to your Webhook URL above.</li>
                 <li>Request Body: <code>{`{ "rawText": "{sms_body}" }`}</code></li>
-                <li><strong>Done!</strong> Whenever you pay ₹10 at any shop, it instantly appears in WealthPulse!</li>
+                <li><strong>Done!</strong> Whenever you pay ₹10 at any shop, it instantly appears in Kuberis!</li>
               </ol>
             </div>
           </div>

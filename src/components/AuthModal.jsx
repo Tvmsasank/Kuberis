@@ -66,7 +66,7 @@ export default function AuthModal({
         .then(res => res.json())
         .then(data => {
           if (data.hasMpin) {
-            localStorage.setItem('wealthpulse_has_mpin', 'true');
+            localStorage.setItem('kuberis_has_mpin', 'true');
             setEmailHasMpin(true);
             setAuthMethod('mpin');
           } else if (data.hasBiometrics) {
@@ -172,8 +172,8 @@ export default function AuthModal({
         return;
       }
 
-      localStorage.setItem('wealthpulse_remembered_email', targetEmail);
-      localStorage.setItem('wealthpulse_has_mpin', 'true');
+      localStorage.setItem('kuberis_remembered_email', targetEmail);
+      localStorage.setItem('kuberis_has_mpin', 'true');
 
       if (json.require2FA) {
         setTotpTempToken(json.tempToken);
@@ -274,7 +274,7 @@ export default function AuthModal({
       }
 
       if (rememberMe) {
-        localStorage.setItem('wealthpulse_remembered_email', email.trim());
+        localStorage.setItem('kuberis_remembered_email', email.trim());
       }
 
       setSuccess('Sign in successful!');
@@ -347,7 +347,7 @@ export default function AuthModal({
       if (!res.ok) throw new Error(json.error || '2FA verification failed');
 
       if (rememberMe) {
-        localStorage.setItem('wealthpulse_remembered_email', email.trim());
+        localStorage.setItem('kuberis_remembered_email', email.trim());
       }
 
       setSuccess('2FA Verified! Signing in...');
@@ -385,7 +385,7 @@ export default function AuthModal({
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Registration failed');
 
-      localStorage.setItem('wealthpulse_remembered_email', email.trim());
+      localStorage.setItem('kuberis_remembered_email', email.trim());
       setSuccess('Account created successfully!');
       setTimeout(() => {
         onLoginSuccess(json.user, json.token, true);
@@ -439,7 +439,7 @@ export default function AuthModal({
             </div>
             <div>
               <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
-                {authMethod === 'register' ? 'Create WealthPulse Account' : 'Sign In to WealthPulse'}
+                {authMethod === 'register' ? 'Create Kuberis Account' : 'Sign In to Kuberis'}
               </h2>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                 {authMethod === 'mpin' ? 'Enter 4-Digit MPIN to unlock' : 'Secure financial dashboard access'}
@@ -773,7 +773,7 @@ export default function AuthModal({
             </button>
 
             <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '13px', color: 'var(--text-muted)' }}>
-              New to WealthPulse?{' '}
+              New to Kuberis?{' '}
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"

@@ -158,11 +158,11 @@ export default function TwoFactorSetupModal({
   };
 
   const downloadRecoveryCodes = () => {
-    const text = `WealthPulse Emergency Recovery Backup Codes:\n==========================================\nAccount: ${user?.email}\nGenerated: ${new Date().toLocaleString('en-IN')}\n\n${recoveryCodes.join('\n')}\n\nKeep these codes in a secure location. Each code can only be used once if you lose your mobile device.`;
+    const text = `Kuberis Emergency Recovery Backup Codes:\n==========================================\nAccount: ${user?.email}\nGenerated: ${new Date().toLocaleString('en-IN')}\n\n${recoveryCodes.join('\n')}\n\nKeep these codes in a secure location. Each code can only be used once if you lose your mobile device.`;
     const element = document.createElement('a');
     const file = new Blob([text], { type: 'text/plain' });
     element.href = URL.createObjectURL(file);
-    element.download = `WealthPulse-Recovery-Codes-${user?.email?.split('@')[0]}.txt`;
+    element.download = `Kuberis-Recovery-Codes-${user?.email?.split('@')[0]}.txt`;
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);

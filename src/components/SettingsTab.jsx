@@ -47,11 +47,14 @@ export default function SettingsTab({
   const [newAccInput, setNewAccInput] = useState('');
   const [catAccMessage, setCatAccMessage] = useState('');
 
-  const driveFolder = settings.driveFolder || {
-    name: 'WealthPulse Financial Inbox',
-    url: 'https://drive.google.com/drive/my-drive'
+  const rawDriveName = settings.driveFolder?.name || 'Kuberis Financial Inbox';
+  const cleanDriveName = rawDriveName.replace(/Ledgerly/gi, 'Kuberis').replace(/WealthPulse/gi, 'Kuberis');
+  const driveFolder = {
+    ...settings.driveFolder,
+    name: cleanDriveName,
+    url: settings.driveFolder?.url || 'https://drive.google.com/drive/my-drive'
   };
-  const [driveNameInput, setDriveNameInput] = useState(driveFolder.name || 'WealthPulse Financial Inbox');
+  const [driveNameInput, setDriveNameInput] = useState(cleanDriveName);
   const [driveUrlInput, setDriveUrlInput] = useState(driveFolder.url || 'https://drive.google.com/drive/my-drive');
   const [driveMessage, setDriveMessage] = useState('');
 
@@ -109,7 +112,7 @@ export default function SettingsTab({
     e.preventDefault();
     onSaveNetWorth({
       driveFolder: {
-        name: driveNameInput.trim() || 'WealthPulse Financial Inbox',
+        name: driveNameInput.trim() || 'Kuberis Financial Inbox',
         url: driveUrlInput.trim() || 'https://drive.google.com/drive/my-drive'
       }
     });
@@ -206,24 +209,37 @@ export default function SettingsTab({
         )}
 
         {/* Informative Note Box */}
-        <div style={{ padding: '12px 16px', borderRadius: '14px', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.2)', marginBottom: '20px', fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5' }}>
-          💡 <strong>Dynamic Net Worth Auto-Calculation:</strong> Your Net Worth includes your live stock & mutual fund investments (<strong>{formatInr(liveInvestmentsValuation)}</strong>) which update live every 3 seconds. You can add additional manual assets (real estate, vehicles) or debts below.
+        <div style={{ padding: '14px 18px', borderRadius: '16px', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', marginBottom: '20px', fontSize: '12.5px', color: 'var(--text-muted)', lineHeight: '1.6' }}>
+          💡 <strong>Dynamic Net Worth Auto-Calculation:</strong> Net Worth = <strong>Total Assets</strong> (Live Portfolio + Extra Assets) − <strong>Total Liabilities</strong> (Debts & Loans).
+          <div style={{ marginTop: '4px' }}>
+            • <strong>1. Live Investments Portfolio (Auto):</strong> <strong>{formatInr(liveInvestmentsValuation)}</strong> is calculated 100% automatically in real-time every 3 seconds from your stocks, mutual funds, crypto, gold & FDs in the Investments tab.
+          </div>
+          <div style={{ marginTop: '2px' }}>
+            • <strong>Descriptions & Itemized Notes:</strong> To record <em>why</em> each asset or loan was added (e.g. loan terms, interest rates, locker keys, property address), manage them privately inside the itemized breakdown modal without cluttering this settings page.
+          </div>
         </div>
 
         <form onSubmit={handleNetWorthSubmit}>
           <div className="settings-grid-5" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '14px', marginBottom: '16px' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label" style={{ fontSize: '12px', fontWeight: '700' }}>
-                1. Live Investments Portfolio (Auto)
+              <label className="form-label" style={{ fontSize: '12px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>1. Live Portfolio (Auto)</span>
+                <span className="badge badge-success" style={{ fontSize: '8.5px', padding: '1px 5px' }}>Live Sync</span>
               </label>
-              <div style={{ padding: '10px 14px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-md)', fontSize: '15px', fontWeight: '800', color: '#10B981', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
+              <div style={{ padding: '10px 14px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: 'var(--radius-md)', fontSize: '15px', fontWeight: '800', color: '#10B981', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
                 {formatInr(liveInvestmentsValuation)}
+              </div>
+              <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                Stocks, MFs, Crypto, Gold & FDs
               </div>
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label" style={{ fontSize: '12px', fontWeight: '700' }}>
-                2. Additional Manual Assets (₹)
+              <label className="form-label" style={{ fontSize: '12px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>2. Manual Assets (₹)</span>
+                {Array.isArray(settings.customAssetsList) && settings.customAssetsList.length > 0 && (
+                  <span style={{ fontSize: '9px', color: '#38BDF8', fontWeight: '700' }}>{settings.customAssetsList.length} itemized</span>
+                )}
               </label>
               <input
                 type={isPrivacyMode ? 'password' : 'number'}
@@ -233,6 +249,9 @@ export default function SettingsTab({
                 value={assetsInput}
                 onChange={e => setAssetsInput(e.target.value)}
               />
+              <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                Property, Vehicles, Cash, Jewelry
+              </div>
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
@@ -242,11 +261,17 @@ export default function SettingsTab({
               <div style={{ padding: '10px 14px', background: 'rgba(56, 189, 248, 0.08)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: 'var(--radius-md)', fontSize: '15px', fontWeight: '800', color: '#38BDF8', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
                 {formatInr(calculatedAssets)}
               </div>
+              <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                (Live Portfolio + Manual Assets)
+              </div>
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label" style={{ fontSize: '12px', fontWeight: '700' }}>
-                4. Total Liabilities & Debts (₹)
+              <label className="form-label" style={{ fontSize: '12px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>4. Liabilities & Debts (₹)</span>
+                {Array.isArray(settings.customLiabilitiesList) && settings.customLiabilitiesList.length > 0 && (
+                  <span style={{ fontSize: '9px', color: 'var(--danger)', fontWeight: '700' }}>{settings.customLiabilitiesList.length} itemized</span>
+                )}
               </label>
               <input
                 type={isPrivacyMode ? 'password' : 'number'}
@@ -256,25 +281,42 @@ export default function SettingsTab({
                 value={liabilitiesInput}
                 onChange={e => setLiabilitiesInput(e.target.value)}
               />
+              <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                Home/Car Loans, Cards, EMIs
+              </div>
             </div>
 
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label" style={{ fontSize: '12px', fontWeight: '700' }}>
-                5. Calculated Dynamic Net Worth
+                5. Dynamic Net Worth
               </label>
               <div style={{ padding: '10px 14px', background: 'var(--bg-app)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', fontSize: '16px', fontWeight: '900', color: calculatedPreview >= 0 ? 'var(--primary)' : 'var(--danger)', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
                 {formatInr(calculatedPreview)}
               </div>
+              <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                Total Assets − Total Liabilities
+              </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
             <button type="submit" className="btn btn-primary">
               Save Net Worth Configuration
             </button>
             {onOpenNetWorthModal && (
-              <button type="button" className="btn btn-secondary" onClick={onOpenNetWorthModal}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontWeight: '700', gap: '8px' }}
+                onClick={onOpenNetWorthModal}
+              >
+                <PieChart size={16} style={{ color: 'var(--primary)' }} />
                 Open Detailed Breakdown & Itemized List
+                {(Array.isArray(settings.customAssetsList) ? settings.customAssetsList.length : 0) + (Array.isArray(settings.customLiabilitiesList) ? settings.customLiabilitiesList.length : 0) > 0 && (
+                  <span className="badge badge-success" style={{ fontSize: '9px', padding: '1px 6px' }}>
+                    {(Array.isArray(settings.customAssetsList) ? settings.customAssetsList.length : 0) + (Array.isArray(settings.customLiabilitiesList) ? settings.customLiabilitiesList.length : 0)} with notes
+                  </span>
+                )}
               </button>
             )}
           </div>

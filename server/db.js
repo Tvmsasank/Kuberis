@@ -598,6 +598,11 @@ export const dbEngine = {
       db.userSettings[userId] = getInitialUserSettings();
       saveDb();
     }
+    // Auto-migrate legacy brand names in stored userSettings
+    if (db.userSettings[userId]?.driveFolder?.name && /ledgerly|wealthpulse/i.test(db.userSettings[userId].driveFolder.name)) {
+      db.userSettings[userId].driveFolder.name = 'Kuberis Financial Inbox';
+      saveDb();
+    }
     return db.userSettings[userId];
   },
 

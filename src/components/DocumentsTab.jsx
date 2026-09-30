@@ -6,9 +6,12 @@ export default function DocumentsTab({
   settings = {},
   onOpenImport
 }) {
-  const driveFolder = settings.driveFolder || {
-    name: 'WealthPulse Financial Inbox',
-    url: 'https://drive.google.com/drive/folders/wealthpulse-inbox'
+  const rawDriveName = settings.driveFolder?.name || 'Kuberis Financial Inbox';
+  const cleanDriveName = rawDriveName.replace(/Ledgerly/gi, 'Kuberis').replace(/WealthPulse/gi, 'Kuberis');
+  const driveFolder = {
+    ...settings.driveFolder,
+    name: cleanDriveName,
+    url: settings.driveFolder?.url || 'https://drive.google.com/drive/my-drive'
   };
   const driveSync = settings.driveSync || {
     schedule: '08:00 AM Daily',

@@ -70,7 +70,7 @@ export default function RecurringTab({
           <h3 style={{ fontSize: '16px', fontWeight: '700' }}>Active Recurring Detection Engine</h3>
         </div>
         <p style={{ fontSize: '13px', opacity: 0.9 }}>
-          WealthPulse automatically normalizes merchants, evaluates interval windows (weekly to annual), and suggests recurring bills without false positives.
+          Kuberis automatically normalizes merchants, evaluates interval windows (weekly to annual), and suggests recurring bills without false positives.
         </p>
       </div>
 

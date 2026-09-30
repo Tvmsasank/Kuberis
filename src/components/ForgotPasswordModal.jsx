@@ -56,7 +56,7 @@ export default function ForgotPasswordModal({ isOpen, onClose, onOpenLogin, onLo
     setSuccessMessage('');
 
     if (emailStatus === 'not_found') {
-      setError('No account found with this email address. Please enter the email associated with your WealthPulse account.');
+      setError('No account found with this email address. Please enter the email associated with your Kuberis account.');
       return;
     }
 
@@ -181,7 +181,7 @@ export default function ForgotPasswordModal({ isOpen, onClose, onOpenLogin, onLo
 
               {emailStatus === 'not_found' && (
                 <div style={{ fontSize: '12px', color: '#F87171', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '6px', fontWeight: '600' }}>
-                  <AlertCircle size={13} /> No account linked with this email. Enter the email associated with your WealthPulse account.
+                  <AlertCircle size={13} /> No account linked with this email. Enter the email associated with your Kuberis account.
                 </div>
               )}
 

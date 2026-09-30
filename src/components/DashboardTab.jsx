@@ -371,7 +371,7 @@ export default function DashboardTab({
         </div>
       </div>
 
-      {/* Bottom Grid: Recent Activity & WealthPulse Insight */}
+      {/* Bottom Grid: Recent Activity & Kuberis Insight */}
       <div className="grid-2">
         {/* Recent Activity (All Account Transactions Displayed) */}
         <div className="card">
