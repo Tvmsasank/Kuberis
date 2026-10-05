@@ -15,7 +15,8 @@ import {
   Shield,
   Lock,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Compass
 } from 'lucide-react';
 
 const INITIAL_TICKERS = [
@@ -44,7 +45,8 @@ export default function Header({
   onOpenImport,
   onTriggerDriveSync,
   isPrivacyMode = false,
-  onTogglePrivacyMode
+  onTogglePrivacyMode,
+  onStartTour
 }) {
   const isDark = theme !== 'light';
   const [tickers, setTickers] = useState(INITIAL_TICKERS);
@@ -162,6 +164,7 @@ export default function Header({
     <div className="global-header-sticky">
       {/* 🔴 Top Live Streaming Marquee Ticker Bar */}
       <div
+        id="tour-market-ticker"
         style={{
           width: '100%',
           height: '28px',
@@ -278,6 +281,31 @@ export default function Header({
             )}
           </button>
 
+          {/* 🧭 Interactive App Tour Trigger */}
+          {user && onStartTour && (
+            <button
+              type="button"
+              className="btn btn-ghost desktop-only-action"
+              onClick={onStartTour}
+              style={{
+                padding: '7px 12px',
+                borderRadius: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid var(--border-color)',
+                fontSize: '12px',
+                fontWeight: '700',
+                color: 'var(--text-main)'
+              }}
+              title="Take Interactive Feature Tour"
+            >
+              <Compass size={15} style={{ color: 'var(--primary)' }} />
+              <span className="btn-text-desktop">Tour</span>
+            </button>
+          )}
+
           {user ? (
             <>
               {/* Desktop Only Actions */}
@@ -290,12 +318,13 @@ export default function Header({
               </button>
 
               {/* Quick Add Entry */}
-              <button className="btn btn-primary btn-sm" onClick={onOpenAddEntry} title="Add Entry" style={{ padding: '6px 14px' }}>
+              <button id="tour-quick-actions" className="btn btn-primary btn-sm" onClick={onOpenAddEntry} title="Add Entry" style={{ padding: '6px 14px' }}>
                 <Plus size={16} /> <span className="btn-text-desktop">Add entry</span>
               </button>
 
               {/* Prominent User Profile Avatar Button */}
               <button
+                id="tour-security-profile"
                 type="button"
                 className="btn btn-ghost user-profile-header-btn"
                 style={{

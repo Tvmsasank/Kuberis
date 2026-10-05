@@ -159,72 +159,77 @@ export default function LandingPage({
           </button>
         </div>
 
-        {/* 📊 LIVE INTERACTIVE GLASS DASHBOARD PREVIEW CARD */}
+        {/* 🌟 CLASSIC PROFESSIONAL CAPABILITY BADGES (Theme-Adaptive & Clean) */}
         <div
-          className="card"
           style={{
-            padding: '24px',
-            borderRadius: '24px',
-            background: 'linear-gradient(145deg, rgba(16, 185, 129, 0.08) 0%, rgba(10, 25, 47, 0.9) 100%)',
-            border: '1px solid var(--border-glass)',
-            boxShadow: '0 24px 60px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-            maxWidth: '940px',
+            maxWidth: '960px',
             margin: '0 auto',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: '14px',
             textAlign: 'left'
           }}
         >
-          {/* Mock Dashboard Top Bar */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10B981', boxShadow: '0 0 10px #10B981' }} />
-              <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-main)' }}>Live Portfolio Feed • ₹ (INR)</span>
+          <div
+            className="card"
+            style={{
+              padding: '16px 20px',
+              borderRadius: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '14px',
+              border: '1px solid var(--border-color)',
+              background: 'var(--bg-card)'
+            }}
+          >
+            <div style={{ padding: '10px', borderRadius: '12px', background: 'var(--primary-light)', color: 'var(--primary)', flexShrink: 0 }}>
+              <TrendingUp size={20} />
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <span style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.15)', color: '#10B981', fontWeight: '700' }}>
-                🟢 NSE Market Open
-              </span>
-              <span style={{ fontSize: '11px', padding: '4px 10px', borderRadius: '8px', background: 'rgba(56, 189, 248, 0.15)', color: '#38BDF8', fontWeight: '700' }}>
-                🌾 AMFI Updated
-              </span>
-            </div>
-          </div>
-
-          {/* Quick Metrics Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '20px' }}>
-            <div style={{ padding: '14px', borderRadius: '16px', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700' }}>Total Portfolio Net Worth</div>
-              <div style={{ fontSize: '22px', fontWeight: '900', color: 'var(--text-main)', marginTop: '4px' }}>₹14,82,450.00</div>
-              <div style={{ fontSize: '11px', color: '#10B981', fontWeight: '700', marginTop: '2px' }}>+₹24,800.00 (+1.7%) Today</div>
-            </div>
-
-            <div style={{ padding: '14px', borderRadius: '16px', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700' }}>Monthly Savings Velocity</div>
-              <div style={{ fontSize: '22px', fontWeight: '900', color: '#38BDF8', marginTop: '4px' }}>₹68,200.00</div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>64% Savings Rate</div>
-            </div>
-
-            <div style={{ padding: '14px', borderRadius: '16px', background: 'rgba(255, 255, 255, 0.04)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700' }}>Fast Hardware Security</div>
-              <div style={{ fontSize: '18px', fontWeight: '900', color: '#FBBF24', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Fingerprint size={20} /> Face ID / MPIN
-              </div>
-              <div style={{ fontSize: '11px', color: '#10B981', marginTop: '2px' }}>✓ W3C Passkeys Active</div>
+            <div>
+              <div style={{ fontSize: '13.5px', fontWeight: '800', color: 'var(--text-main)' }}>Live NSE & BSE Indian Stocks</div>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>Streaming market quotes & 3s auto sync</div>
             </div>
           </div>
 
-          {/* Live Market Tickers Chips (No scrollbar, clean flex wrap) */}
-          <div className="no-scrollbar" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-start', alignItems: 'center' }}>
-            <div style={{ padding: '8px 12px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)', fontSize: '12px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <strong>RELIANCE.NS</strong> <span style={{ color: '#10B981' }}>₹2,980.40 (+1.4%)</span>
+          <div
+            className="card"
+            style={{
+              padding: '16px 20px',
+              borderRadius: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '14px',
+              border: '1px solid var(--border-color)',
+              background: 'var(--bg-card)'
+            }}
+          >
+            <div style={{ padding: '10px', borderRadius: '12px', background: 'var(--info-light)', color: 'var(--info)', flexShrink: 0 }}>
+              <Building2 size={20} />
             </div>
-            <div style={{ padding: '8px 12px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)', fontSize: '12px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <strong>TCS.NS</strong> <span style={{ color: '#10B981' }}>₹4,195.00 (+0.8%)</span>
+            <div>
+              <div style={{ fontSize: '13.5px', fontWeight: '800', color: 'var(--text-main)' }}>10,000+ AMFI Mutual Funds</div>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>Official daily NAVs & SIP compounding</div>
             </div>
-            <div style={{ padding: '8px 12px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)', fontSize: '12px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <strong>HDFCBANK.NS</strong> <span style={{ color: '#10B981' }}>₹1,642.50 (+0.5%)</span>
+          </div>
+
+          <div
+            className="card"
+            style={{
+              padding: '16px 20px',
+              borderRadius: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '14px',
+              border: '1px solid var(--border-color)',
+              background: 'var(--bg-card)'
+            }}
+          >
+            <div style={{ padding: '10px', borderRadius: '12px', background: 'var(--warning-light)', color: 'var(--warning)', flexShrink: 0 }}>
+              <ShieldCheck size={20} />
             </div>
-            <div style={{ padding: '8px 12px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)', fontSize: '12px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <strong>Parag Parikh Flexi Cap</strong> <span style={{ color: '#38BDF8' }}>NAV: ₹78.42</span>
+            <div>
+              <div style={{ fontSize: '13.5px', fontWeight: '800', color: 'var(--text-main)' }}>Zero Credential Storage</div>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>Private, client-encrypted architecture</div>
             </div>
           </div>
         </div>
@@ -311,7 +316,7 @@ export default function LandingPage({
       </section>
 
       {/* 🔄 3-STEP "HOW IT WORKS" PROCESS */}
-      <section style={{ margin: '60px 0', padding: '40px 24px', borderRadius: '24px', background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, rgba(10, 25, 47, 0.6) 100%)', border: '1px solid var(--border-color)' }}>
+      <section style={{ margin: '60px 0', padding: '40px 24px', borderRadius: '24px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
         <div style={{ textAlign: 'center', marginBottom: '36px' }}>
           <h2 style={{ fontSize: 'clamp(20px, 3vw, 32px)', fontWeight: '900' }}>Get Started in 3 Simple Steps</h2>
           <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '6px' }}>No complicated setup. Live portfolio tracking in under 60 seconds.</p>
@@ -346,7 +351,7 @@ export default function LandingPage({
 
       {/* 🛡️ SECURITY & PRIVACY GUARANTEE */}
       <section style={{ margin: '60px 0', textAlign: 'center' }}>
-        <div style={{ maxWidth: '780px', margin: '0 auto', padding: '36px 24px', borderRadius: '24px', background: 'linear-gradient(145deg, rgba(16, 185, 129, 0.06) 0%, rgba(15, 23, 42, 0.7) 100%)', border: '1px solid var(--border-glass)' }}>
+        <div style={{ maxWidth: '780px', margin: '0 auto', padding: '36px 24px', borderRadius: '24px', background: 'var(--hero-bg)', border: 'var(--hero-border)', boxShadow: 'var(--shadow-sm)' }}>
           <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'var(--primary-light)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
             <ShieldCheck size={32} />
           </div>
@@ -437,7 +442,7 @@ export default function LandingPage({
           background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(56, 189, 248, 0.1) 100%)',
           border: '1px solid var(--border-glass)',
           textAlign: 'center',
-          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)'
+          boxShadow: 'var(--shadow-lg)'
         }}
       >
         <h2 style={{ fontSize: 'clamp(24px, 4vw, 36px)', fontWeight: '900', marginBottom: '12px' }}>

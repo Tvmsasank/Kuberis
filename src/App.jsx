@@ -34,6 +34,8 @@ import SmartUpiModal from './components/SmartUpiModal';
 import AccountAggregatorModal from './components/AccountAggregatorModal';
 import NetWorthModal from './components/NetWorthModal';
 import TwoFactorSetupModal from './components/TwoFactorSetupModal';
+import SecurityOnboardingModal from './components/SecurityOnboardingModal';
+import AppTour from './components/AppTour';
 import LandingPage from './components/LandingPage';
 import { CheckCircle2, FolderSync, X, Shield, Lock, UserPlus, LogIn, Fingerprint, KeyRound, Zap, Landmark } from 'lucide-react';
 
@@ -209,6 +211,8 @@ export default function App() {
   // Drive Sync Notification Modal State
   const [driveSyncStatus, setDriveSyncStatus] = useState(null);
   const [sessionTerminatedModalOpen, setSessionTerminatedModalOpen] = useState(false);
+  const [isSecurityOnboardingOpen, setIsSecurityOnboardingOpen] = useState(false);
+  const [isTourOpen, setIsTourOpen] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -221,8 +225,9 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', newTheme);
   };
 
-  const currentEmail = user?.email ? user.email : (localStorage.getItem('kuberis_remembered_email') || localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email') || '');
-  const activeToken = token || localStorage.getItem('kuberis_token') || localStorage.getItem('wealthpulse_token') || localStorage.getItem('ledgerly_token') || sessionStorage.getItem('kuberis_token') || sessionStorage.getItem('wealthpulse_token') || '';
+  // Strictly use active authenticated user's email - NEVER leak remembered email into auth headers
+  const currentEmail = user?.email ? user.email : '';
+  const activeToken = token || localStorage.getItem('kuberis_token') || sessionStorage.getItem('kuberis_token') || '';
 
   const authHeaders = {
     ...(activeToken ? { 'Authorization': `Bearer ${activeToken}`, 'X-Auth-Token': activeToken } : {}),
@@ -230,6 +235,24 @@ export default function App() {
   };
 
   const fetchState = async () => {
+    if (!token && !localStorage.getItem('kuberis_token')) {
+      setTransactions([]);
+      setInvestments([]);
+      setTags([]);
+      setRules([]);
+      setDocuments([]);
+      setSettings({
+        assets: 0,
+        liabilities: 0,
+        netWorthConfigured: false,
+        selectedPeriod: 'all-time',
+        customAssetsList: [],
+        customLiabilitiesList: []
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch('/api/state', { headers: authHeaders });
       if (res.ok) {
@@ -240,10 +263,16 @@ export default function App() {
         setDocuments(data.documents || []);
         setInvestments(data.investments || []);
         if (data.settings) {
-          setSettings(prev => ({
-            ...prev,
-            ...data.settings
-          }));
+          setSettings(data.settings);
+        } else {
+          setSettings({
+            assets: 0,
+            liabilities: 0,
+            netWorthConfigured: false,
+            selectedPeriod: 'all-time',
+            customAssetsList: [],
+            customLiabilitiesList: []
+          });
         }
       } else if (res.status === 401) {
         const json = await res.json().catch(() => ({}));
@@ -263,6 +292,16 @@ export default function App() {
     fetchState();
   }, [token]);
 
+  // Auto-launch tour for new users
+  useEffect(() => {
+    if (user && !localStorage.getItem('kuberis_tour_completed')) {
+      const timer = setTimeout(() => {
+        setIsTourOpen(true);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
+
   // Live Stock Market Ticker Polling Loop (Runs every 3 seconds)
   useEffect(() => {
     if (!user) return;
@@ -277,7 +316,7 @@ export default function App() {
           }
         } else if (res.ok) {
           const invData = await res.json();
-          if (Array.isArray(invData) && invData.length > 0) {
+          if (Array.isArray(invData)) {
             setInvestments(invData);
           }
         }
@@ -289,8 +328,22 @@ export default function App() {
     return () => clearInterval(interval);
   }, [user, token]);
 
-  // Auth Handlers
-  const handleLoginSuccess = (userData, userToken, rememberMe = true) => {
+  // Auth Handlers - Full state reset to guarantee complete isolation across sessions
+  const handleLoginSuccess = (userData, userToken, rememberMe = true, metadata = {}) => {
+    setTransactions([]);
+    setInvestments([]);
+    setTags([]);
+    setRules([]);
+    setDocuments([]);
+    setSettings({
+      assets: 0,
+      liabilities: 0,
+      netWorthConfigured: false,
+      selectedPeriod: 'all-time',
+      customAssetsList: [],
+      customLiabilitiesList: []
+    });
+
     setUser(userData);
     setToken(userToken);
     if (rememberMe) {
@@ -298,6 +351,10 @@ export default function App() {
       localStorage.setItem('kuberis_user', JSON.stringify(userData));
     } else {
       sessionStorage.setItem('kuberis_token', userToken);
+    }
+
+    if (metadata?.isNewRegistration) {
+      setIsSecurityOnboardingOpen(true);
     }
   };
 
@@ -307,6 +364,19 @@ export default function App() {
     } catch (e) {}
     setUser(null);
     setToken('');
+    setTransactions([]);
+    setInvestments([]);
+    setTags([]);
+    setRules([]);
+    setDocuments([]);
+    setSettings({
+      assets: 0,
+      liabilities: 0,
+      netWorthConfigured: false,
+      selectedPeriod: 'all-time',
+      customAssetsList: [],
+      customLiabilitiesList: []
+    });
     localStorage.removeItem('kuberis_token');
     localStorage.removeItem('kuberis_user');
     localStorage.removeItem('wealthpulse_token');
@@ -709,6 +779,7 @@ export default function App() {
             if (!user) { setAuthModalMode('login'); setIsAuthModalOpen(true); return; }
             setIsAaModalOpen(true);
           }}
+          onStartTour={() => setIsTourOpen(true)}
         />
 
         <main className="page-body">
@@ -902,6 +973,10 @@ export default function App() {
         onOpenForgotPassword={() => setIsForgotPasswordOpen(true)}
         onOpenMpinModal={handleOpenMpinModal}
         onOpenTwoFactorModal={() => setIsTwoFactorModalOpen(true)}
+        onStartTour={() => {
+          setIsProfileModalOpen(false);
+          setIsTourOpen(true);
+        }}
       />
 
       {/* Google Authenticator 2FA Setup Modal */}
@@ -914,6 +989,32 @@ export default function App() {
           setUser(updatedUser);
           localStorage.setItem('kuberis_user', JSON.stringify(updatedUser));
         }}
+      />
+
+      {/* 🛡️ Post-Registration Security Caution Onboarding Modal */}
+      <SecurityOnboardingModal
+        isOpen={isSecurityOnboardingOpen}
+        onClose={() => {
+          setIsSecurityOnboardingOpen(false);
+          if (localStorage.getItem('kuberis_tour_completed') !== 'true') {
+            setIsTourOpen(true);
+          }
+        }}
+        onSetupMpin={() => {
+          setIsSecurityOnboardingOpen(false);
+          handleOpenMpinModal('set');
+        }}
+        onSetupTwoFactor={() => {
+          setIsSecurityOnboardingOpen(false);
+          setIsTwoFactorModalOpen(true);
+        }}
+      />
+
+      {/* 🧭 Interactive Step-by-Step Feature Walkthrough Tour */}
+      <AppTour
+        isOpen={isTourOpen}
+        onClose={() => setIsTourOpen(false)}
+        onNavigateTab={(tab) => setActiveTab(tab)}
       />
 
       {/* Auth Modals */}

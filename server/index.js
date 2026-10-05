@@ -50,13 +50,14 @@ const getUserIdFromReq = (req) => {
         return decoded.userId || decoded.id;
       }
     } catch (err) {
-      // Token expired or invalid, proceed to fallbacks
+      // If a token was provided but failed verification, do not fall back to email
+      return null;
     }
   }
 
-  // Mobile Fallback 1: Resolve user by X-User-Email header or query email
+  // Fallback for webhooks or native integrations where only authorized email is supplied without auth header
   const userEmail = (req.headers['x-user-email'] || req.query.email || '').toString().trim().toLowerCase();
-  if (userEmail) {
+  if (userEmail && !authHeader) {
     const user = dbEngine.getUserByEmail(userEmail);
     if (user) return user.id;
   }
@@ -118,6 +119,11 @@ app.post('/api/auth/register', (req, res) => {
     const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     dbEngine.setUserActiveSession(user.id, sessionId);
     const token = jwt.sign({ userId: user.id, email: user.email, sessionId }, JWT_SECRET, { expiresIn: '30d' });
+
+    // Send automated welcome email with platform guidelines and T&C
+    sendWelcomeEmail(user.email, user.name).catch(e => {
+      console.warn('[Welcome Email] Non-fatal delivery notice:', e.message);
+    });
 
     res.json({
       message: 'Account created successfully',
@@ -572,6 +578,55 @@ async function sendResetEmail(toEmail, resetUrl) {
       <p style="font-size: 12px; color: #94A3B8; line-height: 1.5; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 16px; margin-top: 24px;">
         If you did not request this, you can safely ignore this email. This secure link will expire in 1 hour.
       </p>
+    </div>
+  `;
+
+  return await sendEmailWithFallback({ to: toEmail, subject, text, html });
+}
+
+async function sendWelcomeEmail(toEmail, userName) {
+  const subject = 'Welcome to Kuberis — Your Wealth OS Guidelines & Terms';
+  const nameDisplay = userName ? userName.trim() : 'Investor';
+  const text = `Welcome to Kuberis, ${nameDisplay}!\n\nYour account has been created successfully. Kuberis is India's next-gen real-time personal wealth operating system.\n\nSecurity Guidelines:\n1. Set Up 4-Digit MPIN for quick access on trusted devices.\n2. Enable Google Authenticator (2FA) for extra security.\n3. Never share your credentials. Kuberis never asks for bank passwords or debit card PINs.\n4. Connect Google Drive for automatic, encrypted backups.\n\nTerms & Conditions Summary:\n- Kuberis is an informational wealth tracker and personal ledger.\n- Your data is private, isolated, and encrypted.\n- You retain 100% data ownership.\n\nAccess your dashboard: https://kuberis.onrender.com/dashboard`;
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px; border: 1px solid #10B981; border-radius: 20px; background: #040D1A; color: #FFFFFF;">
+      <div style="text-align: center; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.08);">
+        <h2 style="color: #10B981; margin: 0 0 6px 0; font-size: 26px; font-weight: 900; letter-spacing: -0.5px;">⚡ Kuberis</h2>
+        <div style="font-size: 13px; color: #94A3B8; font-weight: 500;">Next-Gen Financial OS Built for India (INR)</div>
+      </div>
+
+      <h3 style="color: #FFFFFF; font-size: 20px; font-weight: 800; margin-top: 0;">Welcome aboard, ${nameDisplay}! 👋</h3>
+      <p style="color: #CBD5E1; font-size: 14px; line-height: 1.6;">
+        Thank you for joining Kuberis. Your private financial dashboard is ready to unify your stocks, mutual funds, gold, fixed deposits, and daily cash flow in real-time.
+      </p>
+
+      <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 14px; padding: 18px; margin: 24px 0;">
+        <h4 style="color: #10B981; margin: 0 0 12px 0; font-size: 15px; font-weight: 800;">🛡️ Recommended Security Guidelines</h4>
+        <ul style="margin: 0; padding-left: 20px; color: #E2E8F0; font-size: 13px; line-height: 1.7;">
+          <li><strong>Set Up Your 4-Digit MPIN:</strong> Fast 1-click device unlocking without having to type your full password.</li>
+          <li><strong>Enable Google Authenticator 2FA:</strong> High-security time-based 6-digit codes to protect your wealth data from unauthorized access.</li>
+          <li><strong>Non-Custodial Architecture:</strong> Kuberis never asks for or stores your netbanking passwords or debit card PINs. All records are isolated and encrypted.</li>
+          <li><strong>Google Drive Sync:</strong> Connect your private Google Drive inbox to ingest statements and secure automated cloud backups.</li>
+        </ul>
+      </div>
+
+      <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; padding: 18px; margin: 24px 0;">
+        <h4 style="color: #38BDF8; margin: 0 0 10px 0; font-size: 14px; font-weight: 800;">📜 Terms & Privacy Summary</h4>
+        <p style="color: #94A3B8; font-size: 12.5px; line-height: 1.6; margin: 0;">
+          Kuberis is an informational wealth tracking OS. Market prices and NAVs are synced live from official exchanges (NSE, BSE, AMFI). You maintain 100% data sovereignty and may export or wipe your data anytime.
+        </p>
+      </div>
+
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="https://kuberis.onrender.com/dashboard" style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: #000000; padding: 14px 32px; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 15px; display: inline-block; box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);">
+          Launch Kuberis Dashboard →
+        </a>
+      </div>
+
+      <div style="font-size: 11.5px; color: #64748B; text-align: center; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 18px; line-height: 1.5;">
+        © 2026 Kuberis OS. All rights reserved. • Built with Privacy & Security First.
+      </div>
     </div>
   `;
 

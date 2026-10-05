@@ -45,13 +45,14 @@ export default function Sidebar({ activeTab, onSelectTab }) {
         </button>
       </div>
 
-      <nav className="sidebar-nav">
+      <nav className="sidebar-nav" id="tour-nav-tabs">
         {NAV_ITEMS.map(item => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
           return (
             <button
               key={item.id}
+              {...(item.id === 'investments' ? { id: 'tour-investments' } : {})}
               className={`nav-item ${isActive ? 'active' : ''}`}
               onClick={() => onSelectTab(item.id)}
             >

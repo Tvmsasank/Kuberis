@@ -118,6 +118,7 @@ export default function DashboardTab({
       <div className="grid-4" style={{ marginBottom: '28px' }}>
         {/* Dynamic Net Worth Card */}
         <div
+          id="tour-net-worth"
           className="card"
           style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', cursor: 'pointer' }}
           onClick={() => onNavigateTab ? onNavigateTab('settings') : null}

@@ -14,7 +14,8 @@ import {
   Receipt,
   Trash2,
   AlertTriangle,
-  ChevronRight
+  ChevronRight,
+  Compass
 } from 'lucide-react';
 import { registerBiometricPasskey } from '../utils/biometrics';
 import { calculateDynamicNetWorth } from '../utils/netWorth';
@@ -30,7 +31,8 @@ export default function UserProfileModal({
   onLogout,
   onOpenForgotPassword,
   onOpenMpinModal,
-  onOpenTwoFactorModal
+  onOpenTwoFactorModal,
+  onStartTour
 }) {
   if (!isOpen || !user) return null;
 
@@ -360,6 +362,21 @@ export default function UserProfileModal({
           </button>
 
           <div style={{ display: 'flex', gap: '6px' }}>
+            {onStartTour && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  onClose();
+                  onStartTour();
+                }}
+                style={{ fontSize: '11px', padding: '6px 10px', gap: '4px' }}
+                title="Interactive Walkthrough"
+              >
+                <Compass size={12} style={{ color: 'var(--primary)' }} /> Tour
+              </button>
+            )}
+
             <button
               type="button"
               className="btn btn-secondary btn-sm"

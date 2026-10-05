@@ -26,6 +26,102 @@ import {
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import StockDetailModal from './StockDetailModal';
 
+function MetricDonutPopover({ title, items = [], alignRight = false, totalLabel = '' }) {
+  const validItems = items.filter(i => (i.value || 0) > 0);
+  const total = validItems.reduce((acc, i) => acc + i.value, 0);
+  const r = 32;
+  const circumference = 2 * Math.PI * r;
+  let accumulated = 0;
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: 'calc(100% + 8px)',
+        ...(alignRight ? { right: 0 } : { left: 0 }),
+        width: '270px',
+        background: 'var(--bg-card)',
+        backdropFilter: 'blur(24px)',
+        border: '1px solid var(--border-glass)',
+        borderRadius: '16px',
+        padding: '16px',
+        boxShadow: '0 16px 36px rgba(0, 0, 0, 0.45)',
+        zIndex: 120,
+        pointerEvents: 'none',
+        animation: 'fadeIn 0.18s ease'
+      }}
+    >
+      <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <PieIcon size={13} style={{ color: 'var(--primary)' }} /> {title}
+      </div>
+
+      {validItems.length === 0 || total === 0 ? (
+        <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', padding: '10px 0' }}>
+          No holding data yet
+        </div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          {/* SVG Donut */}
+          <div style={{ position: 'relative', width: '68px', height: '68px', flexShrink: 0 }}>
+            <svg width="68" height="68" viewBox="0 0 80 80" style={{ transform: 'rotate(-90deg)' }}>
+              <circle cx="40" cy="40" r={r} fill="none" stroke="rgba(255, 255, 255, 0.08)" strokeWidth="12" />
+              {validItems.map((item, idx) => {
+                const fraction = item.value / total;
+                const dashArray = `${fraction * circumference} ${circumference}`;
+                const dashOffset = -accumulated;
+                accumulated += fraction * circumference;
+                return (
+                  <circle
+                    key={idx}
+                    cx="40"
+                    cy="40"
+                    r={r}
+                    fill="none"
+                    stroke={item.color}
+                    strokeWidth="12"
+                    strokeDasharray={dashArray}
+                    strokeDashoffset={dashOffset}
+                    strokeLinecap="round"
+                    style={{ transition: 'stroke-dashoffset 0.3s ease' }}
+                  />
+                );
+              })}
+            </svg>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: '10px', fontWeight: '900', color: 'var(--text-main)', lineHeight: '1' }}>
+                {totalLabel || `${validItems.length}`}
+              </span>
+              <span style={{ fontSize: '8px', fontWeight: '700', color: 'var(--text-muted)' }}>
+                {totalLabel ? 'items' : 'parts'}
+              </span>
+            </div>
+          </div>
+
+          {/* Legend Items */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', overflow: 'hidden' }}>
+            {validItems.slice(0, 4).map((item, idx) => {
+              const pct = total > 0 ? Math.round((item.value / total) * 100) : 0;
+              return (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', gap: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', overflow: 'hidden' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: item.color, flexShrink: 0 }} />
+                    <span style={{ color: 'var(--text-main)', fontWeight: '600', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '85px' }} title={item.label}>
+                      {item.label}
+                    </span>
+                  </div>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: '800', fontSize: '10.5px' }}>
+                    {pct}%
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function InvestmentsTab({
   investments = [],
   onOpenAddInvestment,
@@ -43,6 +139,7 @@ export default function InvestmentsTab({
   const [selectedStockForDetail, setSelectedStockForDetail] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState('all'); // 'all' | 'stock' | 'us_stock' | 'mutual_fund' | 'gold' | 'fd'
   const [searchQuery, setSearchQuery] = useState('');
+  const [hoveredMetricCard, setHoveredMetricCard] = useState(null); // 'invested' | 'value' | 'day' | 'pnl' | null
 
   const safeInvestments = Array.isArray(investments) ? investments : [];
 
@@ -197,6 +294,116 @@ export default function InvestmentsTab({
   }
   const pieData = Object.keys(typeMap).map((k) => ({ name: k, value: Math.round(typeMap[k]) }));
   const COLORS = ['#10B981', '#38BDF8', '#818CF8', '#FBBF24', '#F472B6'];
+
+  // 🥧 High-Impact Metric Hover Pie / Donut Breakdowns
+  const investedBreakdown = useMemo(() => {
+    const targetList = categoryFilter === 'all' ? safeInvestments : categoryHoldings;
+    if (categoryFilter === 'all') {
+      const map = {};
+      for (const i of targetList) {
+        const cat = i.type || 'other';
+        const label =
+          cat === 'stock' ? 'Indian Stocks' :
+          cat === 'us_stock' ? 'US Stocks' :
+          cat === 'mutual_fund' ? 'Mutual Funds' :
+          cat === 'gold' ? 'Gold & SGB' :
+          cat === 'crypto' ? 'Crypto' : 'Fixed Deposits';
+        const cost = (Number(i.buyPrice) || 0) * (Number(i.quantity) || 1);
+        map[label] = (map[label] || 0) + cost;
+      }
+      const palette = ['#10B981', '#38BDF8', '#818CF8', '#FBBF24', '#F472B6', '#34D399'];
+      return Object.entries(map).map(([label, val], idx) => ({
+        label,
+        value: Math.round(val),
+        color: palette[idx % palette.length]
+      })).filter(item => item.value > 0);
+    } else {
+      const sorted = [...targetList].sort((a, b) => {
+        const costA = (Number(a.buyPrice) || 0) * (Number(a.quantity) || 1);
+        const costB = (Number(b.buyPrice) || 0) * (Number(b.quantity) || 1);
+        return costB - costA;
+      });
+      const palette = ['#10B981', '#38BDF8', '#818CF8', '#FBBF24'];
+      return sorted.slice(0, 4).map((s, idx) => ({
+        label: s.name || s.symbol || 'Asset',
+        value: Math.round((Number(s.buyPrice) || 0) * (Number(s.quantity) || 1)),
+        color: palette[idx % palette.length]
+      })).filter(i => i.value > 0);
+    }
+  }, [safeInvestments, categoryHoldings, categoryFilter]);
+
+  const valuationBreakdown = useMemo(() => {
+    const targetList = categoryFilter === 'all' ? safeInvestments : categoryHoldings;
+    const sorted = [...targetList].sort((a, b) => (Number(b.currentValuation) || 0) - (Number(a.currentValuation) || 0));
+    const palette = ['#38BDF8', '#818CF8', '#10B981', '#FBBF24', '#F472B6', '#94A3B8'];
+    if (sorted.length <= 4) {
+      return sorted.map((s, idx) => ({
+        label: s.name || s.symbol || 'Asset',
+        value: Math.round(Number(s.currentValuation) || 0),
+        color: palette[idx % palette.length]
+      })).filter(i => i.value > 0);
+    }
+    const top3 = sorted.slice(0, 3);
+    const rest = sorted.slice(3).reduce((sum, s) => sum + (Number(s.currentValuation) || 0), 0);
+    const list = top3.map((s, idx) => ({
+      label: s.name || s.symbol || 'Asset',
+      value: Math.round(Number(s.currentValuation) || 0),
+      color: palette[idx]
+    }));
+    if (rest > 0) {
+      list.push({ label: `Others (${sorted.length - 3})`, value: Math.round(rest), color: '#94A3B8' });
+    }
+    return list;
+  }, [safeInvestments, categoryHoldings, categoryFilter]);
+
+  const dayPnlBreakdown = useMemo(() => {
+    const targetList = categoryFilter === 'all' ? safeInvestments : categoryHoldings;
+    let gainersCount = 0;
+    let gainersSum = 0;
+    let losersCount = 0;
+    let losersSum = 0;
+    for (const i of targetList) {
+      const ltp = Number(i.currentPrice || i.buyPrice || 0);
+      const prev = Number(i.previousClose || ltp);
+      const qty = Number(i.quantity || 1);
+      const dayRupees = (i.dayRupees !== undefined && !isNaN(Number(i.dayRupees))) ? Number(i.dayRupees) : ((ltp - prev) * qty);
+      if (dayRupees > 0) {
+        gainersCount++;
+        gainersSum += dayRupees;
+      } else if (dayRupees < 0) {
+        losersCount++;
+        losersSum += Math.abs(dayRupees);
+      }
+    }
+    return [
+      { label: `Gainers (${gainersCount})`, value: Math.round(gainersSum), color: '#10B981' },
+      { label: `Losers (${losersCount})`, value: Math.round(losersSum), color: '#EF4444' }
+    ].filter(i => i.value > 0);
+  }, [safeInvestments, categoryHoldings, categoryFilter]);
+
+  const totalPnlBreakdown = useMemo(() => {
+    const targetList = categoryFilter === 'all' ? safeInvestments : categoryHoldings;
+    let profitCount = 0;
+    let profitSum = 0;
+    let lossCount = 0;
+    let lossSum = 0;
+    for (const i of targetList) {
+      const cost = (Number(i.buyPrice) || 0) * (Number(i.quantity) || 1);
+      const val = Number(i.currentValuation) || 0;
+      const pnl = val - cost;
+      if (pnl >= 0) {
+        profitCount++;
+        profitSum += pnl;
+      } else {
+        lossCount++;
+        lossSum += Math.abs(pnl);
+      }
+    }
+    return [
+      { label: `In Profit (${profitCount})`, value: Math.round(profitSum), color: '#10B981' },
+      { label: `In Loss (${lossCount})`, value: Math.round(lossSum), color: '#EF4444' }
+    ].filter(i => i.value > 0);
+  }, [safeInvestments, categoryHoldings, categoryFilter]);
 
   const handleDelete = () => {
     if (deleteTarget) {
@@ -364,7 +571,7 @@ export default function InvestmentsTab({
       {/* ========================================================================= */}
       {activeSubTab === 'holdings' && (
         <>
-          {/* High-Impact Metrics Banner (Calculated Dynamically for Selected Category Tab) */}
+          {/* High-Impact Metrics Banner with Interactive Hover Pie/Donut Breakdowns */}
           <div
             style={{
               display: 'grid',
@@ -373,9 +580,27 @@ export default function InvestmentsTab({
               marginBottom: '24px'
             }}
           >
-            <div className="card" style={{ padding: '18px 20px', borderRadius: '18px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                {currentMeta.investedTitle}
+            {/* 1. Total Invested Card */}
+            <div
+              className="card"
+              style={{
+                padding: '18px 20px',
+                borderRadius: '18px',
+                position: 'relative',
+                cursor: 'pointer',
+                transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+                border: hoveredMetricCard === 'invested' ? '1px solid var(--primary)' : '1px solid var(--border-color)'
+              }}
+              onMouseEnter={() => setHoveredMetricCard('invested')}
+              onMouseLeave={() => setHoveredMetricCard(null)}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  {currentMeta.investedTitle}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', color: 'var(--text-muted)', fontSize: '10px' }} title="Hover to view asset breakdown">
+                  <PieIcon size={13} style={{ color: 'var(--primary)', opacity: hoveredMetricCard === 'invested' ? 1 : 0.6 }} />
+                </div>
               </div>
               <div style={{ fontSize: '24px', fontWeight: '900', color: 'var(--text-main)', marginTop: '4px' }}>
                 {formatInr(totalCost)}
@@ -383,11 +608,36 @@ export default function InvestmentsTab({
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                 {currentMeta.investedSub}
               </div>
+              {hoveredMetricCard === 'invested' && (
+                <MetricDonutPopover
+                  title="Capital by Asset Class"
+                  items={investedBreakdown}
+                  totalLabel={`${investedBreakdown.length}`}
+                />
+              )}
             </div>
 
-            <div className="card" style={{ padding: '18px 20px', borderRadius: '18px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                {currentMeta.valueTitle}
+            {/* 2. Current Portfolio Value Card */}
+            <div
+              className="card"
+              style={{
+                padding: '18px 20px',
+                borderRadius: '18px',
+                position: 'relative',
+                cursor: 'pointer',
+                transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+                border: hoveredMetricCard === 'value' ? '1px solid #38BDF8' : '1px solid var(--border-color)'
+              }}
+              onMouseEnter={() => setHoveredMetricCard('value')}
+              onMouseLeave={() => setHoveredMetricCard(null)}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  {currentMeta.valueTitle}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', color: 'var(--text-muted)', fontSize: '10px' }} title="Hover to view valuation allocation">
+                  <PieIcon size={13} style={{ color: '#38BDF8', opacity: hoveredMetricCard === 'value' ? 1 : 0.6 }} />
+                </div>
               </div>
               <div style={{ fontSize: '24px', fontWeight: '900', color: '#38BDF8', marginTop: '4px' }}>
                 {formatInr(totalValuation)}
@@ -395,11 +645,36 @@ export default function InvestmentsTab({
               <div style={{ fontSize: '11px', color: totalPnL >= 0 ? '#10B981' : '#F87171', fontWeight: '700', marginTop: '2px' }}>
                 {totalPnL >= 0 ? '+' : ''}{formatInr(totalPnL)} ({totalPnLPercentage >= 0 ? '+' : ''}{totalPnLPercentage.toFixed(2)}%)
               </div>
+              {hoveredMetricCard === 'value' && (
+                <MetricDonutPopover
+                  title="Valuation Allocation"
+                  items={valuationBreakdown}
+                  totalLabel={`${valuationBreakdown.length}`}
+                />
+              )}
             </div>
 
-            <div className="card" style={{ padding: '18px 20px', borderRadius: '18px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                {currentMeta.dayTitle}
+            {/* 3. Day's P&L Card */}
+            <div
+              className="card"
+              style={{
+                padding: '18px 20px',
+                borderRadius: '18px',
+                position: 'relative',
+                cursor: 'pointer',
+                transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+                border: hoveredMetricCard === 'day' ? '1px solid ' + (totalDayPnL >= 0 ? '#10B981' : '#F87171') : '1px solid var(--border-color)'
+              }}
+              onMouseEnter={() => setHoveredMetricCard('day')}
+              onMouseLeave={() => setHoveredMetricCard(null)}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  {currentMeta.dayTitle}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', color: 'var(--text-muted)', fontSize: '10px' }} title="Hover to view day gainers vs losers">
+                  <PieIcon size={13} style={{ color: totalDayPnL >= 0 ? '#10B981' : '#F87171', opacity: hoveredMetricCard === 'day' ? 1 : 0.6 }} />
+                </div>
               </div>
               <div style={{ fontSize: '24px', fontWeight: '900', color: totalDayPnL >= 0 ? '#10B981' : '#F87171', marginTop: '4px' }}>
                 {totalDayPnL >= 0 ? '+' : ''}{formatInr(totalDayPnL)}
@@ -407,11 +682,37 @@ export default function InvestmentsTab({
               <div style={{ fontSize: '11px', color: totalDayPnL >= 0 ? '#10B981' : '#F87171', fontWeight: '700', marginTop: '2px' }}>
                 {dayPnLPct >= 0 ? '+' : ''}{dayPnLPct.toFixed(2)}% Today
               </div>
+              {hoveredMetricCard === 'day' && (
+                <MetricDonutPopover
+                  title="Day Gainers vs Losers"
+                  items={dayPnlBreakdown}
+                  alignRight={true}
+                  totalLabel={`${dayPnlBreakdown.length}`}
+                />
+              )}
             </div>
 
-            <div className="card" style={{ padding: '18px 20px', borderRadius: '18px' }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                {currentMeta.pnlTitle}
+            {/* 4. Total P&L Card */}
+            <div
+              className="card"
+              style={{
+                padding: '18px 20px',
+                borderRadius: '18px',
+                position: 'relative',
+                cursor: 'pointer',
+                transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+                border: hoveredMetricCard === 'pnl' ? '1px solid ' + (totalPnL >= 0 ? '#10B981' : '#F87171') : '1px solid var(--border-color)'
+              }}
+              onMouseEnter={() => setHoveredMetricCard('pnl')}
+              onMouseLeave={() => setHoveredMetricCard(null)}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                  {currentMeta.pnlTitle}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', color: 'var(--text-muted)', fontSize: '10px' }} title="Hover to view profit vs loss distribution">
+                  <PieIcon size={13} style={{ color: totalPnL >= 0 ? '#10B981' : '#F87171', opacity: hoveredMetricCard === 'pnl' ? 1 : 0.6 }} />
+                </div>
               </div>
               <div style={{ fontSize: '24px', fontWeight: '900', color: totalPnL >= 0 ? '#10B981' : '#F87171', marginTop: '4px' }}>
                 {totalPnL >= 0 ? '+' : ''}{formatInr(totalPnL)}
@@ -419,6 +720,14 @@ export default function InvestmentsTab({
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                 {currentMeta.pnlSub}
               </div>
+              {hoveredMetricCard === 'pnl' && (
+                <MetricDonutPopover
+                  title="Profit vs Loss Holdings"
+                  items={totalPnlBreakdown}
+                  alignRight={true}
+                  totalLabel={`${totalPnlBreakdown.length}`}
+                />
+              )}
             </div>
           </div>
 

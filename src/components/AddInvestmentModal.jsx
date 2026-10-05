@@ -12,16 +12,16 @@ const INVESTMENT_TYPES = [
 ];
 
 const POPULAR_SUGGESTIONS = [
-  { name: 'Canara Bank', symbol: 'CANBK.NS', type: 'stock', defaultPrice: 131.70 },
-  { name: 'Reliance Industries Ltd', symbol: 'RELIANCE.NS', type: 'stock', defaultPrice: 2950 },
+  { name: 'Canara Bank (NSE)', symbol: 'CANBK.NS', type: 'stock', defaultPrice: 131.70 },
+  { name: 'Reliance (NSE)', symbol: 'RELIANCE.NS', type: 'stock', defaultPrice: 2950 },
+  { name: 'BSE Ltd (Exchange)', symbol: 'BSE.NS', type: 'stock', defaultPrice: 2850 },
+  { name: 'Delta Corp (BSE)', symbol: 'DELTA.BO', type: 'stock', defaultPrice: 118.50 },
   { name: 'Tata Motors (Commercial)', symbol: 'TMCV.NS', type: 'stock', defaultPrice: 468.90 },
   { name: 'Tata Motors (Passenger)', symbol: 'TMPV.NS', type: 'stock', defaultPrice: 330.20 },
   { name: 'Infosys Ltd', symbol: 'INFY.NS', type: 'stock', defaultPrice: 1820 },
   { name: 'HDFC Bank Ltd', symbol: 'HDFCBANK.NS', type: 'stock', defaultPrice: 1650 },
   { name: 'Bitcoin (BTC)', symbol: 'BTC-INR', type: 'crypto', defaultPrice: 6071000 },
   { name: 'Ethereum (ETH)', symbol: 'ETH-INR', type: 'crypto', defaultPrice: 181700 },
-  { name: 'Solana (SOL)', symbol: 'SOL-INR', type: 'crypto', defaultPrice: 7218 },
-  { name: 'Dogecoin (DOGE)', symbol: 'DOGE-INR', type: 'crypto', defaultPrice: 6.70 },
   { name: 'Parag Parikh Flexi Cap Direct Fund', symbol: '122639', type: 'mutual_fund', defaultPrice: 92.83 },
   { name: 'Nippon India Multi Asset Direct Fund', symbol: '148457', type: 'mutual_fund', defaultPrice: 27.22 },
   { name: 'Sovereign Gold Bond (SGB)', symbol: 'SGB', type: 'gold', defaultPrice: 7250 }
@@ -193,7 +193,7 @@ export default function AddInvestmentModal({
               <label className="form-label">Ticker Symbol / Code</label>
               <input
                 type="text"
-                placeholder={type === 'crypto' ? 'e.g. BTC, ETH, SOL, DOGE' : 'e.g. RELIANCE.NS, TMCV.NS, 122639'}
+                placeholder={type === 'crypto' ? 'e.g. BTC, ETH, SOL' : 'e.g. RELIANCE.NS, DELTA.BO, BSE:500325, 122639'}
                 className="form-control"
                 value={symbol}
                 onChange={e => setSymbol(e.target.value)}

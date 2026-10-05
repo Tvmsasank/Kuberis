@@ -175,18 +175,9 @@ export default function TwoFactorSetupModal({
       className="modal-backdrop"
       onClick={onClose}
       style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-        backdropFilter: 'blur(10px)',
-        zIndex: 1100,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '16px'
+        zIndex: 10200,
+        overflowY: 'auto',
+        padding: '20px'
       }}
     >
       <div

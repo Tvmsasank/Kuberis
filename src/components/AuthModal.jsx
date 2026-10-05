@@ -212,7 +212,7 @@ export default function AuthModal({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Failed to send MPIN reset link');
-      
+
       setTotpTempToken(json.resetMpinToken || '');
       setSuccess(`MPIN reset authorized for ${targetEmail}! Check your Gmail inbox or click below to reset right now.`);
     } catch (err) {
@@ -388,7 +388,7 @@ export default function AuthModal({
       localStorage.setItem('kuberis_remembered_email', email.trim());
       setSuccess('Account created successfully!');
       setTimeout(() => {
-        onLoginSuccess(json.user, json.token, true);
+        onLoginSuccess(json.user, json.token, true, { isNewRegistration: true });
         onClose();
       }, 400);
     } catch (err) {
@@ -801,7 +801,7 @@ export default function AuthModal({
               <input
                 type="text"
                 className="form-control"
-                placeholder="e.g. John Doe"
+                placeholder=""
                 value={name}
                 onChange={e => setName(e.target.value)}
                 required
@@ -813,7 +813,7 @@ export default function AuthModal({
               <input
                 type="email"
                 className="form-control"
-                placeholder="name@example.com"
+                placeholder=""
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
@@ -825,7 +825,7 @@ export default function AuthModal({
               <input
                 type="password"
                 className="form-control"
-                placeholder="••••••••"
+                placeholder=""
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
@@ -837,7 +837,7 @@ export default function AuthModal({
               <input
                 type="password"
                 className="form-control"
-                placeholder="••••••••"
+                placeholder=""
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
                 required

@@ -65,10 +65,21 @@ const INDIAN_STOCK_MAP = {
   'DEVYANI': 'DEVYANI.NS',
   'DELHIVERY': 'DELHIVERY.NS',
   'DEEPAKNTR': 'DEEPAKNTR.NS',
-  'DEEPINDS': 'DEEPINDS.NS',
   'DELTACORP': 'DELTACORP.NS',
   'DELTA': 'DELTA.BO',
-  'DEBOCK': 'DEBOCK.NS'
+  'DELTA.BO': 'DELTA.BO',
+  'DEBOCK': 'DEBOCK.NS',
+  'BSE': 'BSE.NS',
+  'BSE.NS': 'BSE.NS',
+  'BSE.BO': '532648.BO',
+  'BSE LIMITED': 'BSE.NS',
+  '500325': '500325.BO',
+  '532540': '532540.BO',
+  '500180': '500180.BO',
+  '500209': '500209.BO',
+  '500570': '500570.BO',
+  '500820': '500820.BO',
+  '500112': '500112.BO'
 };
 
 // Popular Crypto mapper (Coin Name / Symbol -> Yahoo Finance INR Ticker)
@@ -121,6 +132,16 @@ export function resolveStockSymbol(symbolOrName) {
   if (!symbolOrName) return null;
   const rawInput = symbolOrName.trim().toUpperCase();
 
+  // Explicit Exchange Prefixes: BSE:RELIANCE, NSE:TCS, BSE:500325
+  if (rawInput.startsWith('BSE:') || rawInput.startsWith('BSE-') || rawInput.startsWith('BSE/')) {
+    const code = rawInput.slice(4).trim().replace(/[^A-Z0-9]/g, '');
+    return code ? `${code}.BO` : null;
+  }
+  if (rawInput.startsWith('NSE:') || rawInput.startsWith('NSE-') || rawInput.startsWith('NSE/')) {
+    const code = rawInput.slice(4).trim().replace(/[^A-Z0-9]/g, '');
+    return code ? `${code}.NS` : null;
+  }
+
   // 1. Check Indian stock map dictionary FIRST
   if (INDIAN_STOCK_MAP[rawInput]) {
     return INDIAN_STOCK_MAP[rawInput];
@@ -129,6 +150,11 @@ export function resolveStockSymbol(symbolOrName) {
   // 2. If already ends with .NS or .BO
   if (rawInput.endsWith('.NS') || rawInput.endsWith('.BO')) {
     return rawInput;
+  }
+
+  // 3. Indian BSE numeric scrip codes (e.g., 500325, 532540, 500180)
+  if (/^\d{5,6}$/.test(rawInput)) {
+    return `${rawInput}.BO`;
   }
 
   const cleanSymbol = rawInput.replace(/[^A-Z0-9]/g, '');
@@ -193,30 +219,60 @@ async function querySingleYahooSymbol(symbol) {
 }
 
 /**
+ * Search Yahoo Finance for matching NSE / BSE symbol
+ */
+async function searchYahooIndianSymbol(query) {
+  if (!query) return null;
+  try {
+    const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=6&newsCount=0`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const quotes = data?.quotes || [];
+      const nseMatch = quotes.find(q => q.symbol && q.symbol.endsWith('.NS'));
+      if (nseMatch) return nseMatch.symbol;
+      const bseMatch = quotes.find(q => q.symbol && (q.symbol.endsWith('.BO') || q.exchange === 'BSE'));
+      if (bseMatch) return bseMatch.symbol;
+    }
+  } catch (err) {}
+  return null;
+}
+
+/**
  * Fetch live stock price with dual NSE (.NS) and BSE (.BO) fallback resolution
  */
 export async function fetchStockPrice(symbolOrName) {
   if (!symbolOrName) return { price: null, symbol: null, previousClose: null, dayChange: 0, dayPercentage: 0 };
   const primarySymbol = resolveStockSymbol(symbolOrName);
 
-  // 1. Try Primary Symbol (e.g. TMCV.NS, TMPV.NS, DBEIL.NS)
+  // 1. Try Primary Symbol (e.g. TMCV.NS, TMPV.NS, DELTA.BO, 500325.BO)
   let quote = await querySingleYahooSymbol(primarySymbol);
   if (quote && quote.price !== null) {
     return { ...quote, symbol: primarySymbol };
   }
 
-  // 2. Fallback: If .NS failed, try .BO (BSE India)
-  if (primarySymbol && primarySymbol.endsWith('.NS')) {
-    const bseSymbol = primarySymbol.replace(/\.NS$/, '.BO');
-    quote = await querySingleYahooSymbol(bseSymbol);
-    if (quote && quote.price !== null) {
-      return { ...quote, symbol: bseSymbol };
+  // 2. Dual Fallback: If .NS failed, try .BO (BSE India); if .BO failed, try .NS
+  if (primarySymbol) {
+    if (primarySymbol.endsWith('.NS')) {
+      const bseSymbol = primarySymbol.replace(/\.NS$/, '.BO');
+      quote = await querySingleYahooSymbol(bseSymbol);
+      if (quote && quote.price !== null) {
+        return { ...quote, symbol: bseSymbol };
+      }
+    } else if (primarySymbol.endsWith('.BO')) {
+      const nseSymbol = primarySymbol.replace(/\.BO$/, '.NS');
+      quote = await querySingleYahooSymbol(nseSymbol);
+      if (quote && quote.price !== null) {
+        return { ...quote, symbol: nseSymbol };
+      }
     }
   }
 
   // 3. Fallback: If clean name without extension
   const rawClean = symbolOrName.trim().replace(/[^A-Z0-9]/gi, '').toUpperCase();
-  if (rawClean && rawClean !== primarySymbol.replace(/\.NS$/, '')) {
+  if (rawClean && primarySymbol && rawClean !== primarySymbol.replace(/\.(NS|BO)$/, '')) {
     quote = await querySingleYahooSymbol(`${rawClean}.NS`);
     if (quote && quote.price !== null) {
       return { ...quote, symbol: `${rawClean}.NS` };
@@ -224,6 +280,15 @@ export async function fetchStockPrice(symbolOrName) {
     quote = await querySingleYahooSymbol(`${rawClean}.BO`);
     if (quote && quote.price !== null) {
       return { ...quote, symbol: `${rawClean}.BO` };
+    }
+  }
+
+  // 4. Yahoo Finance Search API Fallback for company names / fuzzy codes
+  const searchedSymbol = await searchYahooIndianSymbol(symbolOrName);
+  if (searchedSymbol && searchedSymbol !== primarySymbol) {
+    quote = await querySingleYahooSymbol(searchedSymbol);
+    if (quote && quote.price !== null) {
+      return { ...quote, symbol: searchedSymbol };
     }
   }
 
