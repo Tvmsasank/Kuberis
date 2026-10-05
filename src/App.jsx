@@ -28,6 +28,7 @@ import RuleModal from './components/RuleModal';
 import ConfirmWipeModal from './components/ConfirmWipeModal';
 import AuthModal from './components/AuthModal';
 import ForgotPasswordModal from './components/ForgotPasswordModal';
+import ChangePasswordModal from './components/ChangePasswordModal';
 import UserProfileModal from './components/UserProfileModal';
 import MpinModal from './components/MpinModal';
 import SmartUpiModal from './components/SmartUpiModal';
@@ -37,7 +38,7 @@ import TwoFactorSetupModal from './components/TwoFactorSetupModal';
 import SecurityOnboardingModal from './components/SecurityOnboardingModal';
 import AppTour from './components/AppTour';
 import LandingPage from './components/LandingPage';
-import { CheckCircle2, FolderSync, X, Shield, Lock, UserPlus, LogIn, Fingerprint, KeyRound, Zap, Landmark } from 'lucide-react';
+import { CheckCircle2, FolderSync, X, Shield, Lock, UserPlus, LogIn, Fingerprint, KeyRound, Zap, Landmark, ShieldAlert } from 'lucide-react';
 
 const getInitialTab = () => {
   try {
@@ -104,6 +105,14 @@ export default function App() {
 
   // Google Authenticator 2FA Modal State
   const [isTwoFactorModalOpen, setIsTwoFactorModalOpen] = useState(false);
+
+  // Change Password Modal State for Authenticated User
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+
+  // Dismissible Security Advisory Toast for missing MPIN / 2FA
+  const [isSecurityToastDismissed, setIsSecurityToastDismissed] = useState(
+    () => sessionStorage.getItem('kuberis_dismiss_security_toast') === 'true'
+  );
 
   // Check URL parameters for ?resetToken=... or ?resetMpinToken=... on load
   useEffect(() => {
@@ -964,11 +973,24 @@ export default function App() {
         transactionCount={transactions.length}
         onLogout={handleLogout}
         onOpenForgotPassword={() => setIsForgotPasswordOpen(true)}
+        onOpenChangePassword={() => setIsChangePasswordOpen(true)}
         onOpenMpinModal={handleOpenMpinModal}
         onOpenTwoFactorModal={() => setIsTwoFactorModalOpen(true)}
         onStartTour={() => {
           setIsProfileModalOpen(false);
           setIsTourOpen(true);
+        }}
+      />
+
+      {/* Change Password Modal for Authenticated User */}
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
+        token={token}
+        onSuccessLogout={() => {
+          handleLogout();
+          setAuthModalMode('login');
+          setIsAuthModalOpen(true);
         }}
       />
 
@@ -1202,6 +1224,106 @@ export default function App() {
             >
               Sign In Again
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ⚠️ Security Advisory Caution Toast (MPIN & 2FA check for all accounts) */}
+      {user && (!user.hasMpin || !user.twoFactorEnabled) && !isSecurityToastDismissed && (
+        <div
+          role="alert"
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            zIndex: 9998,
+            maxWidth: '430px',
+            width: 'calc(100vw - 48px)',
+            background: 'var(--bg-card, #0F172A)',
+            border: '1px solid rgba(245, 158, 11, 0.45)',
+            borderRadius: '16px',
+            padding: '16px 18px',
+            boxShadow: '0 12px 36px rgba(0, 0, 0, 0.5), 0 0 20px rgba(245, 158, 11, 0.15)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+              <div
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  background: 'rgba(245, 158, 11, 0.15)',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#F59E0B',
+                  flexShrink: 0
+                }}
+              >
+                <ShieldAlert size={20} />
+              </div>
+              <div>
+                <div style={{ fontSize: '13.5px', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '-0.2px' }}>
+                  Security Advisory
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.45', marginTop: '2px' }}>
+                  {!user.hasMpin && !user.twoFactorEnabled
+                    ? '4-Digit MPIN and Google 2FA are not yet configured on this account. Enable them to enhance portfolio security.'
+                    : !user.hasMpin
+                    ? '4-Digit MPIN is not configured. Set MPIN for fast device unlocking.'
+                    : 'Google Authenticator 2FA is not enabled on this account.'}
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setIsSecurityToastDismissed(true);
+                sessionStorage.setItem('kuberis_dismiss_security_toast', 'true');
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                padding: '4px',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              title="Dismiss for this session"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end', paddingTop: '2px' }}>
+            {!user.hasMpin && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => handleOpenMpinModal('set')}
+                style={{ fontSize: '11.5px', padding: '6px 12px', gap: '5px' }}
+              >
+                <KeyRound size={13} style={{ color: '#F59E0B' }} /> Set MPIN
+              </button>
+            )}
+            {!user.twoFactorEnabled && (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => setIsTwoFactorModalOpen(true)}
+                style={{ fontSize: '11.5px', padding: '6px 14px', gap: '5px' }}
+              >
+                <Shield size={13} /> Enable 2FA
+              </button>
+            )}
           </div>
         </div>
       )}

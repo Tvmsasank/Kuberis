@@ -30,6 +30,7 @@ export default function UserProfileModal({
   transactionCount = 0,
   onLogout,
   onOpenForgotPassword,
+  onOpenChangePassword,
   onOpenMpinModal,
   onOpenTwoFactorModal,
   onStartTour
@@ -382,9 +383,14 @@ export default function UserProfileModal({
               className="btn btn-secondary btn-sm"
               onClick={() => {
                 onClose();
-                onOpenForgotPassword();
+                if (onOpenChangePassword) {
+                  onOpenChangePassword();
+                } else if (onOpenForgotPassword) {
+                  onOpenForgotPassword();
+                }
               }}
-              style={{ fontSize: '11px', padding: '6px 10px' }}
+              style={{ fontSize: '11px', padding: '6px 10px', gap: '4px' }}
+              title="Change Account Password"
             >
               <Lock size={12} /> Password
             </button>

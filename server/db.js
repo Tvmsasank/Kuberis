@@ -429,6 +429,15 @@ export const dbEngine = {
     if (db.recurring) delete db.recurring[userId];
     if (db.subscriptions) delete db.subscriptions[userId];
     saveDb();
+
+    if (pgPool) {
+      pgPool.query('DELETE FROM public.wealthpulse_users WHERE id = $1', [userId]).catch(err => {
+        console.error('[Supabase PostgreSQL] Error deleting user from wealthpulse_users:', err.message);
+      });
+      pgPool.query('DELETE FROM public.wealthpulse_transactions WHERE user_id = $1', [userId]).catch(err => {
+        console.error('[Supabase PostgreSQL] Error deleting transactions from wealthpulse_transactions:', err.message);
+      });
+    }
     return true;
   },
 
@@ -532,6 +541,38 @@ export const dbEngine = {
     user.passwordHash = bcrypt.hashSync(newPassword, 10);
     user.resetToken = null;
     user.resetTokenExpiry = null;
+    saveDb();
+
+    if (pgPool) {
+      executeProcedureOrQuery(
+        'SELECT public.sp_update_user_password($1, $2, $3)',
+        [user.id, user.email, user.passwordHash],
+        'UPDATE public.wealthpulse_users SET password_hash = $1 WHERE id = $2 OR LOWER(email) = LOWER($3)',
+        [user.passwordHash, user.id, user.email]
+      );
+    }
+
+    return true;
+  },
+
+  changePassword({ userId, currentPassword, newPassword }) {
+    const db = loadDb();
+    const user = db.users.find(u => u.id === userId);
+    if (!user) throw new Error('User not found');
+
+    if (!user.passwordHash || !bcrypt.compareSync(currentPassword, user.passwordHash)) {
+      throw new Error('Incorrect current password. Please try again.');
+    }
+
+    if (!newPassword || newPassword.length < 6) {
+      throw new Error('New password must be at least 6 characters');
+    }
+
+    if (bcrypt.compareSync(newPassword, user.passwordHash)) {
+      throw new Error('New password cannot be the same as your current password. Please choose a different password.');
+    }
+
+    user.passwordHash = bcrypt.hashSync(newPassword, 10);
     saveDb();
 
     if (pgPool) {

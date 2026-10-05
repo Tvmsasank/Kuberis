@@ -82,13 +82,8 @@ export default function TwoFactorSetupModal({
     }
   };
 
-  const handleVerifyAndEnable = async (e) => {
-    e.preventDefault();
-    if (!verificationCode || verificationCode.trim().length !== 6) {
-      setError('Please enter a valid 6-digit code from Google Authenticator');
-      return;
-    }
-
+  const triggerVerification = async (codeToVerify) => {
+    if (!codeToVerify || codeToVerify.trim().length !== 6) return;
     setLoading(true);
     setError('');
     try {
@@ -98,10 +93,10 @@ export default function TwoFactorSetupModal({
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ code: verificationCode.trim() })
+        body: JSON.stringify({ code: codeToVerify.trim() })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Verification failed');
+      if (!res.ok) throw new Error(data.error || 'Invalid 6-digit code. Please try again.');
 
       setRecoveryCodes(data.recoveryCodes || []);
       setStep(3); // Move to recovery codes step
@@ -109,9 +104,27 @@ export default function TwoFactorSetupModal({
         onUpdateUser(data.user);
       }
     } catch (err) {
-      setError(err.message || 'Failed to verify 2FA code');
+      setError(err.message || 'Invalid 6-digit code. Please check Google Authenticator and try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleVerifyAndEnable = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!verificationCode || verificationCode.trim().length !== 6) {
+      setError('Please enter a valid 6-digit code from Google Authenticator');
+      return;
+    }
+    await triggerVerification(verificationCode);
+  };
+
+  const handleCodeChange = (raw) => {
+    const clean = raw.replace(/\D/g, '').slice(0, 6);
+    setVerificationCode(clean);
+    setError('');
+    if (clean.length === 6) {
+      triggerVerification(clean);
     }
   };
 
@@ -307,7 +320,7 @@ export default function TwoFactorSetupModal({
                 className="form-control"
                 placeholder="e.g. 582910"
                 value={verificationCode}
-                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
+                onChange={(e) => handleCodeChange(e.target.value)}
                 style={{
                   fontSize: '24px',
                   fontWeight: '900',

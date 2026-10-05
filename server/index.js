@@ -380,6 +380,22 @@ app.get('/api/auth/me', (req, res) => {
   res.json({ user });
 });
 
+function wrapHtmlEmail(htmlContent) {
+  if (!htmlContent) return '';
+  if (htmlContent.includes('<html') || htmlContent.includes('<!DOCTYPE')) return htmlContent;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; background-color: #040D1A; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  ${htmlContent}
+</body>
+</html>`;
+}
+
 async function sendEmailWithFallback({ to, subject, text, html }) {
   const user = (process.env.SMTP_USER || '').trim();
   const pass = (process.env.SMTP_PASS || '').trim().replace(/\s+/g, '');
@@ -387,13 +403,20 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
   const resendKey = (process.env.RESEND_API_KEY || '').trim();
   const brevoKey = (process.env.BREVO_API_KEY || '').trim();
 
+  // Sanitize subject to replace non-standard dashes and quotes that corrupt in email client headers
+  const cleanSubject = (subject || '')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"');
+  const cleanHtml = wrapHtmlEmail(html);
+
   // Attempt 1: Google Apps Script HTTPS Bridge (Port 443 - Bypasses Render Cloud Firewall & Google IP Block)
   if (webhookUrl) {
     try {
       const res = await fetch(webhookUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: to.trim(), subject, text: text || '', html })
+        headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+        body: JSON.stringify({ to: to.trim(), subject: cleanSubject, text: text || '', html: cleanHtml })
       });
       const data = await res.json();
       if (res.ok && (data.success || data.id || data.status === 'success')) {
@@ -419,9 +442,12 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
         body: JSON.stringify({
           from: `Kuberis Security <onboarding@resend.dev>`,
           to: [to.trim()],
-          subject,
+          subject: cleanSubject,
           text: text || '',
-          html
+          html: cleanHtml,
+          headers: {
+            'Content-Type': 'text/html; charset=UTF-8'
+          }
         })
       });
       const data = await res.json();
@@ -443,14 +469,14 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
         method: 'POST',
         headers: {
           'accept': 'application/json',
-          'content-type': 'application/json',
+          'content-type': 'application/json; charset=UTF-8',
           'api-key': brevoKey
         },
         body: JSON.stringify({
           sender: { name: 'Kuberis Security', email: user },
           to: [{ email: to.trim() }],
-          subject,
-          htmlContent: html,
+          subject: cleanSubject,
+          htmlContent: cleanHtml,
           textContent: text || ''
         })
       });
@@ -469,6 +495,18 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
     return false;
   }
 
+  const mailOptions = {
+    from: `"Kuberis Security" <${user}>`,
+    to: to.trim(),
+    subject: cleanSubject,
+    text: text || '',
+    html: cleanHtml,
+    encoding: 'utf-8',
+    headers: {
+      'Content-Type': 'text/html; charset=UTF-8'
+    }
+  };
+
   // Attempt 4: Gmail service transport (Nodemailer)
   try {
     const transporter = nodemailer.createTransport({
@@ -482,13 +520,7 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
       greetingTimeout: 10000,
       socketTimeout: 20000
     });
-    const info = await transporter.sendMail({
-      from: `"Kuberis Security" <${user}>`,
-      to: to.trim(),
-      subject,
-      text: text || '',
-      html
-    });
+    const info = await transporter.sendMail(mailOptions);
     console.log(`[Kuberis Email] Successfully delivered email to ${to} via Gmail Service. MessageId: ${info.messageId}`);
     return true;
   } catch (err1) {
@@ -510,13 +542,7 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
       greetingTimeout: 10000,
       socketTimeout: 20000
     });
-    const info = await transporter.sendMail({
-      from: `"Kuberis Security" <${user}>`,
-      to: to.trim(),
-      subject,
-      text: text || '',
-      html
-    });
+    const info = await transporter.sendMail(mailOptions);
     console.log(`[Kuberis Email] Successfully delivered email to ${to} via SSL 465. MessageId: ${info.messageId}`);
     return true;
   } catch (err2) {
@@ -539,13 +565,7 @@ async function sendEmailWithFallback({ to, subject, text, html }) {
       greetingTimeout: 10000,
       socketTimeout: 20000
     });
-    const info = await transporter.sendMail({
-      from: `"Kuberis Security" <${user}>`,
-      to: to.trim(),
-      subject,
-      text: text || '',
-      html
-    });
+    const info = await transporter.sendMail(mailOptions);
     console.log(`[Kuberis Email] Successfully delivered email to ${to} via Port 587. MessageId: ${info.messageId}`);
     return true;
   } catch (err3) {
@@ -585,7 +605,7 @@ async function sendResetEmail(toEmail, resetUrl) {
 }
 
 async function sendWelcomeEmail(toEmail, userName) {
-  const subject = 'Welcome to Kuberis — Your Wealth OS Guidelines & Terms';
+  const subject = 'Welcome to Kuberis - Your Wealth OS Guidelines & Terms';
   const nameDisplay = userName ? userName.trim() : 'Investor';
   const text = `Welcome to Kuberis, ${nameDisplay}!\n\nYour account has been created successfully. Kuberis is India's next-gen real-time personal wealth operating system.\n\nSecurity Guidelines:\n1. Set Up 4-Digit MPIN for quick access on trusted devices.\n2. Enable Google Authenticator (2FA) for extra security.\n3. Never share your credentials. Kuberis never asks for bank passwords or debit card PINs.\n4. Connect Google Drive for automatic, encrypted backups.\n\nTerms & Conditions Summary:\n- Kuberis is an informational wealth tracker and personal ledger.\n- Your data is private, isolated, and encrypted.\n- You retain 100% data ownership.\n\nAccess your dashboard: https://kuberis.onrender.com/dashboard`;
 
@@ -731,6 +751,33 @@ app.post('/api/auth/reset-password', (req, res) => {
   } catch (err) {
     console.error('POST /api/auth/reset-password error:', err);
     res.status(400).json({ error: err.message || 'Password reset failed' });
+  }
+});
+
+// POST /api/auth/change-password (Authenticated user changes their password)
+app.post('/api/auth/change-password', authenticateToken, (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+
+    const updatedUser = dbEngine.changePassword({
+      userId: req.userId,
+      currentPassword,
+      newPassword
+    });
+
+    res.json({
+      message: 'Password updated successfully. Please sign in with your new password.',
+      user: updatedUser
+    });
+  } catch (err) {
+    console.error('POST /api/auth/change-password error:', err);
+    res.status(400).json({ error: err.message || 'Failed to change password' });
   }
 });
 

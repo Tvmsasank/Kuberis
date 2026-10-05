@@ -329,22 +329,18 @@ export default function AuthModal({
     }
   };
 
-  const handleTwoFactorLoginSubmit = async (e) => {
-    e.preventDefault();
-    if (!totpCode || !totpCode.trim()) {
-      setError('Please enter your 6-digit Google Authenticator code');
-      return;
-    }
+  const triggerTwoFactorLogin = async (codeToVerify) => {
+    if (!codeToVerify || !codeToVerify.trim()) return;
     setLoading(true);
     setError('');
     try {
       const res = await fetch('/api/auth/2fa/verify-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tempToken: totpTempToken, code: totpCode.trim() })
+        body: JSON.stringify({ tempToken: totpTempToken, code: codeToVerify.trim() })
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || '2FA verification failed');
+      if (!res.ok) throw new Error(json.error || 'Invalid 6-digit code. Please try again.');
 
       if (rememberMe) {
         localStorage.setItem('kuberis_remembered_email', email.trim());
@@ -356,9 +352,27 @@ export default function AuthModal({
         onClose();
       }, 400);
     } catch (err) {
-      setError(err.message || '2FA verification failed');
+      setError(err.message || 'Invalid 6-digit code. Please check Google Authenticator and try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTwoFactorLoginSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!totpCode || !totpCode.trim()) {
+      setError('Please enter your 6-digit Google Authenticator code');
+      return;
+    }
+    await triggerTwoFactorLogin(totpCode);
+  };
+
+  const handleTotpCodeChange = (raw) => {
+    const clean = raw.replace(/\D/g, '').slice(0, 6);
+    setTotpCode(clean);
+    setError('');
+    if (clean.length === 6) {
+      triggerTwoFactorLogin(clean);
     }
   };
 
@@ -954,7 +968,7 @@ export default function AuthModal({
                 className="form-control"
                 placeholder="e.g. 582910"
                 value={totpCode}
-                onChange={(e) => setTotpCode(e.target.value)}
+                onChange={(e) => handleTotpCodeChange(e.target.value)}
                 style={{
                   fontSize: '22px',
                   fontWeight: '900',

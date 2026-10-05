@@ -336,6 +336,9 @@ export default function AssetAllocationModal({
 
   const handleCategorySwitch = (catKey) => {
     setActiveCategory(catKey);
+    setDayFilter('all');
+    setPnlFilter('all');
+    setSearchQuery('');
     if (onSelectCategory) {
       onSelectCategory(catKey);
     }
@@ -694,7 +697,13 @@ export default function AssetAllocationModal({
                       <button
                         type="button"
                         className={`btn btn-sm ${dayFilter === 'all' ? 'btn-primary' : 'btn-ghost'}`}
-                        style={{ fontSize: '11px', padding: '5px 10px', borderRadius: '8px', fontWeight: '800' }}
+                        style={{
+                          fontSize: '11px',
+                          padding: '5px 12px',
+                          borderRadius: '8px',
+                          fontWeight: '800',
+                          color: dayFilter === 'all' ? '#FFFFFF' : 'var(--text-main)'
+                        }}
                         onClick={() => setDayFilter('all')}
                       >
                         All ({scopedInvestments.length})
@@ -704,11 +713,12 @@ export default function AssetAllocationModal({
                         className={`btn btn-sm ${dayFilter === 'gainers' ? 'btn-primary' : 'btn-ghost'}`}
                         style={{
                           fontSize: '11px',
-                          padding: '5px 10px',
+                          padding: '5px 12px',
                           borderRadius: '8px',
                           fontWeight: '800',
-                          color: '#10B981',
-                          borderColor: dayFilter === 'gainers' ? '#10B981' : undefined
+                          color: dayFilter === 'gainers' ? '#FFFFFF' : '#10B981',
+                          background: dayFilter === 'gainers' ? '#10B981' : 'rgba(16, 185, 129, 0.12)',
+                          borderColor: '#10B981'
                         }}
                         onClick={() => setDayFilter('gainers')}
                       >
@@ -716,14 +726,15 @@ export default function AssetAllocationModal({
                       </button>
                       <button
                         type="button"
-                        className={`btn btn-sm ${dayFilter === 'losers' ? 'btn-primary' : 'btn-ghost'}`}
+                        className={`btn btn-sm ${dayFilter === 'losers' ? 'btn-danger' : 'btn-ghost'}`}
                         style={{
                           fontSize: '11px',
-                          padding: '5px 10px',
+                          padding: '5px 12px',
                           borderRadius: '8px',
                           fontWeight: '800',
-                          color: '#EF4444',
-                          borderColor: dayFilter === 'losers' ? '#EF4444' : undefined
+                          color: dayFilter === 'losers' ? '#FFFFFF' : '#EF4444',
+                          background: dayFilter === 'losers' ? '#EF4444' : 'rgba(239, 68, 68, 0.12)',
+                          borderColor: '#EF4444'
                         }}
                         onClick={() => setDayFilter('losers')}
                       >
@@ -746,7 +757,13 @@ export default function AssetAllocationModal({
                       <button
                         type="button"
                         className={`btn btn-sm ${pnlFilter === 'all' ? 'btn-primary' : 'btn-ghost'}`}
-                        style={{ fontSize: '11px', padding: '5px 10px', borderRadius: '8px', fontWeight: '800' }}
+                        style={{
+                          fontSize: '11px',
+                          padding: '5px 12px',
+                          borderRadius: '8px',
+                          fontWeight: '800',
+                          color: pnlFilter === 'all' ? '#FFFFFF' : 'var(--text-main)'
+                        }}
                         onClick={() => setPnlFilter('all')}
                       >
                         All ({scopedInvestments.length})
@@ -756,11 +773,12 @@ export default function AssetAllocationModal({
                         className={`btn btn-sm ${pnlFilter === 'profit' ? 'btn-primary' : 'btn-ghost'}`}
                         style={{
                           fontSize: '11px',
-                          padding: '5px 10px',
+                          padding: '5px 12px',
                           borderRadius: '8px',
                           fontWeight: '800',
-                          color: '#10B981',
-                          borderColor: pnlFilter === 'profit' ? '#10B981' : undefined
+                          color: pnlFilter === 'profit' ? '#FFFFFF' : '#10B981',
+                          background: pnlFilter === 'profit' ? '#10B981' : 'rgba(16, 185, 129, 0.12)',
+                          borderColor: '#10B981'
                         }}
                         onClick={() => setPnlFilter('profit')}
                       >
@@ -768,14 +786,15 @@ export default function AssetAllocationModal({
                       </button>
                       <button
                         type="button"
-                        className={`btn btn-sm ${pnlFilter === 'loss' ? 'btn-primary' : 'btn-ghost'}`}
+                        className={`btn btn-sm ${pnlFilter === 'loss' ? 'btn-danger' : 'btn-ghost'}`}
                         style={{
                           fontSize: '11px',
-                          padding: '5px 10px',
+                          padding: '5px 12px',
                           borderRadius: '8px',
                           fontWeight: '800',
-                          color: '#EF4444',
-                          borderColor: pnlFilter === 'loss' ? '#EF4444' : undefined
+                          color: pnlFilter === 'loss' ? '#FFFFFF' : '#EF4444',
+                          background: pnlFilter === 'loss' ? '#EF4444' : 'rgba(239, 68, 68, 0.12)',
+                          borderColor: '#EF4444'
                         }}
                         onClick={() => setPnlFilter('loss')}
                       >
