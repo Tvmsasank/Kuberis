@@ -572,9 +572,9 @@ export default function InvestmentsTab({
                 </div>
               </div>
               <div style={{ position: 'relative', width: '48px', height: '48px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <MiniDonutRing items={investedBreakdown} size={48} strokeWidth={7} />
+                <MiniDonutRing items={categoryHoldings.length === 0 ? [] : investedBreakdown} size={48} strokeWidth={7} />
                 <div style={{ position: 'absolute', fontSize: '9px', fontWeight: '900', color: 'var(--text-main)' }}>
-                  {investedBreakdown.length}
+                  {categoryHoldings.length === 0 ? 0 : (categoryFilter === 'all' ? investedBreakdown.length : categoryHoldings.length)}
                 </div>
               </div>
             </div>
@@ -611,9 +611,9 @@ export default function InvestmentsTab({
                 </div>
               </div>
               <div style={{ position: 'relative', width: '48px', height: '48px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <MiniDonutRing items={valuationBreakdown} size={48} strokeWidth={7} />
+                <MiniDonutRing items={categoryHoldings.length === 0 ? [] : valuationBreakdown} size={48} strokeWidth={7} />
                 <div style={{ position: 'absolute', fontSize: '9px', fontWeight: '900', color: '#38BDF8' }}>
-                  {safeInvestments.length}
+                  {categoryHoldings.length}
                 </div>
               </div>
             </div>
@@ -650,9 +650,9 @@ export default function InvestmentsTab({
                 </div>
               </div>
               <div style={{ position: 'relative', width: '48px', height: '48px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <MiniDonutRing items={dayPnlBreakdown} size={48} strokeWidth={7} />
+                <MiniDonutRing items={categoryHoldings.length === 0 ? [] : dayPnlBreakdown} size={48} strokeWidth={7} />
                 <div style={{ position: 'absolute', fontSize: '9px', fontWeight: '900', color: totalDayPnL >= 0 ? '#10B981' : '#F87171' }}>
-                  {dayPnlBreakdown.length}
+                  {categoryHoldings.length === 0 ? 0 : dayPnlBreakdown.length}
                 </div>
               </div>
             </div>
@@ -689,9 +689,9 @@ export default function InvestmentsTab({
                 </div>
               </div>
               <div style={{ position: 'relative', width: '48px', height: '48px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <MiniDonutRing items={totalPnlBreakdown} size={48} strokeWidth={7} />
+                <MiniDonutRing items={categoryHoldings.length === 0 ? [] : totalPnlBreakdown} size={48} strokeWidth={7} />
                 <div style={{ position: 'absolute', fontSize: '9px', fontWeight: '900', color: totalPnL >= 0 ? '#10B981' : '#F87171' }}>
-                  {totalPnlBreakdown.length}
+                  {categoryHoldings.length === 0 ? 0 : totalPnlBreakdown.length}
                 </div>
               </div>
             </div>
@@ -1146,7 +1146,10 @@ export default function InvestmentsTab({
       <AssetAllocationModal
         isOpen={isAllocationModalOpen}
         onClose={() => setIsAllocationModalOpen(false)}
-        investments={safeInvestments}
+        categoryFilter={categoryFilter}
+        onSelectCategory={(cat) => setCategoryFilter(cat)}
+        investments={categoryHoldings}
+        allInvestments={safeInvestments}
         initialSection={allocationInitialSection}
         formatInr={formatInr}
         isPrivacyMode={isPrivacyMode}
