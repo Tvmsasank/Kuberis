@@ -281,31 +281,6 @@ export default function Header({
             )}
           </button>
 
-          {/* 🧭 Interactive App Tour Trigger */}
-          {user && onStartTour && (
-            <button
-              type="button"
-              className="btn btn-ghost desktop-only-action"
-              onClick={onStartTour}
-              style={{
-                padding: '7px 12px',
-                borderRadius: '20px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid var(--border-color)',
-                fontSize: '12px',
-                fontWeight: '700',
-                color: 'var(--text-main)'
-              }}
-              title="Take Interactive Feature Tour"
-            >
-              <Compass size={15} style={{ color: 'var(--primary)' }} />
-              <span className="btn-text-desktop">Tour</span>
-            </button>
-          )}
-
           {user ? (
             <>
               {/* Desktop Only Actions */}

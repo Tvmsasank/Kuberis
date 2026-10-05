@@ -77,9 +77,25 @@ const INDIAN_STOCK_MAP = {
   '532540': '532540.BO',
   '500180': '500180.BO',
   '500209': '500209.BO',
-  '500570': '500570.BO',
-  '500820': '500820.BO',
-  '500112': '500112.BO'
+  '500112': '500112.BO',
+  'GTV': 'GTV.BO',
+  'GTV.BO': 'GTV.BO',
+  'GTVENG': 'GTV.BO',
+  'GTVENGINEERING': 'GTV.BO',
+  'GTVENGINEERING.NS': 'GTV.BO',
+  'GTVENGINEERING.BO': 'GTV.BO',
+  'GTV ENGINEERING': 'GTV.BO',
+  'GTV ENGINEERING LIMITED': 'GTV.BO',
+  '539479': 'GTV.BO',
+  'FUTURE RETAIL': 'FRETAIL.NS',
+  'FUTURE RETAIL LIMITED': 'FRETAIL.NS',
+  'FRETAIL': 'FRETAIL.NS',
+  'FRETAIL.NS': 'FRETAIL.NS',
+  'FRETAIL.BO': 'FRETAIL.BO',
+  '540702': 'FRETAIL.NS',
+  'FUTURE': 'FRETAIL.NS',
+  'FUTURERELE': 'FRETAIL.NS',
+  'FUTURERELE.NS': 'FRETAIL.NS'
 };
 
 // Popular Crypto mapper (Coin Name / Symbol -> Yahoo Finance INR Ticker)
@@ -128,9 +144,10 @@ const CRYPTO_MAP = {
 /**
  * Resolve stock ticker for any Indian stock symbol or name
  */
-export function resolveStockSymbol(symbolOrName) {
-  if (!symbolOrName) return null;
-  const rawInput = symbolOrName.trim().toUpperCase();
+export function resolveStockSymbol(symbolOrName, fallbackName = '') {
+  if (!symbolOrName && !fallbackName) return null;
+  const rawInput = (symbolOrName || fallbackName).trim().toUpperCase();
+  const rawFallback = (fallbackName || '').trim().toUpperCase();
 
   // Explicit Exchange Prefixes: BSE:RELIANCE, NSE:TCS, BSE:500325
   if (rawInput.startsWith('BSE:') || rawInput.startsWith('BSE-') || rawInput.startsWith('BSE/')) {
@@ -147,12 +164,29 @@ export function resolveStockSymbol(symbolOrName) {
     return INDIAN_STOCK_MAP[rawInput];
   }
 
-  // 2. If already ends with .NS or .BO
+  // 2. Check stripped name (without .NS / .BO) in dictionary to catch GTVENGINEERING.NS -> GTV.BO
+  const stripped = rawInput.replace(/\.(NS|BO)$/i, '');
+  if (INDIAN_STOCK_MAP[stripped]) {
+    return INDIAN_STOCK_MAP[stripped];
+  }
+
+  // 3. Check fallbackName in dictionary
+  if (rawFallback) {
+    if (INDIAN_STOCK_MAP[rawFallback]) {
+      return INDIAN_STOCK_MAP[rawFallback];
+    }
+    const strippedFallback = rawFallback.replace(/\.(NS|BO)$/i, '');
+    if (INDIAN_STOCK_MAP[strippedFallback]) {
+      return INDIAN_STOCK_MAP[strippedFallback];
+    }
+  }
+
+  // 4. If already ends with .NS or .BO
   if (rawInput.endsWith('.NS') || rawInput.endsWith('.BO')) {
     return rawInput;
   }
 
-  // 3. Indian BSE numeric scrip codes (e.g., 500325, 532540, 500180)
+  // 5. Indian BSE numeric scrip codes (e.g., 500325, 532540, 500180, 539479)
   if (/^\d{5,6}$/.test(rawInput)) {
     return `${rawInput}.BO`;
   }
@@ -243,11 +277,11 @@ async function searchYahooIndianSymbol(query) {
 /**
  * Fetch live stock price with dual NSE (.NS) and BSE (.BO) fallback resolution
  */
-export async function fetchStockPrice(symbolOrName) {
-  if (!symbolOrName) return { price: null, symbol: null, previousClose: null, dayChange: 0, dayPercentage: 0 };
-  const primarySymbol = resolveStockSymbol(symbolOrName);
+export async function fetchStockPrice(symbolOrName, fallbackName = '') {
+  if (!symbolOrName && !fallbackName) return { price: null, symbol: null, previousClose: null, dayChange: 0, dayPercentage: 0 };
+  const primarySymbol = resolveStockSymbol(symbolOrName, fallbackName);
 
-  // 1. Try Primary Symbol (e.g. TMCV.NS, TMPV.NS, DELTA.BO, 500325.BO)
+  // 1. Try Primary Symbol (e.g. GTV.BO, FRETAIL.NS, TMCV.NS, DELTA.BO, 500325.BO)
   let quote = await querySingleYahooSymbol(primarySymbol);
   if (quote && quote.price !== null) {
     return { ...quote, symbol: primarySymbol };
@@ -270,25 +304,26 @@ export async function fetchStockPrice(symbolOrName) {
     }
   }
 
-  // 3. Fallback: If clean name without extension
-  const rawClean = symbolOrName.trim().replace(/[^A-Z0-9]/gi, '').toUpperCase();
-  if (rawClean && primarySymbol && rawClean !== primarySymbol.replace(/\.(NS|BO)$/, '')) {
-    quote = await querySingleYahooSymbol(`${rawClean}.NS`);
-    if (quote && quote.price !== null) {
-      return { ...quote, symbol: `${rawClean}.NS` };
-    }
-    quote = await querySingleYahooSymbol(`${rawClean}.BO`);
-    if (quote && quote.price !== null) {
-      return { ...quote, symbol: `${rawClean}.BO` };
+  // 3. Fallback: Search with fallback name (e.g. 'GTV Engineering' or 'Future Retail')
+  if (fallbackName && fallbackName.trim() !== (symbolOrName || '').trim()) {
+    const searchedSymbol = await searchYahooIndianSymbol(fallbackName.trim());
+    if (searchedSymbol) {
+      quote = await querySingleYahooSymbol(searchedSymbol);
+      if (quote && quote.price !== null) {
+        return { ...quote, symbol: searchedSymbol };
+      }
     }
   }
 
-  // 4. Yahoo Finance Search API Fallback for company names / fuzzy codes
-  const searchedSymbol = await searchYahooIndianSymbol(symbolOrName);
-  if (searchedSymbol && searchedSymbol !== primarySymbol) {
-    quote = await querySingleYahooSymbol(searchedSymbol);
-    if (quote && quote.price !== null) {
-      return { ...quote, symbol: searchedSymbol };
+  // 4. Fallback: Search with clean alphanumeric query
+  const stripped = (symbolOrName || '').replace(/\.(NS|BO)$/i, '').trim();
+  if (stripped) {
+    const searchedSymbol = await searchYahooIndianSymbol(stripped);
+    if (searchedSymbol && searchedSymbol !== primarySymbol) {
+      quote = await querySingleYahooSymbol(searchedSymbol);
+      if (quote && quote.price !== null) {
+        return { ...quote, symbol: searchedSymbol };
+      }
     }
   }
 
@@ -447,7 +482,7 @@ export async function refreshHoldingsPrices(holdings = []) {
     let priceStatus = 'ok';
 
     if (h.type === 'stock') {
-      quote = await fetchStockPrice(h.symbol || h.name);
+      quote = await fetchStockPrice(h.symbol, h.name);
       livePrice = quote.price;
       previousClose = quote.previousClose;
       dayChange = quote.dayChange;

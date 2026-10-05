@@ -292,16 +292,6 @@ export default function App() {
     fetchState();
   }, [token]);
 
-  // Auto-launch tour for new users
-  useEffect(() => {
-    if (user && !localStorage.getItem('kuberis_tour_completed')) {
-      const timer = setTimeout(() => {
-        setIsTourOpen(true);
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [user]);
-
   // Live Stock Market Ticker Polling Loop (Runs every 3 seconds)
   useEffect(() => {
     if (!user) return;
@@ -355,6 +345,9 @@ export default function App() {
 
     if (metadata?.isNewRegistration) {
       setIsSecurityOnboardingOpen(true);
+    } else {
+      localStorage.setItem('kuberis_tour_completed', 'true');
+      setIsTourOpen(false);
     }
   };
 

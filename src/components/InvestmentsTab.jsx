@@ -25,100 +25,47 @@ import {
 } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import StockDetailModal from './StockDetailModal';
+import AssetAllocationModal from './AssetAllocationModal';
 
-function MetricDonutPopover({ title, items = [], alignRight = false, totalLabel = '' }) {
+function MiniDonutRing({ items = [], size = 46, strokeWidth = 7 }) {
   const validItems = items.filter(i => (i.value || 0) > 0);
   const total = validItems.reduce((acc, i) => acc + i.value, 0);
-  const r = 32;
+  const r = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * r;
   let accumulated = 0;
 
+  if (validItems.length === 0 || total === 0) {
+    return (
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255, 255, 255, 0.08)" strokeWidth={strokeWidth} />
+      </svg>
+    );
+  }
+
   return (
-    <div
-      style={{
-        position: 'absolute',
-        top: 'calc(100% + 8px)',
-        ...(alignRight ? { right: 0 } : { left: 0 }),
-        width: '270px',
-        background: 'var(--bg-card)',
-        backdropFilter: 'blur(24px)',
-        border: '1px solid var(--border-glass)',
-        borderRadius: '16px',
-        padding: '16px',
-        boxShadow: '0 16px 36px rgba(0, 0, 0, 0.45)',
-        zIndex: 120,
-        pointerEvents: 'none',
-        animation: 'fadeIn 0.18s ease'
-      }}
-    >
-      <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-        <PieIcon size={13} style={{ color: 'var(--primary)' }} /> {title}
-      </div>
-
-      {validItems.length === 0 || total === 0 ? (
-        <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', padding: '10px 0' }}>
-          No holding data yet
-        </div>
-      ) : (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          {/* SVG Donut */}
-          <div style={{ position: 'relative', width: '68px', height: '68px', flexShrink: 0 }}>
-            <svg width="68" height="68" viewBox="0 0 80 80" style={{ transform: 'rotate(-90deg)' }}>
-              <circle cx="40" cy="40" r={r} fill="none" stroke="rgba(255, 255, 255, 0.08)" strokeWidth="12" />
-              {validItems.map((item, idx) => {
-                const fraction = item.value / total;
-                const dashArray = `${fraction * circumference} ${circumference}`;
-                const dashOffset = -accumulated;
-                accumulated += fraction * circumference;
-                return (
-                  <circle
-                    key={idx}
-                    cx="40"
-                    cy="40"
-                    r={r}
-                    fill="none"
-                    stroke={item.color}
-                    strokeWidth="12"
-                    strokeDasharray={dashArray}
-                    strokeDashoffset={dashOffset}
-                    strokeLinecap="round"
-                    style={{ transition: 'stroke-dashoffset 0.3s ease' }}
-                  />
-                );
-              })}
-            </svg>
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: '10px', fontWeight: '900', color: 'var(--text-main)', lineHeight: '1' }}>
-                {totalLabel || `${validItems.length}`}
-              </span>
-              <span style={{ fontSize: '8px', fontWeight: '700', color: 'var(--text-muted)' }}>
-                {totalLabel ? 'items' : 'parts'}
-              </span>
-            </div>
-          </div>
-
-          {/* Legend Items */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', overflow: 'hidden' }}>
-            {validItems.slice(0, 4).map((item, idx) => {
-              const pct = total > 0 ? Math.round((item.value / total) * 100) : 0;
-              return (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '11px', gap: '4px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', overflow: 'hidden' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: item.color, flexShrink: 0 }} />
-                    <span style={{ color: 'var(--text-main)', fontWeight: '600', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', maxWidth: '85px' }} title={item.label}>
-                      {item.label}
-                    </span>
-                  </div>
-                  <span style={{ color: 'var(--text-muted)', fontWeight: '800', fontSize: '10.5px' }}>
-                    {pct}%
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)', flexShrink: 0 }}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255, 255, 255, 0.08)" strokeWidth={strokeWidth} />
+      {validItems.map((item, idx) => {
+        const fraction = item.value / total;
+        const dashArray = `${fraction * circumference} ${circumference}`;
+        const dashOffset = -accumulated;
+        accumulated += fraction * circumference;
+        return (
+          <circle
+            key={idx}
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            fill="none"
+            stroke={item.color}
+            strokeWidth={strokeWidth}
+            strokeDasharray={dashArray}
+            strokeDashoffset={dashOffset}
+            strokeLinecap="round"
+          />
+        );
+      })}
+    </svg>
   );
 }
 
@@ -139,7 +86,8 @@ export default function InvestmentsTab({
   const [selectedStockForDetail, setSelectedStockForDetail] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState('all'); // 'all' | 'stock' | 'us_stock' | 'mutual_fund' | 'gold' | 'fd'
   const [searchQuery, setSearchQuery] = useState('');
-  const [hoveredMetricCard, setHoveredMetricCard] = useState(null); // 'invested' | 'value' | 'day' | 'pnl' | null
+  const [isAllocationModalOpen, setIsAllocationModalOpen] = useState(false);
+  const [allocationInitialSection, setAllocationInitialSection] = useState('allocation');
 
   const safeInvestments = Array.isArray(investments) ? investments : [];
 
@@ -540,6 +488,18 @@ export default function InvestmentsTab({
             >
               <LineChartIcon size={14} /> Performance Analytics
             </button>
+            <button
+              type="button"
+              className="btn btn-sm btn-ghost"
+              style={{ fontSize: '12px', padding: '6px 12px', borderRadius: '8px', fontWeight: '800', gap: '5px', whiteSpace: 'nowrap', color: 'var(--text-main)' }}
+              onClick={() => {
+                setAllocationInitialSection('allocation');
+                setIsAllocationModalOpen(true);
+              }}
+              title="Open full Asset Allocation & Breakdown Modal"
+            >
+              <PieIcon size={14} style={{ color: 'var(--primary)' }} /> Asset Allocation
+            </button>
           </div>
 
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -571,11 +531,11 @@ export default function InvestmentsTab({
       {/* ========================================================================= */}
       {activeSubTab === 'holdings' && (
         <>
-          {/* High-Impact Metrics Banner with Interactive Hover Pie/Donut Breakdowns */}
+          {/* High-Impact Metrics Banner with In-Card Mini Donut Rings & Click-to-Expand Modal */}
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
               gap: '14px',
               marginBottom: '24px'
             }}
@@ -586,35 +546,37 @@ export default function InvestmentsTab({
               style={{
                 padding: '18px 20px',
                 borderRadius: '18px',
-                position: 'relative',
                 cursor: 'pointer',
-                transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
-                border: hoveredMetricCard === 'invested' ? '1px solid var(--primary)' : '1px solid var(--border-color)'
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '12px',
+                transition: 'all 0.2s ease'
               }}
-              onMouseEnter={() => setHoveredMetricCard('invested')}
-              onMouseLeave={() => setHoveredMetricCard(null)}
+              onClick={() => {
+                setAllocationInitialSection('allocation');
+                setIsAllocationModalOpen(true);
+              }}
+              title="Click to view full asset allocation breakdown"
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                   {currentMeta.investedTitle}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', color: 'var(--text-muted)', fontSize: '10px' }} title="Hover to view asset breakdown">
-                  <PieIcon size={13} style={{ color: 'var(--primary)', opacity: hoveredMetricCard === 'invested' ? 1 : 0.6 }} />
+                <div style={{ fontSize: '24px', fontWeight: '900', color: 'var(--text-main)', marginTop: '4px', letterSpacing: '-0.5px' }}>
+                  {formatInr(totalCost)}
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentMeta.investedSub}</span>
+                  <span style={{ color: 'var(--primary)', fontWeight: '800', flexShrink: 0 }}>• Breakdown ↗</span>
                 </div>
               </div>
-              <div style={{ fontSize: '24px', fontWeight: '900', color: 'var(--text-main)', marginTop: '4px' }}>
-                {formatInr(totalCost)}
+              <div style={{ position: 'relative', width: '48px', height: '48px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <MiniDonutRing items={investedBreakdown} size={48} strokeWidth={7} />
+                <div style={{ position: 'absolute', fontSize: '9px', fontWeight: '900', color: 'var(--text-main)' }}>
+                  {investedBreakdown.length}
+                </div>
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                {currentMeta.investedSub}
-              </div>
-              {hoveredMetricCard === 'invested' && (
-                <MetricDonutPopover
-                  title="Capital by Asset Class"
-                  items={investedBreakdown}
-                  totalLabel={`${investedBreakdown.length}`}
-                />
-              )}
             </div>
 
             {/* 2. Current Portfolio Value Card */}
@@ -623,35 +585,37 @@ export default function InvestmentsTab({
               style={{
                 padding: '18px 20px',
                 borderRadius: '18px',
-                position: 'relative',
                 cursor: 'pointer',
-                transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
-                border: hoveredMetricCard === 'value' ? '1px solid #38BDF8' : '1px solid var(--border-color)'
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '12px',
+                transition: 'all 0.2s ease'
               }}
-              onMouseEnter={() => setHoveredMetricCard('value')}
-              onMouseLeave={() => setHoveredMetricCard(null)}
+              onClick={() => {
+                setAllocationInitialSection('holdings');
+                setIsAllocationModalOpen(true);
+              }}
+              title="Click to view holdings weightage and valuation distribution"
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                   {currentMeta.valueTitle}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', color: 'var(--text-muted)', fontSize: '10px' }} title="Hover to view valuation allocation">
-                  <PieIcon size={13} style={{ color: '#38BDF8', opacity: hoveredMetricCard === 'value' ? 1 : 0.6 }} />
+                <div style={{ fontSize: '24px', fontWeight: '900', color: '#38BDF8', marginTop: '4px', letterSpacing: '-0.5px' }}>
+                  {formatInr(totalValuation)}
+                </div>
+                <div style={{ fontSize: '11px', color: totalPnL >= 0 ? '#10B981' : '#F87171', fontWeight: '700', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span>{totalPnL >= 0 ? '+' : ''}{formatInr(totalPnL)} ({totalPnLPercentage >= 0 ? '+' : ''}{totalPnLPercentage.toFixed(2)}%)</span>
+                  <span style={{ color: '#38BDF8', fontWeight: '800', flexShrink: 0 }}>• Details ↗</span>
                 </div>
               </div>
-              <div style={{ fontSize: '24px', fontWeight: '900', color: '#38BDF8', marginTop: '4px' }}>
-                {formatInr(totalValuation)}
+              <div style={{ position: 'relative', width: '48px', height: '48px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <MiniDonutRing items={valuationBreakdown} size={48} strokeWidth={7} />
+                <div style={{ position: 'absolute', fontSize: '9px', fontWeight: '900', color: '#38BDF8' }}>
+                  {safeInvestments.length}
+                </div>
               </div>
-              <div style={{ fontSize: '11px', color: totalPnL >= 0 ? '#10B981' : '#F87171', fontWeight: '700', marginTop: '2px' }}>
-                {totalPnL >= 0 ? '+' : ''}{formatInr(totalPnL)} ({totalPnLPercentage >= 0 ? '+' : ''}{totalPnLPercentage.toFixed(2)}%)
-              </div>
-              {hoveredMetricCard === 'value' && (
-                <MetricDonutPopover
-                  title="Valuation Allocation"
-                  items={valuationBreakdown}
-                  totalLabel={`${valuationBreakdown.length}`}
-                />
-              )}
             </div>
 
             {/* 3. Day's P&L Card */}
@@ -660,36 +624,37 @@ export default function InvestmentsTab({
               style={{
                 padding: '18px 20px',
                 borderRadius: '18px',
-                position: 'relative',
                 cursor: 'pointer',
-                transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
-                border: hoveredMetricCard === 'day' ? '1px solid ' + (totalDayPnL >= 0 ? '#10B981' : '#F87171') : '1px solid var(--border-color)'
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '12px',
+                transition: 'all 0.2s ease'
               }}
-              onMouseEnter={() => setHoveredMetricCard('day')}
-              onMouseLeave={() => setHoveredMetricCard(null)}
+              onClick={() => {
+                setAllocationInitialSection('day');
+                setIsAllocationModalOpen(true);
+              }}
+              title="Click to view day gainers vs losers list"
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                   {currentMeta.dayTitle}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', color: 'var(--text-muted)', fontSize: '10px' }} title="Hover to view day gainers vs losers">
-                  <PieIcon size={13} style={{ color: totalDayPnL >= 0 ? '#10B981' : '#F87171', opacity: hoveredMetricCard === 'day' ? 1 : 0.6 }} />
+                <div style={{ fontSize: '24px', fontWeight: '900', color: totalDayPnL >= 0 ? '#10B981' : '#F87171', marginTop: '4px', letterSpacing: '-0.5px' }}>
+                  {totalDayPnL >= 0 ? '+' : ''}{formatInr(totalDayPnL)}
+                </div>
+                <div style={{ fontSize: '11px', color: totalDayPnL >= 0 ? '#10B981' : '#F87171', fontWeight: '700', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span>{dayPnLPct >= 0 ? '+' : ''}{dayPnLPct.toFixed(2)}% Today</span>
+                  <span style={{ color: 'var(--text-muted)', fontWeight: '800', flexShrink: 0 }}>• List ↗</span>
                 </div>
               </div>
-              <div style={{ fontSize: '24px', fontWeight: '900', color: totalDayPnL >= 0 ? '#10B981' : '#F87171', marginTop: '4px' }}>
-                {totalDayPnL >= 0 ? '+' : ''}{formatInr(totalDayPnL)}
+              <div style={{ position: 'relative', width: '48px', height: '48px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <MiniDonutRing items={dayPnlBreakdown} size={48} strokeWidth={7} />
+                <div style={{ position: 'absolute', fontSize: '9px', fontWeight: '900', color: totalDayPnL >= 0 ? '#10B981' : '#F87171' }}>
+                  {dayPnlBreakdown.length}
+                </div>
               </div>
-              <div style={{ fontSize: '11px', color: totalDayPnL >= 0 ? '#10B981' : '#F87171', fontWeight: '700', marginTop: '2px' }}>
-                {dayPnLPct >= 0 ? '+' : ''}{dayPnLPct.toFixed(2)}% Today
-              </div>
-              {hoveredMetricCard === 'day' && (
-                <MetricDonutPopover
-                  title="Day Gainers vs Losers"
-                  items={dayPnlBreakdown}
-                  alignRight={true}
-                  totalLabel={`${dayPnlBreakdown.length}`}
-                />
-              )}
             </div>
 
             {/* 4. Total P&L Card */}
@@ -698,36 +663,37 @@ export default function InvestmentsTab({
               style={{
                 padding: '18px 20px',
                 borderRadius: '18px',
-                position: 'relative',
                 cursor: 'pointer',
-                transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
-                border: hoveredMetricCard === 'pnl' ? '1px solid ' + (totalPnL >= 0 ? '#10B981' : '#F87171') : '1px solid var(--border-color)'
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '12px',
+                transition: 'all 0.2s ease'
               }}
-              onMouseEnter={() => setHoveredMetricCard('pnl')}
-              onMouseLeave={() => setHoveredMetricCard(null)}
+              onClick={() => {
+                setAllocationInitialSection('pnl');
+                setIsAllocationModalOpen(true);
+              }}
+              title="Click to view total profit vs loss breakdown"
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                   {currentMeta.pnlTitle}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '3px', color: 'var(--text-muted)', fontSize: '10px' }} title="Hover to view profit vs loss distribution">
-                  <PieIcon size={13} style={{ color: totalPnL >= 0 ? '#10B981' : '#F87171', opacity: hoveredMetricCard === 'pnl' ? 1 : 0.6 }} />
+                <div style={{ fontSize: '24px', fontWeight: '900', color: totalPnL >= 0 ? '#10B981' : '#F87171', marginTop: '4px', letterSpacing: '-0.5px' }}>
+                  {totalPnL >= 0 ? '+' : ''}{formatInr(totalPnL)}
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{currentMeta.pnlSub}</span>
+                  <span style={{ color: 'var(--primary)', fontWeight: '800', flexShrink: 0 }}>• Split ↗</span>
                 </div>
               </div>
-              <div style={{ fontSize: '24px', fontWeight: '900', color: totalPnL >= 0 ? '#10B981' : '#F87171', marginTop: '4px' }}>
-                {totalPnL >= 0 ? '+' : ''}{formatInr(totalPnL)}
+              <div style={{ position: 'relative', width: '48px', height: '48px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <MiniDonutRing items={totalPnlBreakdown} size={48} strokeWidth={7} />
+                <div style={{ position: 'absolute', fontSize: '9px', fontWeight: '900', color: totalPnL >= 0 ? '#10B981' : '#F87171' }}>
+                  {totalPnlBreakdown.length}
+                </div>
               </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                {currentMeta.pnlSub}
-              </div>
-              {hoveredMetricCard === 'pnl' && (
-                <MetricDonutPopover
-                  title="Profit vs Loss Holdings"
-                  items={totalPnlBreakdown}
-                  alignRight={true}
-                  totalLabel={`${totalPnlBreakdown.length}`}
-                />
-              )}
             </div>
           </div>
 
@@ -942,39 +908,6 @@ export default function InvestmentsTab({
             </div>
           </div>
 
-          {/* Asset Allocation Pie Chart */}
-          {pieData.length > 0 && (
-            <div className="card" style={{ padding: '24px', borderRadius: '20px' }}>
-              <h2 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <PieIcon size={18} style={{ color: 'var(--primary)' }} /> Asset Allocation Breakdown
-              </h2>
-              <div style={{ width: '100%', height: '240px' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      dataKey="value"
-                      nameKey="name"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={90}
-                      paddingAngle={4}
-                    >
-                      {pieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip
-                      formatter={(val) => [isPrivacyMode ? '₹••••••••' : `₹${Number(val).toLocaleString('en-IN')}`, 'Valuation']}
-                      contentStyle={{ background: 'var(--bg-card)', borderColor: 'var(--border-color)', borderRadius: '12px' }}
-                    />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          )}
         </>
       )}
 
@@ -1206,6 +1139,16 @@ export default function InvestmentsTab({
         isOpen={!!selectedStockForDetail}
         onClose={() => setSelectedStockForDetail(null)}
         investment={selectedStockForDetail}
+        isPrivacyMode={isPrivacyMode}
+      />
+
+      {/* Asset Allocation Breakdown Modal */}
+      <AssetAllocationModal
+        isOpen={isAllocationModalOpen}
+        onClose={() => setIsAllocationModalOpen(false)}
+        investments={safeInvestments}
+        initialSection={allocationInitialSection}
+        formatInr={formatInr}
         isPrivacyMode={isPrivacyMode}
       />
 
