@@ -110,6 +110,57 @@ if (process.env.DATABASE_URL) {
         data JSONB NOT NULL,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS public.wealthpulse_users (
+        id VARCHAR(100) PRIMARY KEY,
+        name VARCHAR(255),
+        email VARCHAR(255) UNIQUE,
+        password_hash VARCHAR(255),
+        mpin_hash VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE OR REPLACE FUNCTION public.sp_upsert_wealthpulse_user(
+        p_id VARCHAR,
+        p_name VARCHAR,
+        p_email VARCHAR,
+        p_password_hash VARCHAR,
+        p_mpin_hash VARCHAR,
+        p_created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+      RETURNS VOID AS $$
+      BEGIN
+        -- First update any existing user matching by email or id
+        UPDATE public.wealthpulse_users
+        SET
+          id = p_id,
+          name = COALESCE(NULLIF(p_name, ''), name),
+          email = p_email,
+          password_hash = COALESCE(p_password_hash, password_hash),
+          mpin_hash = COALESCE(p_mpin_hash, mpin_hash)
+        WHERE LOWER(email) = LOWER(p_email) OR id = p_id;
+
+        -- If no existing row found, insert brand new user
+        IF NOT FOUND THEN
+          INSERT INTO public.wealthpulse_users (id, name, email, password_hash, mpin_hash, created_at)
+          VALUES (p_id, p_name, p_email, p_password_hash, p_mpin_hash, p_created_at)
+          ON CONFLICT (id) DO UPDATE SET
+            name = EXCLUDED.name,
+            email = EXCLUDED.email,
+            password_hash = COALESCE(EXCLUDED.password_hash, public.wealthpulse_users.password_hash),
+            mpin_hash = COALESCE(EXCLUDED.mpin_hash, public.wealthpulse_users.mpin_hash);
+        END IF;
+      EXCEPTION WHEN unique_violation THEN
+        -- Handle concurrent insertion or unique email race gracefully
+        UPDATE public.wealthpulse_users
+        SET
+          id = p_id,
+          name = COALESCE(NULLIF(p_name, ''), name),
+          password_hash = COALESCE(p_password_hash, password_hash),
+          mpin_hash = COALESCE(p_mpin_hash, mpin_hash)
+        WHERE LOWER(email) = LOWER(p_email) OR id = p_id;
+      END;
+      $$ LANGUAGE plpgsql;
     `).then(async () => {
       console.log('[Supabase PostgreSQL] Connected & table initialized successfully!');
       try {
@@ -145,10 +196,57 @@ async function executeProcedureOrQuery(spQuery, spParams, fallbackQuery, fallbac
   try {
     await pgPool.query(spQuery, spParams);
   } catch (err) {
-    if (err.code === '42883' || err.message.includes('function') || err.message.includes('does not exist')) {
-      await pgPool.query(fallbackQuery, fallbackParams).catch(e => console.error('[Supabase PostgreSQL] Fallback query error:', e.message));
+    if (err.code === '42883' || err.message.includes('function') || err.message.includes('does not exist') || err.code === '23505' || err.message.includes('unique constraint')) {
+      if (fallbackQuery) {
+        await pgPool.query(fallbackQuery, fallbackParams).catch(e => {
+          if (e.code !== '23505' && !e.message.includes('unique constraint')) {
+            console.error('[Supabase PostgreSQL] Fallback query error:', e.message);
+          }
+        });
+      }
     } else {
       console.error('[Supabase PostgreSQL] Stored Procedure execution error:', err.message);
+    }
+  }
+}
+
+async function upsertUserToPostgres(u) {
+  if (!pgPool || !u || !u.id) return;
+  const name = u.name || '';
+  const email = (u.email || '').trim().toLowerCase();
+  const passwordHash = u.passwordHash || null;
+  const mpinHash = u.mpinHash || null;
+  const createdAt = u.createdAt || new Date().toISOString();
+
+  try {
+    await pgPool.query(
+      'SELECT public.sp_upsert_wealthpulse_user($1, $2, $3, $4, $5, $6)',
+      [u.id, name, email, passwordHash, mpinHash, createdAt]
+    );
+  } catch (err) {
+    try {
+      const updateRes = await pgPool.query(
+        `UPDATE public.wealthpulse_users
+         SET id = $1, name = $2, password_hash = COALESCE($4, password_hash), mpin_hash = COALESCE($5, mpin_hash)
+         WHERE LOWER(email) = LOWER($3) OR id = $1`,
+        [u.id, name, email, passwordHash, mpinHash]
+      );
+      if (updateRes.rowCount === 0) {
+        await pgPool.query(
+          `INSERT INTO public.wealthpulse_users (id, name, email, password_hash, mpin_hash, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT (id) DO UPDATE SET
+             name = EXCLUDED.name,
+             email = EXCLUDED.email,
+             password_hash = COALESCE(EXCLUDED.password_hash, public.wealthpulse_users.password_hash),
+             mpin_hash = COALESCE(EXCLUDED.mpin_hash, public.wealthpulse_users.mpin_hash)`,
+          [u.id, name, email, passwordHash, mpinHash, createdAt]
+        );
+      }
+    } catch (fallbackErr) {
+      if (fallbackErr.code !== '23505' && !fallbackErr.message.includes('unique constraint')) {
+        console.warn('[Supabase PostgreSQL] Safe user upsert notice:', fallbackErr.message);
+      }
     }
   }
 }
@@ -160,18 +258,7 @@ function syncRelationalTables(db) {
   if (Array.isArray(db.users)) {
     for (const u of db.users) {
       if (!u || !u.id) continue;
-      executeProcedureOrQuery(
-        'SELECT public.sp_upsert_wealthpulse_user($1, $2, $3, $4, $5, $6)',
-        [u.id, u.name || '', u.email || '', u.passwordHash || null, u.mpinHash || null, u.createdAt || new Date().toISOString()],
-        `INSERT INTO public.wealthpulse_users (id, name, email, password_hash, mpin_hash, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT (id) DO UPDATE SET
-           name = EXCLUDED.name,
-           email = EXCLUDED.email,
-           password_hash = EXCLUDED.password_hash,
-           mpin_hash = EXCLUDED.mpin_hash`,
-        [u.id, u.name || '', u.email || '', u.passwordHash || null, u.mpinHash || null, u.createdAt || new Date().toISOString()]
-      );
+      upsertUserToPostgres(u);
     }
   }
 
@@ -274,12 +361,7 @@ export const dbEngine = {
     saveDb();
 
     if (pgPool) {
-      executeProcedureOrQuery(
-        'SELECT public.sp_upsert_wealthpulse_user($1, $2, $3, $4, NULL, $5)',
-        [newUser.id, newUser.name, newUser.email, newUser.passwordHash, newUser.createdAt],
-        'INSERT INTO public.wealthpulse_users (id, name, email, password_hash, created_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING',
-        [newUser.id, newUser.name, newUser.email, newUser.passwordHash, newUser.createdAt]
-      );
+      upsertUserToPostgres(newUser);
     }
 
     return {
