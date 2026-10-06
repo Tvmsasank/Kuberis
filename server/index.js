@@ -402,7 +402,7 @@ app.post('/api/auth/2fa/verify-setup', authenticateToken, async (req, res) => {
       secret: twoFactorDetails.tempSecret,
       encoding: 'base32',
       token: code.trim(),
-      window: 2
+      window: 4
     });
 
     if (!verified) {
@@ -463,13 +463,13 @@ app.post('/api/auth/2fa/verify-login', async (req, res) => {
     const cleanCode = code.trim();
     let isValid = false;
 
-    // Verify 6-digit TOTP code
+    // Verify 6-digit TOTP code (window 4 allows +/- 120s clock drift across devices)
     if (/^\d{6}$/.test(cleanCode)) {
       isValid = speakeasy.totp.verify({
         secret: twoFactorDetails.secret,
         encoding: 'base32',
         token: cleanCode,
-        window: 2
+        window: 4
       });
     }
 
@@ -570,7 +570,7 @@ app.post('/api/auth/2fa/disable', authenticateToken, async (req, res) => {
       secret: twoFactorDetails.secret,
       encoding: 'base32',
       token: cleanCode,
-      window: 2
+      window: 4
     }) || dbEngine.useRecoveryCode(req.userId, cleanCode);
 
     if (!verified) {

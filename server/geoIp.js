@@ -29,61 +29,64 @@ export async function resolveIpLocation(ip) {
     return cached.location;
   }
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2500);
+  // Define lookup task
+  const lookupPromise = (async () => {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 700);
 
-    // Primary: ipwho.is (fast, free, no API key required)
-    const res = await fetch(`https://ipwho.is/${cleanIp}`, { signal: controller.signal });
-    clearTimeout(timeout);
+      // Primary: ipwho.is (fast, free, no API key required)
+      const res = await fetch(`https://ipwho.is/${cleanIp}`, { signal: controller.signal });
+      clearTimeout(timeout);
 
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.success) {
-        const city = data.city || '';
-        const region = data.region_code || data.region || '';
-        const country = data.country_code || data.country || '';
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.success) {
+          const city = data.city || '';
+          const region = data.region_code || data.region || '';
+          const country = data.country_code || data.country || '';
 
-        const parts = [city, region, country].filter(Boolean);
-        const locationStr = parts.length > 0 ? parts.join(' - ') : 'India - IN';
+          const parts = [city, region, country].filter(Boolean);
+          const locationStr = parts.length > 0 ? parts.join(' - ') : 'India - IN';
 
-        geoCache.set(cleanIp, { location: locationStr, timestamp: Date.now() });
-        return locationStr;
+          geoCache.set(cleanIp, { location: locationStr, timestamp: Date.now() });
+          return locationStr;
+        }
       }
-    }
-  } catch (err) {
-    // Primary lookup failed, attempt secondary fallback
-  }
+    } catch (err) {}
 
-  try {
-    const controller2 = new AbortController();
-    const timeout2 = setTimeout(() => controller2.abort(), 2000);
+    try {
+      const controller2 = new AbortController();
+      const timeout2 = setTimeout(() => controller2.abort(), 600);
 
-    // Secondary fallback: ip-api.com
-    const res2 = await fetch(`http://ip-api.com/json/${cleanIp}?fields=city,region,countryCode,status`, {
-      signal: controller2.signal
-    });
-    clearTimeout2 = clearTimeout(timeout2);
+      // Secondary fallback: ip-api.com
+      const res2 = await fetch(`http://ip-api.com/json/${cleanIp}?fields=city,region,countryCode,status`, {
+        signal: controller2.signal
+      });
+      clearTimeout(timeout2);
 
-    if (res2.ok) {
-      const data2 = await res2.json();
-      if (data2 && data2.status === 'success') {
-        const city = data2.city || '';
-        const region = data2.region || '';
-        const country = data2.countryCode || '';
+      if (res2.ok) {
+        const data2 = await res2.json();
+        if (data2 && data2.status === 'success') {
+          const city = data2.city || '';
+          const region = data2.region || '';
+          const country = data2.countryCode || '';
 
-        const parts = [city, region, country].filter(Boolean);
-        const locationStr = parts.length > 0 ? parts.join(' - ') : 'India - IN';
+          const parts = [city, region, country].filter(Boolean);
+          const locationStr = parts.length > 0 ? parts.join(' - ') : 'India - IN';
 
-        geoCache.set(cleanIp, { location: locationStr, timestamp: Date.now() });
-        return locationStr;
+          geoCache.set(cleanIp, { location: locationStr, timestamp: Date.now() });
+          return locationStr;
+        }
       }
-    }
-  } catch (err2) {
-    // Secondary lookup failed
-  }
+    } catch (err2) {}
 
-  const defaultLocation = 'India - IN';
-  geoCache.set(cleanIp, { location: defaultLocation, timestamp: Date.now() });
-  return defaultLocation;
+    const defaultLoc = 'India - IN';
+    geoCache.set(cleanIp, { location: defaultLoc, timestamp: Date.now() });
+    return defaultLoc;
+  })();
+
+  // Guarantee maximum 650ms wait so auth/login/2FA never blocks or freezes
+  const quickTimeout = new Promise((resolve) => setTimeout(() => resolve('India - IN'), 650));
+  return Promise.race([lookupPromise, quickTimeout]);
 }

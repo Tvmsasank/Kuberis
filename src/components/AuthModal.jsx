@@ -334,12 +334,17 @@ export default function AuthModal({
     if (!codeToVerify || !codeToVerify.trim()) return;
     setLoading(true);
     setError('');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000);
+
     try {
       const res = await fetch('/api/auth/2fa/verify-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getDeviceHeaders() },
-        body: JSON.stringify({ tempToken: totpTempToken, code: codeToVerify.trim() })
+        body: JSON.stringify({ tempToken: totpTempToken, code: codeToVerify.trim() }),
+        signal: controller.signal
       });
+      clearTimeout(timeout);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Invalid 6-digit code. Please try again.');
 
@@ -353,7 +358,13 @@ export default function AuthModal({
         onClose();
       }, 400);
     } catch (err) {
-      setError(err.message || 'Invalid 6-digit code. Please check Google Authenticator and try again.');
+      clearTimeout(timeout);
+      if (err.name === 'AbortError') {
+        setError('Verification timed out. Please check your internet connection and try again.');
+      } else {
+        setError(err.message || 'Invalid 6-digit code. Please check Google Authenticator and try again.');
+      }
+      setTotpCode(''); // Reset so user can immediately type the fresh code
     } finally {
       setLoading(false);
     }
