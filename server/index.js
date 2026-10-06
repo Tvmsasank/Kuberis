@@ -30,6 +30,25 @@ app.use(cors());
 app.use(express.json({ limit: '25mb' }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
+// Security Headers Middleware (Production Zero-Trust Architecture)
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
+
+// Helper to reliably extract client IP address behind reverse proxies
+const getClientIp = (req) => {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.socket?.remoteAddress || req.ip || '127.0.0.1';
+};
+
 // Multer memory storage for up to 20MB file uploads
 const upload = multer({
   limits: { fileSize: 20 * 1024 * 1024 } // 20MB limit
@@ -105,7 +124,7 @@ const authenticateToken = (req, res, next) => {
 // ==========================================
 
 // POST /api/auth/register
-app.post('/api/auth/register', (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
     if (!email || !password) {
@@ -118,7 +137,18 @@ app.post('/api/auth/register', (req, res) => {
     const user = dbEngine.createUser({ name, email, password });
     const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     dbEngine.setUserActiveSession(user.id, sessionId);
-    const token = jwt.sign({ userId: user.id, email: user.email, sessionId }, JWT_SECRET, { expiresIn: '30d' });
+
+    // 15-minute high security access token + 30-day rotating refresh token
+    const accessToken = jwt.sign({ userId: user.id, email: user.email, sessionId }, JWT_SECRET, { expiresIn: '15m' });
+    const { refreshToken } = await dbEngine.createRefreshToken({ userId: user.id, sessionId, rememberMe: true });
+
+    await dbEngine.logSecurityEvent({
+      userId: user.id,
+      eventType: 'USER_REGISTERED',
+      ipAddress: getClientIp(req),
+      userAgent: req.headers['user-agent'],
+      status: 'SUCCESS'
+    });
 
     // Send automated welcome email with platform guidelines and T&C
     sendWelcomeEmail(user.email, user.name).catch(e => {
@@ -127,7 +157,9 @@ app.post('/api/auth/register', (req, res) => {
 
     res.json({
       message: 'Account created successfully',
-      token,
+      token: accessToken, // backwards compatibility
+      accessToken,
+      refreshToken,
       user
     });
   } catch (err) {
@@ -137,7 +169,7 @@ app.post('/api/auth/register', (req, res) => {
 });
 
 // POST /api/auth/login
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password, rememberMe, forceLogin } = req.body;
     if (!email || !password) {
@@ -146,6 +178,16 @@ app.post('/api/auth/login', (req, res) => {
 
     const user = dbEngine.verifyUserCredentials({ email, password });
     if (!user) {
+      const existing = dbEngine.getUserByEmail(email);
+      if (existing) {
+        await dbEngine.logSecurityEvent({
+          userId: existing.id,
+          eventType: 'LOGIN_FAILED',
+          ipAddress: getClientIp(req),
+          userAgent: req.headers['user-agent'],
+          status: 'FAILURE'
+        });
+      }
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
@@ -177,17 +219,92 @@ app.post('/api/auth/login', (req, res) => {
     const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     dbEngine.setUserActiveSession(user.id, sessionId);
 
-    const expiresIn = rememberMe ? '30d' : '1d';
-    const token = jwt.sign({ userId: user.id, email: user.email, sessionId }, JWT_SECRET, { expiresIn });
+    // Issue 15-minute access token + rotating refresh token
+    const accessToken = jwt.sign({ userId: user.id, email: user.email, sessionId }, JWT_SECRET, { expiresIn: '15m' });
+    const { refreshToken } = await dbEngine.createRefreshToken({
+      userId: user.id,
+      sessionId,
+      rememberMe: !!rememberMe
+    });
+
+    await dbEngine.logSecurityEvent({
+      userId: user.id,
+      eventType: 'LOGIN_SUCCESS',
+      ipAddress: getClientIp(req),
+      userAgent: req.headers['user-agent'],
+      status: 'SUCCESS'
+    });
 
     res.json({
       message: 'Signed in successfully',
-      token,
+      token: accessToken, // backwards compatibility
+      accessToken,
+      refreshToken,
       user
     });
   } catch (err) {
     console.error('POST /api/auth/login error:', err);
     res.status(500).json({ error: 'Authentication failed' });
+  }
+});
+
+// POST /api/auth/refresh - Refresh 15-minute access token using rotating refresh token
+app.post('/api/auth/refresh', async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return res.status(400).json({ error: 'Refresh token is required' });
+    }
+
+    const rotated = await dbEngine.verifyAndRotateRefreshToken(refreshToken);
+    if (!rotated) {
+      return res.status(401).json({
+        code: 'INVALID_REFRESH_TOKEN',
+        error: 'Refresh token is invalid or expired. Please sign in again.'
+      });
+    }
+
+    const user = dbEngine.getUserById(rotated.userId);
+    if (!user) {
+      return res.status(401).json({ error: 'User no longer exists' });
+    }
+
+    // Check active session continuity
+    const currentActiveSession = dbEngine.getUserActiveSession(user.id);
+    if (currentActiveSession && rotated.sessionId && rotated.sessionId !== currentActiveSession) {
+      return res.status(401).json({
+        code: 'SESSION_TERMINATED',
+        error: 'Another login was detected on a different device or browser.'
+      });
+    }
+
+    const newAccessToken = jwt.sign(
+      { userId: user.id, email: user.email, sessionId: rotated.sessionId || currentActiveSession },
+      JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    res.json({
+      token: newAccessToken,
+      accessToken: newAccessToken,
+      refreshToken: rotated.newRefreshToken,
+      user
+    });
+  } catch (err) {
+    console.error('POST /api/auth/refresh error:', err);
+    res.status(500).json({ error: 'Failed to refresh token' });
+  }
+});
+
+// GET /api/auth/audit-logs - Security activity feed for current authenticated user
+app.get('/api/auth/audit-logs', authenticateToken, async (req, res) => {
+  try {
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 15));
+    const logs = await dbEngine.getUserAuditLogs(req.userId, limit);
+    res.json({ logs });
+  } catch (err) {
+    console.error('GET /api/auth/audit-logs error:', err);
+    res.status(500).json({ error: 'Failed to fetch audit logs' });
   }
 });
 
@@ -223,7 +340,7 @@ app.post('/api/auth/2fa/setup', authenticateToken, async (req, res) => {
 });
 
 // POST /api/auth/2fa/verify-setup - Verify 6-digit TOTP code and Activate 2FA
-app.post('/api/auth/2fa/verify-setup', authenticateToken, (req, res) => {
+app.post('/api/auth/2fa/verify-setup', authenticateToken, async (req, res) => {
   try {
     const { code } = req.body;
     if (!code || code.trim().length !== 6) {
@@ -254,6 +371,14 @@ app.post('/api/auth/2fa/verify-setup', authenticateToken, (req, res) => {
     dbEngine.enableTwoFactor(req.userId, twoFactorDetails.tempSecret, recoveryCodes);
     const updatedUser = dbEngine.getUserById(req.userId);
 
+    await dbEngine.logSecurityEvent({
+      userId: req.userId,
+      eventType: '2FA_ENABLED',
+      ipAddress: getClientIp(req),
+      userAgent: req.headers['user-agent'],
+      status: 'SUCCESS'
+    });
+
     res.json({
       message: 'Google Authenticator 2FA enabled successfully!',
       user: updatedUser,
@@ -266,7 +391,7 @@ app.post('/api/auth/2fa/verify-setup', authenticateToken, (req, res) => {
 });
 
 // POST /api/auth/2fa/verify-login - AWS-style 2FA Challenge Verification during login
-app.post('/api/auth/2fa/verify-login', (req, res) => {
+app.post('/api/auth/2fa/verify-login', async (req, res) => {
   try {
     const { tempToken, code } = req.body;
     if (!tempToken || !code) {
@@ -308,18 +433,39 @@ app.post('/api/auth/2fa/verify-login', (req, res) => {
     }
 
     if (!isValid) {
+      await dbEngine.logSecurityEvent({
+        userId,
+        eventType: '2FA_VERIFY_FAILED',
+        ipAddress: getClientIp(req),
+        userAgent: req.headers['user-agent'],
+        status: 'FAILURE'
+      });
       return res.status(401).json({ error: 'Invalid 6-digit Google Authenticator code or recovery code' });
     }
 
     const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     dbEngine.setUserActiveSession(user.id, sessionId);
 
-    const expiresIn = decoded.rememberMe ? '30d' : '1d';
-    const finalToken = jwt.sign({ userId: user.id, email: user.email, sessionId }, JWT_SECRET, { expiresIn });
+    const accessToken = jwt.sign({ userId: user.id, email: user.email, sessionId }, JWT_SECRET, { expiresIn: '15m' });
+    const { refreshToken } = await dbEngine.createRefreshToken({
+      userId: user.id,
+      sessionId,
+      rememberMe: decoded.rememberMe
+    });
+
+    await dbEngine.logSecurityEvent({
+      userId: user.id,
+      eventType: '2FA_VERIFIED',
+      ipAddress: getClientIp(req),
+      userAgent: req.headers['user-agent'],
+      status: 'SUCCESS'
+    });
 
     res.json({
       message: '2FA verification successful!',
-      token: finalToken,
+      token: accessToken, // backwards compatibility
+      accessToken,
+      refreshToken,
       user
     });
   } catch (err) {
@@ -329,7 +475,7 @@ app.post('/api/auth/2fa/verify-login', (req, res) => {
 });
 
 // POST /api/auth/2fa/disable - Disable 2FA (Requires valid 6-digit TOTP code or recovery code)
-app.post('/api/auth/2fa/disable', authenticateToken, (req, res) => {
+app.post('/api/auth/2fa/disable', authenticateToken, async (req, res) => {
   try {
     const { code } = req.body;
     if (!code || !code.trim()) {
@@ -356,6 +502,14 @@ app.post('/api/auth/2fa/disable', authenticateToken, (req, res) => {
 
     dbEngine.disableTwoFactor(req.userId);
     const updatedUser = dbEngine.getUserById(req.userId);
+
+    await dbEngine.logSecurityEvent({
+      userId: req.userId,
+      eventType: '2FA_DISABLED',
+      ipAddress: getClientIp(req),
+      userAgent: req.headers['user-agent'],
+      status: 'SUCCESS'
+    });
 
     res.json({
       message: 'Google Authenticator 2FA disabled',
@@ -736,7 +890,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 });
 
 // POST /api/auth/reset-password
-app.post('/api/auth/reset-password', (req, res) => {
+app.post('/api/auth/reset-password', async (req, res) => {
   try {
     const { resetToken, newPassword } = req.body;
     if (!resetToken || !newPassword) {
@@ -746,7 +900,16 @@ app.post('/api/auth/reset-password', (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
 
-    dbEngine.resetPassword({ resetToken, newPassword });
+    const user = dbEngine.resetPassword({ resetToken, newPassword });
+    if (user && user.id) {
+      await dbEngine.logSecurityEvent({
+        userId: user.id,
+        eventType: 'PASSWORD_RESET',
+        ipAddress: getClientIp(req),
+        userAgent: req.headers['user-agent'],
+        status: 'SUCCESS'
+      });
+    }
     res.json({ message: 'Password updated successfully' });
   } catch (err) {
     console.error('POST /api/auth/reset-password error:', err);
@@ -755,7 +918,7 @@ app.post('/api/auth/reset-password', (req, res) => {
 });
 
 // POST /api/auth/change-password (Authenticated user changes their password)
-app.post('/api/auth/change-password', authenticateToken, (req, res) => {
+app.post('/api/auth/change-password', authenticateToken, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     if (!currentPassword || !newPassword) {
@@ -771,12 +934,29 @@ app.post('/api/auth/change-password', authenticateToken, (req, res) => {
       newPassword
     });
 
+    await dbEngine.logSecurityEvent({
+      userId: req.userId,
+      eventType: 'PASSWORD_CHANGED',
+      ipAddress: getClientIp(req),
+      userAgent: req.headers['user-agent'],
+      status: 'SUCCESS'
+    });
+
     res.json({
       message: 'Password updated successfully. Please sign in with your new password.',
       user: updatedUser
     });
   } catch (err) {
     console.error('POST /api/auth/change-password error:', err);
+    if (req.userId) {
+      await dbEngine.logSecurityEvent({
+        userId: req.userId,
+        eventType: 'PASSWORD_CHANGE_FAILED',
+        ipAddress: getClientIp(req),
+        userAgent: req.headers['user-agent'],
+        status: 'FAILURE'
+      });
+    }
     res.status(400).json({ error: err.message || 'Failed to change password' });
   }
 });
@@ -841,14 +1021,23 @@ app.get('/api/auth/debug-email', async (req, res) => {
 });
 
 // POST /api/auth/reset-mpin
-app.post('/api/auth/reset-mpin', (req, res) => {
+app.post('/api/auth/reset-mpin', async (req, res) => {
   try {
     const { resetMpinToken, newMpin } = req.body;
     if (!resetMpinToken || !newMpin) {
       return res.status(400).json({ error: 'Reset token and new 4-digit MPIN are required' });
     }
 
-    dbEngine.resetUserMpin({ resetMpinToken, newMpin });
+    const user = dbEngine.resetUserMpin({ resetMpinToken, newMpin });
+    if (user && user.id) {
+      await dbEngine.logSecurityEvent({
+        userId: user.id,
+        eventType: 'MPIN_RESET',
+        ipAddress: getClientIp(req),
+        userAgent: req.headers['user-agent'],
+        status: 'SUCCESS'
+      });
+    }
     res.json({ message: '4-Digit MPIN reset successfully!' });
   } catch (err) {
     console.error('POST /api/auth/reset-mpin error:', err);
@@ -878,9 +1067,21 @@ app.post('/api/auth/check-methods', (req, res) => {
 });
 
 // DELETE /api/auth/account (Permanently delete user account & all data)
-app.delete('/api/auth/account', (req, res) => {
+app.delete('/api/auth/account', async (req, res) => {
   try {
     const userId = getUserIdFromReq(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    await dbEngine.logSecurityEvent({
+      userId,
+      eventType: 'ACCOUNT_DELETED',
+      ipAddress: getClientIp(req),
+      userAgent: req.headers['user-agent'],
+      status: 'SUCCESS'
+    });
+
     dbEngine.deleteUserAccount(userId);
     res.json({ success: true, message: 'Account permanently deleted' });
   } catch (err) {
@@ -890,7 +1091,7 @@ app.delete('/api/auth/account', (req, res) => {
 });
 
 // POST /api/auth/mpin/set
-app.post('/api/auth/mpin/set', (req, res) => {
+app.post('/api/auth/mpin/set', async (req, res) => {
   try {
     let userId = getUserIdFromReq(req);
     const { mpin, email } = req.body;
@@ -904,6 +1105,14 @@ app.post('/api/auth/mpin/set', (req, res) => {
 
     dbEngine.setUserMpin({ userId, mpin });
     const updatedUser = dbEngine.getUserById(userId);
+
+    await dbEngine.logSecurityEvent({
+      userId,
+      eventType: 'MPIN_SET',
+      ipAddress: getClientIp(req),
+      userAgent: req.headers['user-agent'],
+      status: 'SUCCESS'
+    });
 
     res.json({
       message: '4-Digit MPIN set successfully!',
@@ -934,6 +1143,15 @@ app.post('/api/auth/mpin/verify', async (req, res) => {
     if (!user) {
       dbUser.failedMpinAttempts = (dbUser.failedMpinAttempts || 0) + 1;
       const attemptsLeft = Math.max(0, 3 - dbUser.failedMpinAttempts);
+
+      await dbEngine.logSecurityEvent({
+        userId: dbUser.id,
+        eventType: 'MPIN_LOGIN_FAILED',
+        ipAddress: getClientIp(req),
+        userAgent: req.headers['user-agent'],
+        status: 'FAILURE',
+        metadata: { attemptsLeft }
+      });
 
       if (dbUser.failedMpinAttempts >= 3) {
         const result = dbEngine.createMpinResetToken(cleanEmail);
@@ -992,13 +1210,33 @@ app.post('/api/auth/mpin/verify', async (req, res) => {
     const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     dbEngine.setUserActiveSession(user.id, sessionId);
 
-    const token = jwt.sign(
+    // Issue 15-minute access token + rotating refresh token
+    const accessToken = jwt.sign(
       { userId: user.id, email: user.email, sessionId },
       JWT_SECRET,
-      { expiresIn: '30d' }
+      { expiresIn: '15m' }
     );
+    const { refreshToken } = await dbEngine.createRefreshToken({
+      userId: user.id,
+      sessionId,
+      rememberMe: true
+    });
 
-    res.json({ message: 'MPIN authentication successful', token, user });
+    await dbEngine.logSecurityEvent({
+      userId: user.id,
+      eventType: 'MPIN_LOGIN_SUCCESS',
+      ipAddress: getClientIp(req),
+      userAgent: req.headers['user-agent'],
+      status: 'SUCCESS'
+    });
+
+    res.json({
+      message: 'MPIN authentication successful',
+      token: accessToken, // backwards compatibility
+      accessToken,
+      refreshToken,
+      user
+    });
   } catch (err) {
     console.error('POST /api/auth/mpin/verify error:', err);
     res.status(400).json({ error: err.message || 'MPIN authentication failed' });
@@ -1006,11 +1244,22 @@ app.post('/api/auth/mpin/verify', async (req, res) => {
 });
 
 // POST /api/auth/logout
-app.post('/api/auth/logout', (req, res) => {
+app.post('/api/auth/logout', async (req, res) => {
   try {
     const userId = getUserIdFromReq(req);
+    const { refreshToken } = req.body || {};
+    if (refreshToken) {
+      await dbEngine.revokeRefreshToken(refreshToken);
+    }
     if (userId) {
       dbEngine.clearUserActiveSession(userId);
+      await dbEngine.logSecurityEvent({
+        userId,
+        eventType: 'LOGOUT',
+        ipAddress: getClientIp(req),
+        userAgent: req.headers['user-agent'],
+        status: 'SUCCESS'
+      });
     }
     res.json({ success: true, message: 'Logged out successfully' });
   } catch (e) {

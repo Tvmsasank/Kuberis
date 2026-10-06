@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Mail,
@@ -15,7 +15,10 @@ import {
   Trash2,
   AlertTriangle,
   ChevronRight,
-  Compass
+  Compass,
+  Activity,
+  History,
+  Clock
 } from 'lucide-react';
 import { registerBiometricPasskey } from '../utils/biometrics';
 import { calculateDynamicNetWorth } from '../utils/netWorth';
@@ -46,6 +49,27 @@ export default function UserProfileModal({
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !token) return;
+    setLoadingAuditLogs(true);
+    fetch('/api/auth/audit-logs?limit=8', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'X-Auth-Token': token
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data && Array.isArray(data.logs)) {
+          setAuditLogs(data.logs);
+        }
+      })
+      .catch(err => console.warn('Failed to load audit logs:', err))
+      .finally(() => setLoadingAuditLogs(false));
+  }, [isOpen, token]);
 
   const handleRequestMpinReset = async () => {
     const emailToUse = (user?.email || localStorage.getItem('kuberis_remembered_email') || localStorage.getItem('wealthpulse_remembered_email') || '').trim();
@@ -308,6 +332,99 @@ export default function UserProfileModal({
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Recent Security Activity Audit Log Card */}
+        <div style={{ marginBottom: '16px', padding: '14px', borderRadius: '12px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', boxSizing: 'border-box' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '800', color: 'var(--text-main)' }}>
+              <Activity size={14} style={{ color: 'var(--primary)' }} /> Recent Security Activity
+            </div>
+            <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <ShieldCheck size={11} style={{ color: 'var(--primary)' }} /> Zero-Trust Audit
+            </span>
+          </div>
+
+          {loadingAuditLogs ? (
+            <div style={{ padding: '12px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>
+              Loading security audit records...
+            </div>
+          ) : auditLogs.length === 0 ? (
+            <div style={{ padding: '12px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>
+              No recent security events recorded yet.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto', paddingRight: '2px' }}>
+              {auditLogs.map((log) => {
+                const isSuccess = log.status === 'SUCCESS';
+                const eventName = (log.eventType || log.event_type || '')
+                  .replace(/_/g, ' ')
+                  .toLowerCase()
+                  .replace(/\b\w/g, c => c.toUpperCase());
+                const timestamp = log.createdAt || log.created_at;
+                const formattedDate = timestamp
+                  ? new Date(timestamp).toLocaleDateString('en-IN', {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })
+                  : '';
+
+                return (
+                  <div
+                    key={log.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 10px',
+                      borderRadius: '8px',
+                      background: 'var(--bg-app)',
+                      border: '1px solid var(--border-color)',
+                      fontSize: '11px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                      <div
+                        style={{
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          background: isSuccess ? 'var(--primary)' : 'var(--danger)',
+                          flexShrink: 0
+                        }}
+                      />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', overflow: 'hidden' }}>
+                        <span style={{ fontWeight: '700', color: 'var(--text-main)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                          {eventName}
+                        </span>
+                        <span style={{ fontSize: '9.5px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Clock size={9} /> {formattedDate}
+                          {(log.ipAddress || log.ip_address) && (
+                            <span>• {log.ipAddress || log.ip_address}</span>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: '9.5px',
+                        fontWeight: '800',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        background: isSuccess ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                        color: isSuccess ? 'var(--primary)' : 'var(--danger)',
+                        flexShrink: 0
+                      }}
+                    >
+                      {log.status}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Account Deletion Confirmation Card */}

@@ -70,7 +70,9 @@ const getInitialDb = () => ({
   rules: [],
   documents: [],
   settings: getInitialUserSettings(),
-  userSettings: {} // userId -> settings object
+  userSettings: {}, // userId -> settings object
+  auditLogs: [], // Security event history
+  refreshTokens: [] // Active rotating refresh tokens
 });
 
 let memoryDb = null;
@@ -117,6 +119,26 @@ if (process.env.DATABASE_URL) {
         email VARCHAR(255) UNIQUE,
         password_hash VARCHAR(255),
         mpin_hash VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS public.wealthpulse_audit_logs (
+        id VARCHAR(100) PRIMARY KEY,
+        user_id VARCHAR(100) NOT NULL,
+        event_type VARCHAR(100) NOT NULL,
+        ip_address VARCHAR(100),
+        user_agent TEXT,
+        status VARCHAR(50) DEFAULT 'success',
+        metadata JSONB DEFAULT '{}'::jsonb,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS public.wealthpulse_refresh_tokens (
+        token_hash VARCHAR(100) PRIMARY KEY,
+        user_id VARCHAR(100) NOT NULL,
+        session_id VARCHAR(100),
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        revoked BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -294,6 +316,8 @@ function loadDb() {
       if (!memoryDb.userSettings) memoryDb.userSettings = {};
       if (!memoryDb.investments) memoryDb.investments = [];
       if (!memoryDb.transactions) memoryDb.transactions = [];
+      if (!memoryDb.auditLogs) memoryDb.auditLogs = [];
+      if (!memoryDb.refreshTokens) memoryDb.refreshTokens = [];
     } catch (e) {
       console.error('Failed to parse database file, reinitializing', e);
       memoryDb = getInitialDb();
@@ -510,6 +534,8 @@ export const dbEngine = {
     if (db.goals) delete db.goals[userId];
     if (db.recurring) delete db.recurring[userId];
     if (db.subscriptions) delete db.subscriptions[userId];
+    if (db.refreshTokens) db.refreshTokens = db.refreshTokens.filter(t => t.userId !== userId);
+    if (db.auditLogs) db.auditLogs = db.auditLogs.filter(l => l.user_id !== userId);
     saveDb();
 
     if (pgPool) {
@@ -518,6 +544,12 @@ export const dbEngine = {
       });
       pgPool.query('DELETE FROM public.wealthpulse_transactions WHERE user_id = $1', [userId]).catch(err => {
         console.error('[Supabase PostgreSQL] Error deleting transactions from wealthpulse_transactions:', err.message);
+      });
+      pgPool.query('DELETE FROM public.wealthpulse_refresh_tokens WHERE user_id = $1', [userId]).catch(err => {
+        console.error('[Supabase PostgreSQL] Error deleting refresh tokens:', err.message);
+      });
+      pgPool.query('DELETE FROM public.wealthpulse_audit_logs WHERE user_id = $1', [userId]).catch(err => {
+        console.error('[Supabase PostgreSQL] Error deleting audit logs:', err.message);
       });
     }
     return true;
@@ -634,7 +666,7 @@ export const dbEngine = {
       );
     }
 
-    return true;
+    return user;
   },
 
   changePassword({ userId, currentPassword, newPassword }) {
@@ -711,7 +743,7 @@ export const dbEngine = {
       );
     }
 
-    return true;
+    return user;
   },
 
   getUserSettings(userId) {
@@ -1070,5 +1102,215 @@ export const dbEngine = {
       saveDb();
     }
     return acc;
+  },
+
+  // Dual-Token Architecture: Rotating Refresh Token System
+  createRefreshToken({ userId, sessionId, rememberMe = false }) {
+    if (!userId) return null;
+    const rawToken = crypto.randomBytes(40).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const durationMs = (rememberMe ? 30 : 7) * 24 * 60 * 60 * 1000;
+    const expiresAt = new Date(Date.now() + durationMs).toISOString();
+
+    const db = loadDb();
+    if (!db.refreshTokens) db.refreshTokens = [];
+    const tokenRecord = {
+      tokenHash,
+      userId,
+      sessionId: sessionId || null,
+      expiresAt,
+      revoked: false,
+      createdAt: new Date().toISOString()
+    };
+    db.refreshTokens.push(tokenRecord);
+    saveDb();
+
+    if (pgPool) {
+      pgPool.query(
+        `INSERT INTO public.wealthpulse_refresh_tokens (token_hash, user_id, session_id, expires_at, revoked, created_at)
+         VALUES ($1, $2, $3, $4, FALSE, NOW())
+         ON CONFLICT (token_hash) DO NOTHING`,
+        [tokenHash, userId, sessionId || null, expiresAt]
+      ).catch(e => console.warn('[Supabase PostgreSQL] Refresh token store notice:', e.message));
+    }
+
+    return rawToken;
+  },
+
+  async verifyAndRotateRefreshToken(rawRefreshToken) {
+    if (!rawRefreshToken || typeof rawRefreshToken !== 'string') {
+      return { success: false, error: 'Refresh token is required' };
+    }
+    const tokenHash = crypto.createHash('sha256').update(rawRefreshToken.trim()).digest('hex');
+    const db = loadDb();
+    if (!db.refreshTokens) db.refreshTokens = [];
+
+    let tokenRecord = db.refreshTokens.find(t => t.tokenHash === tokenHash);
+
+    // If not found in memory, query PostgreSQL table
+    if (!tokenRecord && pgPool) {
+      try {
+        const res = await pgPool.query(
+          'SELECT token_hash, user_id, session_id, expires_at, revoked FROM public.wealthpulse_refresh_tokens WHERE token_hash = $1',
+          [tokenHash]
+        );
+        if (res.rows.length > 0) {
+          const row = res.rows[0];
+          tokenRecord = {
+            tokenHash: row.token_hash,
+            userId: row.user_id,
+            sessionId: row.session_id,
+            expiresAt: row.expires_at,
+            revoked: !!row.revoked
+          };
+        }
+      } catch (e) {
+        console.warn('[Supabase PostgreSQL] Token lookup error:', e.message);
+      }
+    }
+
+    if (!tokenRecord) {
+      return { success: false, error: 'Invalid refresh token' };
+    }
+
+    // Replay Attack Detection: If token was already revoked, revoke ALL user tokens (family revocation)
+    if (tokenRecord.revoked) {
+      this.revokeAllUserTokens(tokenRecord.userId);
+      this.logSecurityEvent({
+        userId: tokenRecord.userId,
+        eventType: 'SUSPICIOUS_TOKEN_REUSE',
+        status: 'danger',
+        metadata: { reason: 'Revoked refresh token presented. All active sessions terminated.' }
+      });
+      return { success: false, error: 'Suspicious session reuse detected. Please log in again.' };
+    }
+
+    // Check expiration
+    if (new Date(tokenRecord.expiresAt).getTime() < Date.now()) {
+      tokenRecord.revoked = true;
+      saveDb();
+      return { success: false, error: 'Refresh token expired. Please sign in again.' };
+    }
+
+    const user = this.getUserById(tokenRecord.userId);
+    if (!user) {
+      return { success: false, error: 'User account not found' };
+    }
+
+    // Invalidate old token (one-time use rotation)
+    tokenRecord.revoked = true;
+    saveDb();
+
+    if (pgPool) {
+      pgPool.query(
+        'UPDATE public.wealthpulse_refresh_tokens SET revoked = TRUE WHERE token_hash = $1',
+        [tokenHash]
+      ).catch(e => console.warn('[Supabase PostgreSQL] Revoke token notice:', e.message));
+    }
+
+    // Generate brand new rotating refresh token
+    const newRefreshToken = this.createRefreshToken({
+      userId: user.id,
+      sessionId: tokenRecord.sessionId
+    });
+
+    return {
+      success: true,
+      user,
+      sessionId: tokenRecord.sessionId,
+      newRefreshToken
+    };
+  },
+
+  revokeRefreshToken(rawRefreshToken) {
+    if (!rawRefreshToken || typeof rawRefreshToken !== 'string') return;
+    const tokenHash = crypto.createHash('sha256').update(rawRefreshToken.trim()).digest('hex');
+    const db = loadDb();
+    if (db.refreshTokens) {
+      const rec = db.refreshTokens.find(t => t.tokenHash === tokenHash);
+      if (rec) rec.revoked = true;
+      saveDb();
+    }
+    if (pgPool) {
+      pgPool.query(
+        'UPDATE public.wealthpulse_refresh_tokens SET revoked = TRUE WHERE token_hash = $1',
+        [tokenHash]
+      ).catch(e => console.warn('[Supabase PostgreSQL] Revoke token notice:', e.message));
+    }
+  },
+
+  revokeAllUserTokens(userId) {
+    if (!userId) return;
+    const db = loadDb();
+    if (db.refreshTokens) {
+      for (const t of db.refreshTokens) {
+        if (t.userId === userId) t.revoked = true;
+      }
+      saveDb();
+    }
+    if (pgPool) {
+      pgPool.query(
+        'UPDATE public.wealthpulse_refresh_tokens SET revoked = TRUE WHERE user_id = $1',
+        [userId]
+      ).catch(e => console.warn('[Supabase PostgreSQL] Revoke all notice:', e.message));
+    }
+  },
+
+  // Security Audit Logging (Tamper-evident activity trail)
+  logSecurityEvent({ userId, eventType, ipAddress = '', userAgent = '', status = 'success', metadata = {} }) {
+    if (!userId || !eventType) return;
+    const logId = `audit_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    const timestamp = new Date().toISOString();
+    const event = {
+      id: logId,
+      user_id: userId,
+      event_type: eventType,
+      ip_address: ipAddress || 'Unknown',
+      user_agent: (userAgent || '').substring(0, 255),
+      status,
+      metadata,
+      created_at: timestamp
+    };
+
+    const db = loadDb();
+    if (!db.auditLogs) db.auditLogs = [];
+    db.auditLogs.unshift(event);
+    if (db.auditLogs.length > 500) {
+      db.auditLogs = db.auditLogs.slice(0, 500);
+    }
+    saveDb();
+
+    if (pgPool) {
+      pgPool.query(
+        `INSERT INTO public.wealthpulse_audit_logs (id, user_id, event_type, ip_address, user_agent, status, metadata, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+        [logId, userId, eventType, ipAddress || 'Unknown', (userAgent || '').substring(0, 255), status, JSON.stringify(metadata)]
+      ).catch(e => console.warn('[Supabase PostgreSQL] Audit log store notice:', e.message));
+    }
+  },
+
+  async getUserAuditLogs(userId, limit = 15) {
+    if (!userId) return [];
+    if (pgPool) {
+      try {
+        const res = await pgPool.query(
+          `SELECT id, event_type, ip_address, user_agent, status, metadata, created_at
+           FROM public.wealthpulse_audit_logs
+           WHERE user_id = $1
+           ORDER BY created_at DESC
+           LIMIT $2`,
+          [userId, limit]
+        );
+        if (res.rows && res.rows.length > 0) {
+          return res.rows;
+        }
+      } catch (e) {
+        console.warn('[Supabase PostgreSQL] Query audit logs notice:', e.message);
+      }
+    }
+
+    const db = loadDb();
+    const userLogs = (db.auditLogs || []).filter(l => l.user_id === userId);
+    return userLogs.slice(0, limit);
   }
 };

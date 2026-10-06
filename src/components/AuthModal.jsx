@@ -184,7 +184,7 @@ export default function AuthModal({
 
       setSuccess('MPIN Verified! Logging in...');
       setTimeout(() => {
-        onLoginSuccess(json.user, json.token, true);
+        onLoginSuccess(json.user, json.token, true, { refreshToken: json.refreshToken });
         onClose();
       }, 400);
     } catch (err) {
@@ -279,7 +279,7 @@ export default function AuthModal({
 
       setSuccess('Sign in successful!');
       setTimeout(() => {
-        onLoginSuccess(json.user, json.token, rememberMe);
+        onLoginSuccess(json.user, json.token, rememberMe, { refreshToken: json.refreshToken });
         onClose();
       }, 400);
     } catch (err) {
@@ -319,7 +319,7 @@ export default function AuthModal({
 
       setSuccess('Signed in successfully! Previous session closed.');
       setTimeout(() => {
-        onLoginSuccess(json.user, json.token, true);
+        onLoginSuccess(json.user, json.token, true, { refreshToken: json.refreshToken });
         onClose();
       }, 400);
     } catch (err) {
@@ -348,7 +348,7 @@ export default function AuthModal({
 
       setSuccess('2FA Verified! Signing in...');
       setTimeout(() => {
-        onLoginSuccess(json.user, json.token, rememberMe);
+        onLoginSuccess(json.user, json.token, rememberMe, { refreshToken: json.refreshToken });
         onClose();
       }, 400);
     } catch (err) {
@@ -402,7 +402,7 @@ export default function AuthModal({
       localStorage.setItem('kuberis_remembered_email', email.trim());
       setSuccess('Account created successfully!');
       setTimeout(() => {
-        onLoginSuccess(json.user, json.token, true, { isNewRegistration: true });
+        onLoginSuccess(json.user, json.token, true, { isNewRegistration: true, refreshToken: json.refreshToken });
         onClose();
       }, 400);
     } catch (err) {

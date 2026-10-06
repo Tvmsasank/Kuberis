@@ -151,7 +151,7 @@ export default function MpinModal({
 
       setSuccess('MPIN Verified!');
       setTimeout(() => {
-        if (onSuccess) onSuccess(json.user, json.token);
+        if (onSuccess) onSuccess(json.user, json.token, json.refreshToken);
         onClose();
       }, 400);
     } catch (err) {

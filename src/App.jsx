@@ -243,6 +243,56 @@ export default function App() {
     ...(currentEmail ? { 'X-User-Email': currentEmail } : {})
   };
 
+  const refreshAuthToken = async () => {
+    const storedRefreshToken = localStorage.getItem('kuberis_refresh_token') || sessionStorage.getItem('kuberis_refresh_token');
+    if (!storedRefreshToken) return null;
+
+    try {
+      const res = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: storedRefreshToken })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const newAccessToken = data.accessToken || data.token;
+        const newRefreshToken = data.refreshToken;
+
+        if (newAccessToken) {
+          setToken(newAccessToken);
+          if (localStorage.getItem('kuberis_token')) {
+            localStorage.setItem('kuberis_token', newAccessToken);
+          } else {
+            sessionStorage.setItem('kuberis_token', newAccessToken);
+          }
+        }
+        if (newRefreshToken) {
+          if (localStorage.getItem('kuberis_refresh_token')) {
+            localStorage.setItem('kuberis_refresh_token', newRefreshToken);
+          } else {
+            sessionStorage.setItem('kuberis_refresh_token', newRefreshToken);
+          }
+        }
+        if (data.user) {
+          setUser(data.user);
+          localStorage.setItem('kuberis_user', JSON.stringify(data.user));
+        }
+        return newAccessToken;
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        if (errJson.code === 'SESSION_TERMINATED') {
+          setSessionTerminatedModalOpen(true);
+        }
+        handleLogout();
+        return null;
+      }
+    } catch (e) {
+      console.warn('Silent token refresh failed:', e);
+      return null;
+    }
+  };
+
   const fetchState = async () => {
     if (!token && !localStorage.getItem('kuberis_token')) {
       setTransactions([]);
@@ -263,7 +313,29 @@ export default function App() {
     }
 
     try {
-      const res = await fetch('/api/state', { headers: authHeaders });
+      let res = await fetch('/api/state', { headers: authHeaders });
+
+      // Silent Refresh & Retry on 401
+      if (res.status === 401) {
+        const json = await res.clone().json().catch(() => ({}));
+        if (json.code === 'SESSION_TERMINATED') {
+          setSessionTerminatedModalOpen(true);
+          handleLogout();
+          return;
+        }
+
+        const freshToken = await refreshAuthToken();
+        if (freshToken) {
+          res = await fetch('/api/state', {
+            headers: {
+              Authorization: `Bearer ${freshToken}`,
+              'X-Auth-Token': freshToken,
+              ...(currentEmail ? { 'X-User-Email': currentEmail } : {})
+            }
+          });
+        }
+      }
+
       if (res.ok) {
         const data = await res.json();
         setTransactions(data.transactions || []);
@@ -284,10 +356,6 @@ export default function App() {
           });
         }
       } else if (res.status === 401) {
-        const json = await res.json().catch(() => ({}));
-        if (json.code === 'SESSION_TERMINATED') {
-          setSessionTerminatedModalOpen(true);
-        }
         handleLogout();
       }
     } catch (err) {
@@ -301,6 +369,16 @@ export default function App() {
     fetchState();
   }, [token]);
 
+  // Proactive background silent token refresh every 10 minutes (before 15m expiration)
+  useEffect(() => {
+    if (!token && !localStorage.getItem('kuberis_token')) return;
+    const refreshTimer = setInterval(() => {
+      refreshAuthToken();
+    }, 10 * 60 * 1000);
+
+    return () => clearInterval(refreshTimer);
+  }, [token]);
+
   // Live Stock Market Ticker Polling Loop (Runs every 3 seconds)
   useEffect(() => {
     if (!user) return;
@@ -312,6 +390,8 @@ export default function App() {
           if (json.code === 'SESSION_TERMINATED') {
             setSessionTerminatedModalOpen(true);
             handleLogout();
+          } else {
+            refreshAuthToken();
           }
         } else if (res.ok) {
           const invData = await res.json();
@@ -348,8 +428,14 @@ export default function App() {
     if (rememberMe) {
       localStorage.setItem('kuberis_token', userToken);
       localStorage.setItem('kuberis_user', JSON.stringify(userData));
+      if (metadata?.refreshToken) {
+        localStorage.setItem('kuberis_refresh_token', metadata.refreshToken);
+      }
     } else {
       sessionStorage.setItem('kuberis_token', userToken);
+      if (metadata?.refreshToken) {
+        sessionStorage.setItem('kuberis_refresh_token', metadata.refreshToken);
+      }
     }
 
     if (metadata?.isNewRegistration) {
@@ -361,8 +447,13 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    const storedRefreshToken = localStorage.getItem('kuberis_refresh_token') || sessionStorage.getItem('kuberis_refresh_token');
     try {
-      await fetch('/api/auth/logout', { method: 'POST', headers: authHeaders });
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ refreshToken: storedRefreshToken })
+      });
     } catch (e) {}
     setUser(null);
     setToken('');
@@ -380,10 +471,12 @@ export default function App() {
       customLiabilitiesList: []
     });
     localStorage.removeItem('kuberis_token');
+    localStorage.removeItem('kuberis_refresh_token');
     localStorage.removeItem('kuberis_user');
     localStorage.removeItem('wealthpulse_token');
     localStorage.removeItem('wealthpulse_user');
     sessionStorage.removeItem('kuberis_token');
+    sessionStorage.removeItem('kuberis_refresh_token');
     sessionStorage.removeItem('wealthpulse_token');
     setActiveTab('home');
   };
@@ -1060,12 +1153,12 @@ export default function App() {
         email={mpinModalEmail}
         token={token}
         resetMpinToken={activeMpinResetToken}
-        onSuccess={(u, t) => {
+        onSuccess={(u, t, rt) => {
           if (isPrivacyMode) {
             setIsPrivacyMode(false);
             localStorage.setItem('kuberis_privacy_mode', 'false');
           }
-          if (u && t) handleLoginSuccess(u, t, true);
+          if (u && t) handleLoginSuccess(u, t, true, { refreshToken: rt });
         }}
       />
 
