@@ -2,6 +2,7 @@
  * WebAuthn Native Biometric & Passkey Helper
  * Supports Apple Face ID / Touch ID, Android Fingerprint, Windows Hello
  */
+import { getDeviceHeaders } from './deviceInfo';
 
 function bufferToBase64Url(buffer) {
   const bytes = new Uint8Array(buffer);
@@ -181,7 +182,7 @@ export async function authenticateWithBiometrics(targetEmail) {
 
   const res = await fetch('/api/auth/webauthn/verify', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getDeviceHeaders() },
     body: JSON.stringify({
       email,
       credentialId: finalCredentialId

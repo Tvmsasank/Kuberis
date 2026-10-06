@@ -142,6 +142,13 @@ if (process.env.DATABASE_URL) {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
+      -- Schema upgrades for WebAuthn Biometrics and Device Security Tracking
+      ALTER TABLE public.wealthpulse_users ADD COLUMN IF NOT EXISTS webauthn_credential_id TEXT;
+      ALTER TABLE public.wealthpulse_users ADD COLUMN IF NOT EXISTS webauthn_public_key TEXT;
+      ALTER TABLE public.wealthpulse_audit_logs ADD COLUMN IF NOT EXISTS device_id VARCHAR(100);
+      ALTER TABLE public.wealthpulse_audit_logs ADD COLUMN IF NOT EXISTS device_name VARCHAR(255);
+      ALTER TABLE public.wealthpulse_audit_logs ADD COLUMN IF NOT EXISTS location VARCHAR(255);
+
       CREATE OR REPLACE FUNCTION public.sp_upsert_wealthpulse_user(
         p_id VARCHAR,
         p_name VARCHAR,
@@ -432,6 +439,7 @@ export const dbEngine = {
       email: user.email,
       createdAt: user.createdAt,
       hasMpin: !!user.mpinHash,
+      hasBiometrics: !!user.webauthnCredentialId,
       twoFactorEnabled: !!user.twoFactorEnabled,
       activeSessionId: user.activeSessionId || null
     };
@@ -608,16 +616,54 @@ export const dbEngine = {
     user.webauthnCredentialId = credentialId;
     user.webauthnPublicKey = publicKey;
     saveDb();
+
+    if (pgPool) {
+      pgPool.query(
+        'UPDATE public.wealthpulse_users SET webauthn_credential_id = $1, webauthn_public_key = $2 WHERE id = $3',
+        [credentialId, publicKey, userId]
+      ).catch(e => console.warn('[Supabase PostgreSQL] WebAuthn save notice:', e.message));
+    }
     return true;
   },
 
-  verifyWebAuthnCredential({ email, credentialId }) {
+  async verifyWebAuthnCredential({ email, credentialId }) {
     const db = loadDb();
     const cleanEmail = (email || '').trim().toLowerCase();
-    const user = db.users.find(u => 
+    let user = db.users.find(u => 
       (cleanEmail && u.email === cleanEmail) || 
       (credentialId && u.webauthnCredentialId === credentialId)
     );
+
+    if (!user && pgPool) {
+      try {
+        const res = await pgPool.query(
+          'SELECT id, name, email, password_hash, mpin_hash, webauthn_credential_id, created_at FROM public.wealthpulse_users WHERE (webauthn_credential_id = $1 OR LOWER(email) = LOWER($2)) LIMIT 1',
+          [credentialId || '', cleanEmail || '']
+        );
+        if (res.rows && res.rows.length > 0) {
+          const row = res.rows[0];
+          user = {
+            id: row.id,
+            name: row.name,
+            email: row.email,
+            passwordHash: row.password_hash,
+            mpinHash: row.mpin_hash,
+            webauthnCredentialId: row.webauthn_credential_id,
+            createdAt: row.created_at
+          };
+          const existingMem = db.users.find(u => u.id === user.id);
+          if (existingMem) {
+            existingMem.webauthnCredentialId = user.webauthnCredentialId;
+          } else {
+            db.users.push(user);
+          }
+          saveDb();
+        }
+      } catch (e) {
+        console.warn('[Supabase PostgreSQL] WebAuthn verify query error:', e.message);
+      }
+    }
+
     if (!user) return null;
 
     return {
@@ -625,6 +671,7 @@ export const dbEngine = {
       name: user.name,
       email: user.email,
       hasMpin: !!user.mpinHash,
+      hasBiometrics: !!user.webauthnCredentialId,
       createdAt: user.createdAt
     };
   },
@@ -1256,8 +1303,18 @@ export const dbEngine = {
     }
   },
 
-  // Security Audit Logging (Tamper-evident activity trail)
-  logSecurityEvent({ userId, eventType, ipAddress = '', userAgent = '', status = 'success', metadata = {} }) {
+  // Security Audit Logging (Tamper-evident activity trail with instant commit)
+  async logSecurityEvent({
+    userId,
+    eventType,
+    ipAddress = '',
+    userAgent = '',
+    deviceId = '',
+    deviceName = '',
+    location = '',
+    status = 'SUCCESS',
+    metadata = {}
+  }) {
     if (!userId || !eventType) return;
     const logId = `audit_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
     const timestamp = new Date().toISOString();
@@ -1267,6 +1324,9 @@ export const dbEngine = {
       event_type: eventType,
       ip_address: ipAddress || 'Unknown',
       user_agent: (userAgent || '').substring(0, 255),
+      device_id: deviceId || 'unknown_device',
+      device_name: deviceName || 'Device',
+      location: location || 'India - IN',
       status,
       metadata,
       created_at: timestamp
@@ -1281,11 +1341,34 @@ export const dbEngine = {
     saveDb();
 
     if (pgPool) {
-      pgPool.query(
-        `INSERT INTO public.wealthpulse_audit_logs (id, user_id, event_type, ip_address, user_agent, status, metadata, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
-        [logId, userId, eventType, ipAddress || 'Unknown', (userAgent || '').substring(0, 255), status, JSON.stringify(metadata)]
-      ).catch(e => console.warn('[Supabase PostgreSQL] Audit log store notice:', e.message));
+      try {
+        await pgPool.query(
+          `INSERT INTO public.wealthpulse_audit_logs (id, user_id, event_type, ip_address, user_agent, device_id, device_name, location, status, metadata, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
+          [
+            logId,
+            userId,
+            eventType,
+            ipAddress || 'Unknown',
+            (userAgent || '').substring(0, 255),
+            deviceId || 'unknown_device',
+            deviceName || 'Device',
+            location || 'India - IN',
+            status,
+            JSON.stringify(metadata)
+          ]
+        );
+      } catch (e) {
+        try {
+          await pgPool.query(
+            `INSERT INTO public.wealthpulse_audit_logs (id, user_id, event_type, ip_address, user_agent, status, metadata, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+            [logId, userId, eventType, ipAddress || 'Unknown', (userAgent || '').substring(0, 255), status, JSON.stringify({ ...metadata, deviceId, deviceName, location })]
+          );
+        } catch (innerErr) {
+          console.warn('[Supabase PostgreSQL] Audit log store notice:', innerErr.message);
+        }
+      }
     }
   },
 
@@ -1294,7 +1377,7 @@ export const dbEngine = {
     if (pgPool) {
       try {
         const res = await pgPool.query(
-          `SELECT id, event_type, ip_address, user_agent, status, metadata, created_at
+          `SELECT id, event_type, ip_address, user_agent, device_id, device_name, location, status, metadata, created_at
            FROM public.wealthpulse_audit_logs
            WHERE user_id = $1
            ORDER BY created_at DESC
@@ -1305,7 +1388,21 @@ export const dbEngine = {
           return res.rows;
         }
       } catch (e) {
-        console.warn('[Supabase PostgreSQL] Query audit logs notice:', e.message);
+        try {
+          const res = await pgPool.query(
+            `SELECT id, event_type, ip_address, user_agent, status, metadata, created_at
+             FROM public.wealthpulse_audit_logs
+             WHERE user_id = $1
+             ORDER BY created_at DESC
+             LIMIT $2`,
+            [userId, limit]
+          );
+          if (res.rows && res.rows.length > 0) {
+            return res.rows;
+          }
+        } catch (err2) {
+          console.warn('[Supabase PostgreSQL] Query audit logs notice:', err2.message);
+        }
       }
     }
 

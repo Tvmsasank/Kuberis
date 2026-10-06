@@ -16,9 +16,11 @@ import {
   AlertTriangle,
   ChevronRight,
   Compass,
-  Activity,
   History,
-  Clock
+  Clock,
+  RefreshCw,
+  Smartphone,
+  Globe
 } from 'lucide-react';
 import { registerBiometricPasskey } from '../utils/biometrics';
 import { calculateDynamicNetWorth } from '../utils/netWorth';
@@ -52,23 +54,31 @@ export default function UserProfileModal({
   const [auditLogs, setAuditLogs] = useState([]);
   const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
 
-  useEffect(() => {
-    if (!isOpen || !token) return;
+  const loadAuditLogs = async () => {
+    if (!token) return;
     setLoadingAuditLogs(true);
-    fetch('/api/auth/audit-logs?limit=8', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'X-Auth-Token': token
-      }
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data && Array.isArray(data.logs)) {
-          setAuditLogs(data.logs);
+    try {
+      const res = await fetch('/api/auth/audit-logs?limit=8', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'X-Auth-Token': token
         }
-      })
-      .catch(err => console.warn('Failed to load audit logs:', err))
-      .finally(() => setLoadingAuditLogs(false));
+      });
+      const data = await res.json();
+      if (data && Array.isArray(data.logs)) {
+        setAuditLogs(data.logs);
+      }
+    } catch (err) {
+      console.warn('Failed to load audit logs:', err);
+    } finally {
+      setLoadingAuditLogs(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && token) {
+      loadAuditLogs();
+    }
   }, [isOpen, token]);
 
   const handleRequestMpinReset = async () => {
@@ -338,23 +348,46 @@ export default function UserProfileModal({
         <div style={{ marginBottom: '16px', padding: '14px', borderRadius: '12px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', boxSizing: 'border-box' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '800', color: 'var(--text-main)' }}>
-              <Activity size={14} style={{ color: 'var(--primary)' }} /> Recent Security Activity
+              <History size={14} style={{ color: 'var(--primary)' }} /> Recent Security Activity
             </div>
-            <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <ShieldCheck size={11} style={{ color: 'var(--primary)' }} /> Zero-Trust Audit
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={loadAuditLogs}
+                disabled={loadingAuditLogs}
+                title="Refresh audit activity logs"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: '2px 4px',
+                  cursor: 'pointer',
+                  color: 'var(--text-muted)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '10px',
+                  borderRadius: '4px'
+                }}
+              >
+                <RefreshCw size={11} className={loadingAuditLogs ? 'spin' : ''} />
+                <span>{loadingAuditLogs ? 'Refreshing...' : 'Refresh'}</span>
+              </button>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <ShieldCheck size={11} style={{ color: 'var(--primary)' }} /> Zero-Trust
+              </span>
+            </div>
           </div>
 
           {loadingAuditLogs ? (
-            <div style={{ padding: '12px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>
-              Loading security audit records...
+            <div style={{ padding: '12px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              <RefreshCw size={12} className="spin" /> Loading security audit records...
             </div>
           ) : auditLogs.length === 0 ? (
             <div style={{ padding: '12px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>
               No recent security events recorded yet.
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto', paddingRight: '2px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '190px', overflowY: 'auto', paddingRight: '2px' }}>
               {auditLogs.map((log) => {
                 const isSuccess = log.status === 'SUCCESS';
                 const eventName = (log.eventType || log.event_type || '')
@@ -370,6 +403,9 @@ export default function UserProfileModal({
                       minute: '2-digit'
                     })
                   : '';
+                const device = log.deviceName || log.device_name || '';
+                const location = log.location || '';
+                const ip = log.ipAddress || log.ip_address || '';
 
                 return (
                   <div
@@ -395,14 +431,26 @@ export default function UserProfileModal({
                           flexShrink: 0
                         }}
                       />
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', overflow: 'hidden' }}>
-                        <span style={{ fontWeight: '700', color: 'var(--text-main)', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                          {eventName}
-                        </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: '700', color: 'var(--text-main)', whiteSpace: 'nowrap' }}>
+                            {eventName}
+                          </span>
+                          {device && (
+                            <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(56, 189, 248, 0.1)', color: '#38BDF8', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                              <Smartphone size={8} /> {device}
+                            </span>
+                          )}
+                          {location && (
+                            <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '4px', background: 'rgba(168, 85, 247, 0.1)', color: '#A855F7', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                              <Globe size={8} /> {location}
+                            </span>
+                          )}
+                        </div>
                         <span style={{ fontSize: '9.5px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <Clock size={9} /> {formattedDate}
-                          {(log.ipAddress || log.ip_address) && (
-                            <span>• {log.ipAddress || log.ip_address}</span>
+                          {ip && (
+                            <span>• {ip}</span>
                           )}
                         </span>
                       </div>

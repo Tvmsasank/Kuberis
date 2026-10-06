@@ -18,9 +18,23 @@ import { dbEngine } from './db.js';
 import { refreshHoldingsPrices } from './investments.js';
 import { parseUpiTransactionText } from './upiParser.js';
 import { SUPPORTED_BANKS, initiateAaConsent, verifyAaOtp, generateLiveBankFeed } from './accountAggregator.js';
+import { resolveIpLocation } from './geoIp.js';
+import { parseDeviceDetails } from './deviceParser.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const getAppOrigin = (req) => {
+  let origin = req.headers.origin || req.headers.referer;
+  if (origin) {
+    try { origin = new URL(origin).origin; } catch (e) {}
+  }
+  if (!origin) {
+    const host = req.headers.host || 'kuberis.onrender.com';
+    origin = `${host.includes('localhost') ? 'http' : 'https'}://${host}`;
+  }
+  return origin;
+};
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -176,6 +190,11 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
+    const clientIp = getClientIp(req);
+    const device = parseDeviceDetails(req);
+    const location = await resolveIpLocation(clientIp);
+    const resetUrl = `${getAppOrigin(req)}/?forgot=true`;
+
     const user = dbEngine.verifyUserCredentials({ email, password });
     if (!user) {
       const existing = dbEngine.getUserByEmail(email);
@@ -183,10 +202,23 @@ app.post('/api/auth/login', async (req, res) => {
         await dbEngine.logSecurityEvent({
           userId: existing.id,
           eventType: 'LOGIN_FAILED',
-          ipAddress: getClientIp(req),
+          ipAddress: clientIp,
           userAgent: req.headers['user-agent'],
+          deviceId: device.deviceId,
+          deviceName: device.deviceName,
+          location,
           status: 'FAILURE'
         });
+
+        // Instant security alert on failed password entry
+        sendFailedLoginAlertEmail({
+          toEmail: existing.email,
+          name: existing.name,
+          deviceName: device.deviceName,
+          ipAddress: clientIp,
+          location,
+          resetUrl
+        }).catch(e => console.warn('[Security Email] Notice:', e.message));
       }
       return res.status(401).json({ error: 'Invalid email or password' });
     }
@@ -230,10 +262,24 @@ app.post('/api/auth/login', async (req, res) => {
     await dbEngine.logSecurityEvent({
       userId: user.id,
       eventType: 'LOGIN_SUCCESS',
-      ipAddress: getClientIp(req),
+      ipAddress: clientIp,
       userAgent: req.headers['user-agent'],
+      deviceId: device.deviceId,
+      deviceName: device.deviceName,
+      location,
       status: 'SUCCESS'
     });
+
+    // Instant branded security email alert on successful login
+    sendLoginSecurityAlertEmail({
+      toEmail: user.email,
+      name: user.name,
+      deviceName: device.deviceName,
+      ipAddress: clientIp,
+      location,
+      isNewDevice: !!forceLogin,
+      resetUrl
+    }).catch(e => console.warn('[Security Email] Notice:', e.message));
 
     res.json({
       message: 'Signed in successfully',
@@ -432,14 +478,32 @@ app.post('/api/auth/2fa/verify-login', async (req, res) => {
       isValid = dbEngine.useRecoveryCode(userId, cleanCode);
     }
 
+    const clientIp = getClientIp(req);
+    const device = parseDeviceDetails(req);
+    const location = await resolveIpLocation(clientIp);
+    const resetUrl = `${getAppOrigin(req)}/?forgot=true`;
+
     if (!isValid) {
       await dbEngine.logSecurityEvent({
         userId,
         eventType: '2FA_VERIFY_FAILED',
-        ipAddress: getClientIp(req),
+        ipAddress: clientIp,
         userAgent: req.headers['user-agent'],
+        deviceId: device.deviceId,
+        deviceName: device.deviceName,
+        location,
         status: 'FAILURE'
       });
+
+      sendFailedLoginAlertEmail({
+        toEmail: user.email,
+        name: user.name,
+        deviceName: device.deviceName,
+        ipAddress: clientIp,
+        location,
+        resetUrl
+      }).catch(e => console.warn('[Security Email] Notice:', e.message));
+
       return res.status(401).json({ error: 'Invalid 6-digit Google Authenticator code or recovery code' });
     }
 
@@ -456,10 +520,23 @@ app.post('/api/auth/2fa/verify-login', async (req, res) => {
     await dbEngine.logSecurityEvent({
       userId: user.id,
       eventType: '2FA_VERIFIED',
-      ipAddress: getClientIp(req),
+      ipAddress: clientIp,
       userAgent: req.headers['user-agent'],
+      deviceId: device.deviceId,
+      deviceName: device.deviceName,
+      location,
       status: 'SUCCESS'
     });
+
+    sendLoginSecurityAlertEmail({
+      toEmail: user.email,
+      name: user.name,
+      deviceName: device.deviceName,
+      ipAddress: clientIp,
+      location,
+      isNewDevice: false,
+      resetUrl
+    }).catch(e => console.warn('[Security Email] Notice:', e.message));
 
     res.json({
       message: '2FA verification successful!',
@@ -845,6 +922,170 @@ async function sendMpinResetEmail(toEmail, resetMpinUrl, isLocked = false) {
   return await sendEmailWithFallback({ to: toEmail, subject, text, html });
 }
 
+async function sendLoginSecurityAlertEmail({ toEmail, name, deviceName, ipAddress, location, isNewDevice, resetUrl }) {
+  const subject = isNewDevice 
+    ? 'New Sign-in from Different Device - Kuberis Security' 
+    : 'New Sign-in detected on your Kuberis account';
+  const text = `Hi ${name || 'there'},\n\nA new sign-in was detected into your Kuberis account (${toEmail}).\nDevice: ${deviceName || 'Unknown Device'}\nIP Address: ${ipAddress || 'Unknown'}\nLocation: ${location || 'India - IN'}\nTime: ${new Date().toLocaleString('en-IN')}\n\nIf this was not you, please secure your account immediately: ${resetUrl}`;
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 540px; margin: 0 auto; padding: 32px 24px; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 18px; background: #040D1A; color: #FFFFFF;">
+      <div style="text-align: center; margin-bottom: 24px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 16px;">
+        <h2 style="color: #10B981; margin: 0 0 4px 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">⚡ Kuberis</h2>
+        <div style="font-size: 12px; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Real-Time Personal Wealth OS</div>
+      </div>
+
+      <p style="color: #F8FAFC; font-size: 15px; margin-bottom: 12px; font-weight: 600;">
+        Hi ${name || 'there'},
+      </p>
+
+      <p style="color: #CBD5E1; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
+        ${isNewDevice ? 'A sign-in from a <strong>new or different device</strong> has been detected' : 'A new sign-in has been detected'} into your Kuberis account from the following device:
+      </p>
+
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; overflow: hidden;">
+        <tbody>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <td style="padding: 12px 16px; font-size: 13px; color: #94A3B8; font-weight: 600; width: 35%;">Device</td>
+            <td style="padding: 12px 16px; font-size: 13.5px; color: #FFFFFF; font-weight: 700;">${deviceName || 'Unknown Device'}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <td style="padding: 12px 16px; font-size: 13px; color: #94A3B8; font-weight: 600;">IP Address</td>
+            <td style="padding: 12px 16px; font-size: 13.5px; color: #FFFFFF; font-family: monospace; font-weight: 700;">${ipAddress || '127.0.0.1'}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <td style="padding: 12px 16px; font-size: 13px; color: #94A3B8; font-weight: 600;">Location</td>
+            <td style="padding: 12px 16px; font-size: 13.5px; color: #38BDF8; font-weight: 700;">${location || 'India - IN'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 16px; font-size: 13px; color: #94A3B8; font-weight: 600;">Time</td>
+            <td style="padding: 12px 16px; font-size: 13px; color: #CBD5E1;">${new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p style="color: #94A3B8; font-size: 13px; line-height: 1.6; margin-bottom: 24px;">
+        If you recognize this Login activity (IP / Device information) as your own, no need to worry. If not, immediately <a href="${resetUrl}" style="color: #F97316; font-weight: 700; text-decoration: underline;">raise a security alert / change your password</a>.
+      </p>
+
+      <div style="font-size: 13px; color: #CBD5E1; margin-top: 20px;">
+        Regards,<br>
+        <strong style="color: #FFFFFF;">Team Kuberis</strong>
+      </div>
+    </div>
+  `;
+  return await sendEmailWithFallback({ to: toEmail, subject, text, html });
+}
+
+async function sendLogoutAlertEmail({ toEmail, name, deviceName, ipAddress, location, resetUrl }) {
+  const subject = 'Account Signed Out - Kuberis';
+  const text = `Hi ${name || 'there'},\n\nYour Kuberis account was signed out from ${deviceName || 'Device'} (IP: ${ipAddress || 'Unknown'}, Location: ${location || 'India - IN'}) at ${new Date().toLocaleString('en-IN')}.\n\nIf you did not initiate this, please secure your account: ${resetUrl}`;
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 540px; margin: 0 auto; padding: 32px 24px; border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 18px; background: #040D1A; color: #FFFFFF;">
+      <div style="text-align: center; margin-bottom: 24px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 16px;">
+        <h2 style="color: #10B981; margin: 0 0 4px 0; font-size: 24px; font-weight: 800;">⚡ Kuberis</h2>
+        <div style="font-size: 12px; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Account Sign Out Notice</div>
+      </div>
+
+      <p style="color: #F8FAFC; font-size: 15px; margin-bottom: 12px; font-weight: 600;">
+        Hi ${name || 'there'},
+      </p>
+
+      <p style="color: #CBD5E1; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
+        Your Kuberis account was signed out from the following device:
+      </p>
+
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; overflow: hidden;">
+        <tbody>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <td style="padding: 12px 16px; font-size: 13px; color: #94A3B8; font-weight: 600; width: 35%;">Device</td>
+            <td style="padding: 12px 16px; font-size: 13.5px; color: #FFFFFF; font-weight: 700;">${deviceName || 'Unknown Device'}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <td style="padding: 12px 16px; font-size: 13px; color: #94A3B8; font-weight: 600;">IP Address</td>
+            <td style="padding: 12px 16px; font-size: 13.5px; color: #FFFFFF; font-family: monospace; font-weight: 700;">${ipAddress || '127.0.0.1'}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <td style="padding: 12px 16px; font-size: 13px; color: #94A3B8; font-weight: 600;">Location</td>
+            <td style="padding: 12px 16px; font-size: 13.5px; color: #38BDF8; font-weight: 700;">${location || 'India - IN'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 16px; font-size: 13px; color: #94A3B8; font-weight: 600;">Time</td>
+            <td style="padding: 12px 16px; font-size: 13px; color: #CBD5E1;">${new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p style="color: #94A3B8; font-size: 13px; line-height: 1.6; margin-bottom: 24px;">
+        If you did not perform this logout, another device may have signed in or your active session expired. If you suspect unauthorized access, <a href="${resetUrl}" style="color: #EF4444; font-weight: 700;">secure your account now</a>.
+      </p>
+
+      <div style="font-size: 13px; color: #CBD5E1; margin-top: 20px;">
+        Regards,<br>
+        <strong style="color: #FFFFFF;">Team Kuberis</strong>
+      </div>
+    </div>
+  `;
+  return await sendEmailWithFallback({ to: toEmail, subject, text, html });
+}
+
+async function sendFailedLoginAlertEmail({ toEmail, name, deviceName, ipAddress, location, resetUrl }) {
+  const subject = '⚠️ Security Alert: Failed sign-in attempt on your Kuberis account';
+  const text = `Hi ${name || 'there'},\n\nWe detected an unsuccessful sign-in attempt into your Kuberis account (${toEmail}) from ${deviceName || 'Device'} (IP: ${ipAddress || 'Unknown'}, Location: ${location || 'India - IN'}) at ${new Date().toLocaleString('en-IN')}.\n\nIf this was not you, someone may be attempting to access your account. Reset your password immediately: ${resetUrl}`;
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 540px; margin: 0 auto; padding: 32px 24px; border: 1px solid #EF4444; border-radius: 18px; background: #040D1A; color: #FFFFFF;">
+      <div style="text-align: center; margin-bottom: 24px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 16px;">
+        <h2 style="color: #EF4444; margin: 0 0 4px 0; font-size: 24px; font-weight: 800;">⚠️ Kuberis Security Alert</h2>
+        <div style="font-size: 12px; color: #FCA5A5; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Unsuccessful Sign-In Attempt</div>
+      </div>
+
+      <p style="color: #F8FAFC; font-size: 15px; margin-bottom: 12px; font-weight: 600;">
+        Hi ${name || 'there'},
+      </p>
+
+      <p style="color: #CBD5E1; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
+        An incorrect password or MPIN was entered for your Kuberis account from the following device:
+      </p>
+
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 12px; overflow: hidden;">
+        <tbody>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <td style="padding: 12px 16px; font-size: 13px; color: #94A3B8; font-weight: 600; width: 35%;">Device</td>
+            <td style="padding: 12px 16px; font-size: 13.5px; color: #FFFFFF; font-weight: 700;">${deviceName || 'Unknown Device'}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <td style="padding: 12px 16px; font-size: 13px; color: #94A3B8; font-weight: 600;">IP Address</td>
+            <td style="padding: 12px 16px; font-size: 13.5px; color: #FFFFFF; font-family: monospace; font-weight: 700;">${ipAddress || '127.0.0.1'}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <td style="padding: 12px 16px; font-size: 13px; color: #94A3B8; font-weight: 600;">Location</td>
+            <td style="padding: 12px 16px; font-size: 13.5px; color: #FCA5A5; font-weight: 700;">${location || 'India - IN'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 16px; font-size: 13px; color: #94A3B8; font-weight: 600;">Time</td>
+            <td style="padding: 12px 16px; font-size: 13px; color: #CBD5E1;">${new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p style="color: #CBD5E1; font-size: 13px; line-height: 1.6; margin-bottom: 24px;">
+        If this was you, please ensure your password is typed accurately. If you did NOT attempt this sign-in, an unauthorized party may be attempting to access your account.
+      </p>
+
+      <div style="text-align: center; margin: 24px 0;">
+        <a href="${resetUrl}" style="background: #EF4444; color: #FFFFFF; padding: 12px 24px; text-decoration: none; border-radius: 10px; font-weight: 800; font-size: 14px; display: inline-block;">
+          Reset Password Immediately →
+        </a>
+      </div>
+
+      <div style="font-size: 13px; color: #CBD5E1; margin-top: 20px;">
+        Regards,<br>
+        <strong style="color: #FFFFFF;">Team Kuberis Security</strong>
+      </div>
+    </div>
+  `;
+  return await sendEmailWithFallback({ to: toEmail, subject, text, html });
+}
+
 // POST /api/auth/forgot-password
 app.post('/api/auth/forgot-password', async (req, res) => {
   try {
@@ -1133,6 +1374,11 @@ app.post('/api/auth/mpin/verify', async (req, res) => {
       return res.status(400).json({ error: 'Email and MPIN are required' });
     }
 
+    const clientIp = getClientIp(req);
+    const device = parseDeviceDetails(req);
+    const location = await resolveIpLocation(clientIp);
+    const resetUrl = `${getAppOrigin(req)}/?forgot=true`;
+
     const cleanEmail = email.trim().toLowerCase();
     const dbUser = dbEngine.getUserByEmail(cleanEmail);
     if (!dbUser) {
@@ -1147,11 +1393,24 @@ app.post('/api/auth/mpin/verify', async (req, res) => {
       await dbEngine.logSecurityEvent({
         userId: dbUser.id,
         eventType: 'MPIN_LOGIN_FAILED',
-        ipAddress: getClientIp(req),
+        ipAddress: clientIp,
         userAgent: req.headers['user-agent'],
+        deviceId: device.deviceId,
+        deviceName: device.deviceName,
+        location,
         status: 'FAILURE',
         metadata: { attemptsLeft }
       });
+
+      // Instant security alert on wrong MPIN attempt
+      sendFailedLoginAlertEmail({
+        toEmail: dbUser.email,
+        name: dbUser.name,
+        deviceName: device.deviceName,
+        ipAddress: clientIp,
+        location,
+        resetUrl
+      }).catch(e => console.warn('[Security Email] Notice:', e.message));
 
       if (dbUser.failedMpinAttempts >= 3) {
         const result = dbEngine.createMpinResetToken(cleanEmail);
@@ -1161,7 +1420,7 @@ app.post('/api/auth/mpin/verify', async (req, res) => {
           try { origin = new URL(origin).origin; } catch (e) {}
         }
         if (!origin) {
-          const host = req.headers.host || 'wealthpulse-financial-service.onrender.com';
+          const host = req.headers.host || 'kuberis.onrender.com';
           origin = `${host.includes('localhost') ? 'http' : 'https'}://${host}`;
         }
         const resetMpinUrl = `${origin}/?resetMpinToken=${result.resetMpinToken}`;
@@ -1225,10 +1484,24 @@ app.post('/api/auth/mpin/verify', async (req, res) => {
     await dbEngine.logSecurityEvent({
       userId: user.id,
       eventType: 'MPIN_LOGIN_SUCCESS',
-      ipAddress: getClientIp(req),
+      ipAddress: clientIp,
       userAgent: req.headers['user-agent'],
+      deviceId: device.deviceId,
+      deviceName: device.deviceName,
+      location,
       status: 'SUCCESS'
     });
+
+    // Instant branded security email alert on MPIN sign-in
+    sendLoginSecurityAlertEmail({
+      toEmail: user.email,
+      name: user.name,
+      deviceName: device.deviceName,
+      ipAddress: clientIp,
+      location,
+      isNewDevice: !!forceLogin,
+      resetUrl
+    }).catch(e => console.warn('[Security Email] Notice:', e.message));
 
     res.json({
       message: 'MPIN authentication successful',
@@ -1248,18 +1521,38 @@ app.post('/api/auth/logout', async (req, res) => {
   try {
     const userId = getUserIdFromReq(req);
     const { refreshToken } = req.body || {};
+    const clientIp = getClientIp(req);
+    const device = parseDeviceDetails(req);
+    const location = await resolveIpLocation(clientIp);
+    const resetUrl = `${getAppOrigin(req)}/?forgot=true`;
+
     if (refreshToken) {
       await dbEngine.revokeRefreshToken(refreshToken);
     }
     if (userId) {
+      const user = dbEngine.getUserById(userId);
       dbEngine.clearUserActiveSession(userId);
       await dbEngine.logSecurityEvent({
         userId,
         eventType: 'LOGOUT',
-        ipAddress: getClientIp(req),
+        ipAddress: clientIp,
         userAgent: req.headers['user-agent'],
+        deviceId: device.deviceId,
+        deviceName: device.deviceName,
+        location,
         status: 'SUCCESS'
       });
+
+      if (user && user.email) {
+        sendLogoutAlertEmail({
+          toEmail: user.email,
+          name: user.name,
+          deviceName: device.deviceName,
+          ipAddress: clientIp,
+          location,
+          resetUrl
+        }).catch(e => console.warn('[Security Email] Notice:', e.message));
+      }
     }
     res.json({ success: true, message: 'Logged out successfully' });
   } catch (e) {
@@ -1268,13 +1561,28 @@ app.post('/api/auth/logout', async (req, res) => {
 });
 
 // POST /api/auth/webauthn/register
-app.post('/api/auth/webauthn/register', (req, res) => {
+app.post('/api/auth/webauthn/register', authenticateToken, async (req, res) => {
   try {
-    const userId = getUserIdFromReq(req);
+    const userId = req.userId;
     if (!userId) return res.status(401).json({ error: 'Unauthorized: Please sign in' });
 
     const { credentialId, publicKey } = req.body;
     dbEngine.registerWebAuthnCredential({ userId, credentialId, publicKey });
+
+    const clientIp = getClientIp(req);
+    const device = parseDeviceDetails(req);
+    const location = await resolveIpLocation(clientIp);
+
+    await dbEngine.logSecurityEvent({
+      userId,
+      eventType: 'BIOMETRIC_REGISTERED',
+      ipAddress: clientIp,
+      userAgent: req.headers['user-agent'],
+      deviceId: device.deviceId,
+      deviceName: device.deviceName,
+      location,
+      status: 'SUCCESS'
+    });
 
     res.json({ message: 'Biometric Face ID / Touch ID registered successfully!' });
   } catch (err) {
@@ -1284,15 +1592,42 @@ app.post('/api/auth/webauthn/register', (req, res) => {
 });
 
 // POST /api/auth/webauthn/verify
-app.post('/api/auth/webauthn/verify', (req, res) => {
+app.post('/api/auth/webauthn/verify', async (req, res) => {
   try {
-    const { credentialId, forceLogin } = req.body;
-    if (!credentialId) {
-      return res.status(400).json({ error: 'Biometric credential ID required' });
+    const { credentialId, email, forceLogin } = req.body;
+    if (!credentialId && !email) {
+      return res.status(400).json({ error: 'Biometric credential ID or email required' });
     }
 
-    const user = dbEngine.verifyWebAuthnCredential({ credentialId });
+    const clientIp = getClientIp(req);
+    const device = parseDeviceDetails(req);
+    const location = await resolveIpLocation(clientIp);
+    const resetUrl = `${getAppOrigin(req)}/?forgot=true`;
+
+    const user = await dbEngine.verifyWebAuthnCredential({ credentialId, email });
     if (!user) {
+      const existing = email ? dbEngine.getUserByEmail(email) : null;
+      if (existing) {
+        await dbEngine.logSecurityEvent({
+          userId: existing.id,
+          eventType: 'BIOMETRIC_VERIFY_FAILED',
+          ipAddress: clientIp,
+          userAgent: req.headers['user-agent'],
+          deviceId: device.deviceId,
+          deviceName: device.deviceName,
+          location,
+          status: 'FAILURE'
+        });
+
+        sendFailedLoginAlertEmail({
+          toEmail: existing.email,
+          name: existing.name,
+          deviceName: device.deviceName,
+          ipAddress: clientIp,
+          location,
+          resetUrl
+        }).catch(e => console.warn('[Security Email] Notice:', e.message));
+      }
       return res.status(401).json({ error: 'Biometric verification failed' });
     }
 
@@ -1324,13 +1659,46 @@ app.post('/api/auth/webauthn/verify', (req, res) => {
     const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     dbEngine.setUserActiveSession(user.id, sessionId);
 
-    const token = jwt.sign(
+    // Issue 15-minute access token + rotating refresh token
+    const accessToken = jwt.sign(
       { userId: user.id, email: user.email, sessionId },
       JWT_SECRET,
-      { expiresIn: '30d' }
+      { expiresIn: '15m' }
     );
+    const { refreshToken } = await dbEngine.createRefreshToken({
+      userId: user.id,
+      sessionId,
+      rememberMe: true
+    });
 
-    res.json({ message: 'Biometric authentication successful', token, user });
+    await dbEngine.logSecurityEvent({
+      userId: user.id,
+      eventType: 'BIOMETRIC_LOGIN_SUCCESS',
+      ipAddress: clientIp,
+      userAgent: req.headers['user-agent'],
+      deviceId: device.deviceId,
+      deviceName: device.deviceName,
+      location,
+      status: 'SUCCESS'
+    });
+
+    sendLoginSecurityAlertEmail({
+      toEmail: user.email,
+      name: user.name,
+      deviceName: device.deviceName,
+      ipAddress: clientIp,
+      location,
+      isNewDevice: !!forceLogin,
+      resetUrl
+    }).catch(e => console.warn('[Security Email] Notice:', e.message));
+
+    res.json({
+      message: 'Biometric authentication successful',
+      token: accessToken,
+      accessToken,
+      refreshToken,
+      user
+    });
   } catch (err) {
     console.error('POST /api/auth/webauthn/verify error:', err);
     res.status(400).json({ error: err.message || 'Biometric authentication failed' });

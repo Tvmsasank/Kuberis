@@ -39,6 +39,7 @@ import SecurityOnboardingModal from './components/SecurityOnboardingModal';
 import AppTour from './components/AppTour';
 import LandingPage from './components/LandingPage';
 import { CheckCircle2, FolderSync, X, Shield, Lock, UserPlus, LogIn, Fingerprint, KeyRound, Zap, Landmark, ShieldAlert } from 'lucide-react';
+import { getDeviceHeaders } from './utils/deviceInfo';
 
 const getInitialTab = () => {
   try {
@@ -240,7 +241,8 @@ export default function App() {
 
   const authHeaders = {
     ...(activeToken ? { 'Authorization': `Bearer ${activeToken}`, 'X-Auth-Token': activeToken } : {}),
-    ...(currentEmail ? { 'X-User-Email': currentEmail } : {})
+    ...(currentEmail ? { 'X-User-Email': currentEmail } : {}),
+    ...getDeviceHeaders()
   };
 
   const refreshAuthToken = async () => {

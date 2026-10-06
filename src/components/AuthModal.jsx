@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Lock, Mail, User, CheckCircle2, AlertCircle, Fingerprint, KeyRound, Shield, Delete, RefreshCw } from 'lucide-react';
 import { authenticateWithBiometrics, isBiometricsAvailable } from '../utils/biometrics';
+import { getDeviceHeaders } from '../utils/deviceInfo';
 
 export default function AuthModal({
   isOpen,
@@ -145,7 +146,7 @@ export default function AuthModal({
       const targetEmail = email || rememberedEmail;
       const res = await fetch('/api/auth/mpin/verify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getDeviceHeaders() },
         body: JSON.stringify({ email: targetEmail, mpin: completedMpin })
       });
 
@@ -251,7 +252,7 @@ export default function AuthModal({
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getDeviceHeaders() },
         body: JSON.stringify({ email: email.trim(), password })
       });
 
@@ -300,7 +301,7 @@ export default function AuthModal({
       const endpoint = type === 'mpin' ? '/api/auth/mpin/verify' : '/api/auth/login';
       const res = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getDeviceHeaders() },
         body: JSON.stringify({ ...payload, forceLogin: true })
       });
 
@@ -336,7 +337,7 @@ export default function AuthModal({
     try {
       const res = await fetch('/api/auth/2fa/verify-login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getDeviceHeaders() },
         body: JSON.stringify({ tempToken: totpTempToken, code: codeToVerify.trim() })
       });
       const json = await res.json();
@@ -392,7 +393,7 @@ export default function AuthModal({
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getDeviceHeaders() },
         body: JSON.stringify({ name: name.trim(), email: email.trim(), password })
       });
 
