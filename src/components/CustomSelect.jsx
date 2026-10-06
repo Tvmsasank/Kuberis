@@ -80,10 +80,10 @@ export default function CustomSelect({
   const SelectedIcon = selectedOption?.icon;
 
   const sizeStyles = {
-    sm: { height: '34px', fontSize: '12px', padding: '0 10px', iconSize: 13 },
-    md: { height: '42px', fontSize: '13px', padding: '0 14px', iconSize: 15 },
-    lg: { height: '48px', fontSize: '14.5px', padding: '0 16px', iconSize: 17 }
-  }[size] || { height: '42px', fontSize: '13px', padding: '0 14px', iconSize: 15 };
+    sm: { height: '36px', fontSize: '12.5px', padding: '0 12px', iconSize: 13.5 },
+    md: { height: '38px', fontSize: '13px', padding: '0 13px', iconSize: 15 },
+    lg: { height: '46px', fontSize: '14px', padding: '0 16px', iconSize: 16 }
+  }[size] || { height: '38px', fontSize: '13px', padding: '0 13px', iconSize: 15 };
 
   return (
     <div

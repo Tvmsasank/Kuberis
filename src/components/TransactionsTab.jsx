@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Filter, Plus, FileText, Trash2, Tag, ChevronDown, Edit3, Zap, Sparkles, Landmark } from 'lucide-react';
+import { Search, Filter, Plus, FileText, Trash2, Tag, ChevronDown, Edit3, Zap, Sparkles, Landmark, X } from 'lucide-react';
 import ConfirmDeleteTxModal from './ConfirmDeleteTxModal';
 import CustomSelect from './CustomSelect';
 
@@ -161,40 +161,97 @@ export default function TransactionsTab({
         </div>
       </div>
 
-      {/* Filter Controls Card */}
-      <div className="card" style={{ marginBottom: '20px', padding: '14px' }}>
-        <div className="transaction-filter-grid">
-          {/* Search Box */}
-          <div style={{ position: 'relative' }}>
-            <Search size={16} style={{ position: 'absolute', left: '12px', top: '14px', color: 'var(--text-muted)' }} />
-            <input
-              type="text"
-              placeholder="Search merchant, category, or tag..."
-              className="form-control"
-              style={{ paddingLeft: '36px' }}
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
-          </div>
+      {/* Sleek 1-Line Filter Controls Toolbar */}
+      <div
+        className="card"
+        style={{
+          marginBottom: '16px',
+          padding: '8px 12px',
+          borderRadius: '14px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          flexWrap: 'wrap'
+        }}
+      >
+        {/* Search Box (flexible width) */}
+        <div style={{ position: 'relative', flex: '1 1 240px', minWidth: '180px' }}>
+          <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
+          <input
+            type="text"
+            placeholder="Search merchant, category, or tag..."
+            className="form-control"
+            style={{
+              paddingLeft: '34px',
+              paddingRight: searchQuery ? '32px' : '12px',
+              height: '36px',
+              fontSize: '13px',
+              borderRadius: '10px'
+            }}
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              style={{
+                position: 'absolute',
+                right: '10px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                padding: '2px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              title="Clear search"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
 
-          {/* Account Filter */}
+        {/* Account Filter */}
+        <div style={{ flex: '0 0 auto', minWidth: '150px', maxWidth: '200px' }}>
           <CustomSelect
             value={selectedAccount}
             onChange={e => setSelectedAccount(e.target.value)}
             options={[{ value: '', label: 'All Accounts' }, ...accounts.map(a => ({ value: a, label: a }))]}
-            style={{ width: 'auto', minWidth: '160px' }}
-            size="md"
+            size="sm"
           />
+        </div>
 
-          {/* Category Filter */}
+        {/* Category Filter */}
+        <div style={{ flex: '0 0 auto', minWidth: '150px', maxWidth: '200px' }}>
           <CustomSelect
             value={selectedCategory}
             onChange={e => setSelectedCategory(e.target.value)}
             options={[{ value: '', label: 'All Categories' }, ...categories.map(c => ({ value: c, label: c }))]}
-            style={{ width: 'auto', minWidth: '160px' }}
-            size="md"
+            size="sm"
           />
         </div>
+
+        {/* Reset Filter Button */}
+        {(searchQuery || selectedAccount || selectedCategory) && (
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => {
+              setSearchQuery('');
+              setSelectedAccount('');
+              setSelectedCategory('');
+            }}
+            style={{ fontSize: '11.5px', padding: '6px 10px', height: '36px', borderRadius: '10px', color: 'var(--text-muted)' }}
+            title="Reset filters"
+          >
+            Reset
+          </button>
+        )}
       </div>
 
       {/* Transactions Output */}

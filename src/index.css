@@ -324,14 +324,18 @@ body::after {
   border-radius: var(--radius-lg);
   padding: 24px;
   box-shadow: var(--shadow-sm);
-  transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.32s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.25s ease;
-  will-change: transform, box-shadow;
+  transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.24s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .card:hover {
-  transform: translateY(-6px) scale(1.012);
+  transform: translateY(-3px) translateZ(0);
   border-color: var(--border-glass);
-  box-shadow: var(--shadow-glow), var(--shadow-md), 0 20px 40px -10px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-glow), var(--shadow-md), 0 16px 36px -8px rgba(0, 0, 0, 0.35);
 }
 
 /* Special Table Container Card (No transform to prevent breaking z-index stacking context) */
@@ -346,6 +350,40 @@ body::after {
 
 .card-table:hover {
   transform: none !important;
+}
+
+/* Sleek Search Bar & Input Group */
+.search-bar {
+  display: flex;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0 12px;
+  height: 38px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.search-bar:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-glow);
+}
+
+.search-bar input {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 500;
+  width: 100%;
+  padding: 0 0 0 8px;
+}
+
+.search-bar input::placeholder {
+  color: var(--text-muted);
+  opacity: 0.8;
 }
 
 /* 🔴 Live Streaming Marquee Ticker */
@@ -372,11 +410,15 @@ body::after {
 }
 
 .ticker-item {
-  transition: background-color 0.3s ease, transform 0.2s ease;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 .ticker-item:hover {
-  transform: scale(1.05);
+  background-color: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px) translateZ(0);
 }
 
 .card-navy {
@@ -1069,12 +1111,15 @@ select.form-control option {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 .welcome-feature-card:hover {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.12);
-  transform: translateY(-2px);
+  transform: translateY(-2px) translateZ(0);
 }
 
 @media (max-width: 640px) {

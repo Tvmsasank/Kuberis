@@ -664,18 +664,54 @@ export default function AssetAllocationModal({
                     <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5', margin: '0 0 14px 0' }}>
                       Showing all {scopedInvestments.length} purchased {categoryName.toLowerCase()} ranked by current market value and portfolio weight.
                     </p>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <div className="search-bar" style={{ flex: 1, padding: '6px 10px', borderRadius: '10px' }}>
-                        <Search size={14} style={{ color: 'var(--text-muted)' }} />
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px' }}>
+                      <div
+                        className="search-bar"
+                        style={{
+                          flex: 1,
+                          padding: '0 12px',
+                          borderRadius: '12px',
+                          height: '38px',
+                          background: 'var(--bg-card)',
+                          border: '1px solid var(--border-color)',
+                          boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.08)'
+                        }}
+                      >
+                        <Search size={15} style={{ color: 'var(--primary)', flexShrink: 0 }} />
                         <input
                           type="text"
-                          placeholder="Search holding..."
+                          placeholder="Search holding by name or ticker..."
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
-                          style={{ fontSize: '12px', width: '100%' }}
+                          style={{
+                            fontSize: '12.5px',
+                            width: '100%',
+                            background: 'transparent',
+                            border: 'none',
+                            outline: 'none',
+                            color: 'var(--text-main)',
+                            padding: '0 8px'
+                          }}
                         />
                         {searchQuery && (
-                          <button type="button" onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                          <button
+                            type="button"
+                            onClick={() => setSearchQuery('')}
+                            style={{
+                              background: 'rgba(255, 255, 255, 0.1)',
+                              border: 'none',
+                              borderRadius: '50%',
+                              width: '20px',
+                              height: '20px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: 'var(--text-muted)',
+                              cursor: 'pointer',
+                              flexShrink: 0
+                            }}
+                            title="Clear search"
+                          >
                             <X size={12} />
                           </button>
                         )}
