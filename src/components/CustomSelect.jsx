@@ -88,11 +88,12 @@ export default function CustomSelect({
   return (
     <div
       ref={containerRef}
-      className={`custom-select-wrapper ${className}`}
+      className={`custom-select-wrapper ${isOpen ? 'is-open' : ''} ${className}`}
       style={{
         position: 'relative',
         width: '100%',
         userSelect: 'none',
+        zIndex: isOpen ? 1000 : 'auto',
         ...style
       }}
       id={id}

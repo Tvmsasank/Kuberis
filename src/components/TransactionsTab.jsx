@@ -171,7 +171,9 @@ export default function TransactionsTab({
           display: 'flex',
           alignItems: 'center',
           gap: '10px',
-          flexWrap: 'wrap'
+          flexWrap: 'wrap',
+          position: 'relative',
+          zIndex: 50
         }}
       >
         {/* Search Box (flexible width) */}
@@ -217,7 +219,7 @@ export default function TransactionsTab({
         </div>
 
         {/* Account Filter */}
-        <div style={{ flex: '0 0 auto', minWidth: '150px', maxWidth: '200px' }}>
+        <div style={{ flex: '0 0 auto', minWidth: '150px', maxWidth: '200px', position: 'relative', zIndex: 51 }}>
           <CustomSelect
             value={selectedAccount}
             onChange={e => setSelectedAccount(e.target.value)}
@@ -227,7 +229,7 @@ export default function TransactionsTab({
         </div>
 
         {/* Category Filter */}
-        <div style={{ flex: '0 0 auto', minWidth: '150px', maxWidth: '200px' }}>
+        <div style={{ flex: '0 0 auto', minWidth: '150px', maxWidth: '200px', position: 'relative', zIndex: 50 }}>
           <CustomSelect
             value={selectedCategory}
             onChange={e => setSelectedCategory(e.target.value)}
