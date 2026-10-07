@@ -403,7 +403,7 @@ export default function StandaloneAdminPortal() {
                 type="email"
                 value={loginEmail}
                 onChange={e => setLoginEmail(e.target.value)}
-                placeholder="venkatamanishashank@gmail.com"
+                placeholder="venkatamanishashankt@gmail.com"
                 required
                 style={{
                   width: '100%',

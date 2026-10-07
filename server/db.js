@@ -344,40 +344,44 @@ function loadDb() {
 
 function ensureDefaultSuperAdmin(db) {
   if (!db || !Array.isArray(db.users)) return;
-  const adminEmail = 'venkatamanishashank@gmail.com';
-  let admin = db.users.find(u => u.email.toLowerCase() === adminEmail);
-  if (!admin) {
-    const adminId = 'usr_admin_root_001';
-    // Temporary initial password hash for "Admin@12345"
-    const tempPasswordHash = bcrypt.hashSync('Admin@12345', 10);
-    admin = {
-      id: adminId,
-      name: 'Super Admin',
-      email: adminEmail,
-      passwordHash: tempPasswordHash,
-      role: 'super_admin',
-      isSuspended: false,
-      isLocked: false,
-      failedMpinAttempts: 0,
-      createdAt: new Date().toISOString(),
-      lastLoginAt: null,
-      resetToken: null,
-      resetTokenExpiry: null
-    };
-    db.users.push(admin);
-    if (!db.userSettings) db.userSettings = {};
-    if (!db.userSettings[adminId]) {
-      db.userSettings[adminId] = getInitialUserSettings();
+  const rawList = process.env.SUPER_ADMIN_EMAILS || 'venkatamanishashankt@gmail.com,venkatamanishashank@gmail.com,admin@kuberis.com';
+  const adminEmails = rawList.toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
+
+  const defaultInitialPasswordHash = bcrypt.hashSync('Admin@12345', 10);
+
+  adminEmails.forEach((adminEmail, idx) => {
+    let admin = db.users.find(u => u.email.toLowerCase() === adminEmail);
+    if (!admin) {
+      const adminId = `usr_admin_root_${idx + 1}`;
+      admin = {
+        id: adminId,
+        name: adminEmail.split('@')[0],
+        email: adminEmail,
+        passwordHash: defaultInitialPasswordHash,
+        role: 'super_admin',
+        isSuspended: false,
+        isLocked: false,
+        failedMpinAttempts: 0,
+        createdAt: new Date().toISOString(),
+        lastLoginAt: null,
+        resetToken: null,
+        resetTokenExpiry: null
+      };
+      db.users.push(admin);
+      if (!db.userSettings) db.userSettings = {};
+      if (!db.userSettings[adminId]) {
+        db.userSettings[adminId] = getInitialUserSettings();
+      }
+      saveDb();
+      if (pgPool) {
+        upsertUserToPostgres(admin);
+      }
+      console.log(`[Security Initialization] Super Admin provisioned for ${adminEmail} with initial credentials.`);
+    } else if (admin.role !== 'super_admin') {
+      admin.role = 'super_admin';
+      saveDb();
     }
-    saveDb();
-    if (pgPool) {
-      upsertUserToPostgres(admin);
-    }
-    console.log(`[Security Initialization] Root Super Admin provisioned for ${adminEmail}`);
-  } else if (admin.role !== 'super_admin') {
-    admin.role = 'super_admin';
-    saveDb();
-  }
+  });
 }
 
 let pgSaveTimeout = null;
