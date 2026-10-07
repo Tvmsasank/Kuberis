@@ -398,6 +398,16 @@ function ensureDefaultSuperAdmin(db) {
   if (!Array.isArray(db.superAdmins)) {
     db.superAdmins = [];
   }
+  // Remove any legacy auto-generated root admin records from customer users list
+  if (Array.isArray(db.users)) {
+    db.users = db.users.filter(u => !u.id || !u.id.startsWith('usr_admin_root_'));
+    // Ensure all customer accounts have normal user role
+    db.users.forEach(u => {
+      if (u.role === 'super_admin') {
+        u.role = 'user';
+      }
+    });
+  }
 }
 
 let pgSaveTimeout = null;
@@ -462,14 +472,14 @@ export const dbEngine = {
 
     const userId = `usr_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     const passwordHash = bcrypt.hashSync(password, 10);
-    const role = isSuperAdminEmail(cleanEmail) ? 'super_admin' : 'user';
+    const role = 'user';
 
     const newUser = {
       id: userId,
       name: (name || cleanEmail.split('@')[0]).trim(),
       email: cleanEmail,
       passwordHash,
-      role,
+      role: 'user',
       isSuspended: false,
       isLocked: false,
       failedMpinAttempts: 0,
@@ -513,7 +523,7 @@ export const dbEngine = {
     if (!isValid) return null;
 
     user.lastLoginAt = new Date().toISOString();
-    const role = user.role || (isSuperAdminEmail(cleanEmail) ? 'super_admin' : 'user');
+    const role = (user.role === 'super_admin' ? 'user' : user.role) || 'user';
     user.role = role;
     saveDb();
 
@@ -538,7 +548,7 @@ export const dbEngine = {
     const db = loadDb();
     const user = db.users.find(u => u.id === userId);
     if (!user) return null;
-    const role = user.role || (isSuperAdminEmail(user.email) ? 'super_admin' : 'user');
+    const role = (user.role === 'super_admin' ? 'user' : user.role) || 'user';
     return {
       id: user.id,
       name: user.name,
@@ -718,7 +728,7 @@ export const dbEngine = {
     if (!isValid) return null;
 
     user.lastLoginAt = new Date().toISOString();
-    const role = user.role || (isSuperAdminEmail(cleanEmail) ? 'super_admin' : 'user');
+    const role = (user.role === 'super_admin' ? 'user' : user.role) || 'user';
     user.role = role;
     saveDb();
 
@@ -798,7 +808,7 @@ export const dbEngine = {
     }
 
     user.lastLoginAt = new Date().toISOString();
-    const role = user.role || (isSuperAdminEmail(user.email) ? 'super_admin' : 'user');
+    const role = (user.role === 'super_admin' ? 'user' : user.role) || 'user';
     user.role = role;
     saveDb();
 
@@ -1594,12 +1604,11 @@ export const dbEngine = {
 
   getAllUsersForAdmin() {
     const db = loadDb();
-    const superAdminEmails = (process.env.SUPER_ADMIN_EMAILS || 'admin@kuberis.com').toLowerCase().split(',').map(e => e.trim());
     return (db.users || []).map(u => ({
       id: u.id,
       name: u.name || 'User',
       email: u.email,
-      role: u.role || (superAdminEmails.includes((u.email || '').toLowerCase()) ? 'super_admin' : 'user'),
+      role: (u.role === 'super_admin' ? 'user' : u.role) || 'user',
       createdAt: u.createdAt,
       lastLoginAt: u.lastLoginAt || null,
       isSuspended: !!u.isSuspended,
