@@ -337,18 +337,26 @@ function loadDb() {
   return memoryDb;
 }
 
+let pgSaveTimeout = null;
+
 function saveDb() {
   if (!memoryDb) return;
-  fs.writeFileSync(DB_FILE, JSON.stringify(memoryDb, null, 2), 'utf-8');
-  if (pgPool) {
-    executeProcedureOrQuery(
-      'SELECT public.sp_upsert_wealthpulse_store($1, $2)',
-      ['main_store', memoryDb],
-      'INSERT INTO public.wealthpulse_store (id, data) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = NOW()',
-      ['main_store', JSON.stringify(memoryDb)]
-    );
+  try {
+    fs.writeFileSync(DB_FILE, JSON.stringify(memoryDb, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn('[DB File] Write error:', e.message);
+  }
 
-    syncRelationalTables(memoryDb);
+  if (pgPool) {
+    if (pgSaveTimeout) clearTimeout(pgSaveTimeout);
+    pgSaveTimeout = setTimeout(() => {
+      executeProcedureOrQuery(
+        'SELECT public.sp_upsert_wealthpulse_store($1, $2)',
+        ['main_store', memoryDb],
+        'INSERT INTO public.wealthpulse_store (id, data) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = NOW()',
+        ['main_store', JSON.stringify(memoryDb)]
+      ).catch(e => console.warn('[Supabase PostgreSQL] Debounced store sync notice:', e.message));
+    }, 1000);
   }
 }
 
@@ -1181,7 +1189,13 @@ export const dbEngine = {
       ).catch(e => console.warn('[Supabase PostgreSQL] Refresh token store notice:', e.message));
     }
 
-    return rawToken;
+    return {
+      refreshToken: rawToken,
+      rawToken,
+      toString() {
+        return rawToken;
+      }
+    };
   },
 
   async verifyAndRotateRefreshToken(rawRefreshToken) {
@@ -1256,10 +1270,11 @@ export const dbEngine = {
     }
 
     // Generate brand new rotating refresh token
-    const newRefreshToken = this.createRefreshToken({
+    const tokenResult = this.createRefreshToken({
       userId: user.id,
       sessionId: tokenRecord.sessionId
     });
+    const newRefreshToken = typeof tokenResult === 'string' ? tokenResult : (tokenResult.refreshToken || tokenResult.rawToken);
 
     return {
       success: true,
@@ -1304,7 +1319,7 @@ export const dbEngine = {
   },
 
   // Security Audit Logging (Tamper-evident activity trail with instant commit)
-  async logSecurityEvent({
+  logSecurityEvent({
     userId,
     eventType,
     ipAddress = '',
@@ -1341,39 +1356,43 @@ export const dbEngine = {
     saveDb();
 
     if (pgPool) {
-      try {
-        await pgPool.query(
-          `INSERT INTO public.wealthpulse_audit_logs (id, user_id, event_type, ip_address, user_agent, device_id, device_name, location, status, metadata, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
-          [
-            logId,
-            userId,
-            eventType,
-            ipAddress || 'Unknown',
-            (userAgent || '').substring(0, 255),
-            deviceId || 'unknown_device',
-            deviceName || 'Device',
-            location || 'India - IN',
-            status,
-            JSON.stringify(metadata)
-          ]
-        );
-      } catch (e) {
-        try {
-          await pgPool.query(
-            `INSERT INTO public.wealthpulse_audit_logs (id, user_id, event_type, ip_address, user_agent, status, metadata, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
-            [logId, userId, eventType, ipAddress || 'Unknown', (userAgent || '').substring(0, 255), status, JSON.stringify({ ...metadata, deviceId, deviceName, location })]
-          );
-        } catch (innerErr) {
+      pgPool.query(
+        `INSERT INTO public.wealthpulse_audit_logs (id, user_id, event_type, ip_address, user_agent, device_id, device_name, location, status, metadata, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
+        [
+          logId,
+          userId,
+          eventType,
+          ipAddress || 'Unknown',
+          (userAgent || '').substring(0, 255),
+          deviceId || 'unknown_device',
+          deviceName || 'Device',
+          location || 'India - IN',
+          status,
+          JSON.stringify(metadata)
+        ]
+      ).catch(() => {
+        pgPool.query(
+          `INSERT INTO public.wealthpulse_audit_logs (id, user_id, event_type, ip_address, user_agent, status, metadata, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+          [logId, userId, eventType, ipAddress || 'Unknown', (userAgent || '').substring(0, 255), status, JSON.stringify({ ...metadata, deviceId, deviceName, location })]
+        ).catch(innerErr => {
           console.warn('[Supabase PostgreSQL] Audit log store notice:', innerErr.message);
-        }
-      }
+        });
+      });
     }
+
+    return event;
   },
 
   async getUserAuditLogs(userId, limit = 15) {
     if (!userId) return [];
+    const db = loadDb();
+    const userLogs = (db.auditLogs || []).filter(l => l.user_id === userId);
+    if (userLogs.length > 0) {
+      return userLogs.slice(0, limit);
+    }
+
     if (pgPool) {
       try {
         const res = await pgPool.query(
@@ -1406,8 +1425,6 @@ export const dbEngine = {
       }
     }
 
-    const db = loadDb();
-    const userLogs = (db.auditLogs || []).filter(l => l.user_id === userId);
-    return userLogs.slice(0, limit);
+    return [];
   }
 };

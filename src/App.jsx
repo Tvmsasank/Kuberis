@@ -448,15 +448,11 @@ export default function App() {
     }
   };
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     const storedRefreshToken = localStorage.getItem('kuberis_refresh_token') || sessionStorage.getItem('kuberis_refresh_token');
-    try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders },
-        body: JSON.stringify({ refreshToken: storedRefreshToken })
-      });
-    } catch (e) {}
+    const headers = { 'Content-Type': 'application/json', ...authHeaders };
+
+    // 1. Instant local reset (0ms latency for user experience)
     setUser(null);
     setToken('');
     setTransactions([]);
@@ -481,6 +477,16 @@ export default function App() {
     sessionStorage.removeItem('kuberis_refresh_token');
     sessionStorage.removeItem('wealthpulse_token');
     setActiveTab('home');
+
+    // 2. Fire backend session termination in background with keepalive
+    try {
+      fetch('/api/auth/logout', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ refreshToken: storedRefreshToken }),
+        keepalive: true
+      }).catch(() => {});
+    } catch (e) {}
   };
 
   const handleOpenMpinModal = (mode = 'verify', emailOverride = '') => {

@@ -120,11 +120,9 @@ export default function UserProfileModal({
 
   const handleLogoutAnimated = () => {
     setIsLoggingOut(true);
-    setTimeout(() => {
-      onLogout();
-      onClose();
-      setIsLoggingOut(false);
-    }, 350);
+    onLogout();
+    onClose();
+    setIsLoggingOut(false);
   };
 
   const handleEnableBiometrics = async () => {
