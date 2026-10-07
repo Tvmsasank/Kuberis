@@ -37,6 +37,8 @@ export default function AuthModal({
   const [biometricSupported, setBiometricSupported] = useState(false);
   const [emailHasMpin, setEmailHasMpin] = useState(false);
   const [emailHasBiometrics, setEmailHasBiometrics] = useState(false);
+  const [isAccountSuspended, setIsAccountSuspended] = useState(false);
+  const [suspendedReason, setSuspendedReason] = useState('');
   const [pendingSessionOverride, setPendingSessionOverride] = useState(null);
 
   useEffect(() => {
@@ -44,6 +46,8 @@ export default function AuthModal({
     setMpin('');
     setError('');
     setSuccess('');
+    setIsAccountSuspended(false);
+    setSuspendedReason('');
 
     isBiometricsAvailable().then(setBiometricSupported);
 
@@ -66,6 +70,12 @@ export default function AuthModal({
       })
         .then(res => res.json())
         .then(data => {
+          if (data.isSuspended) {
+            setIsAccountSuspended(true);
+            setSuspendedReason(data.suspendedReason || 'Policy compliance review');
+            setError(`Account Suspended: ${data.suspendedReason || 'Contact platform administration.'}`);
+            return;
+          }
           if (data.hasMpin) {
             localStorage.setItem('kuberis_has_mpin', 'true');
             setEmailHasMpin(true);
@@ -86,11 +96,13 @@ export default function AuthModal({
     }
   }, [initialMode, isOpen]);
 
-  // Dynamically check if typed email has MPIN or Biometrics set
+  // Dynamically check if typed email has MPIN or Biometrics set or is suspended
   const handleEmailChange = (val) => {
     setEmail(val);
     setEmailHasMpin(false);
     setEmailHasBiometrics(false);
+    setIsAccountSuspended(false);
+    setSuspendedReason('');
     if (val && val.includes('@')) {
       fetch('/api/auth/check-methods', {
         method: 'POST',
@@ -99,6 +111,12 @@ export default function AuthModal({
       })
         .then(res => res.json())
         .then(data => {
+          if (data.isSuspended) {
+            setIsAccountSuspended(true);
+            setSuspendedReason(data.suspendedReason || 'Policy compliance review');
+            setError(`Account Suspended: ${data.suspendedReason || 'Contact platform administration.'}`);
+            return;
+          }
           if (data.hasMpin) setEmailHasMpin(true);
           if (data.hasBiometrics) setEmailHasBiometrics(true);
         })
@@ -107,7 +125,7 @@ export default function AuthModal({
   };
 
   const handleKeyPress = useCallback((digit) => {
-    if (loading || authMethod !== 'mpin') return;
+    if (loading || isAccountSuspended || authMethod !== 'mpin') return;
     if (mpin.length < 4) {
       const nextMpin = mpin + digit;
       setMpin(nextMpin);
@@ -159,6 +177,11 @@ export default function AuthModal({
       }
 
       if (!res.ok) {
+        if (json.code === 'ACCOUNT_SUSPENDED' || res.status === 403) {
+          setIsAccountSuspended(true);
+          setSuspendedReason(json.error || 'Your account has been administratively suspended.');
+          throw new Error(json.error || 'Account suspended. Contact administrator.');
+        }
         if (json.locked || res.status === 423) {
           throw new Error(json.error || 'Account locked: 3 incorrect MPIN attempts. An unlock link has been sent to your Gmail inbox.');
         }
@@ -257,7 +280,13 @@ export default function AuthModal({
       });
 
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Sign in failed');
+      if (!res.ok) {
+        if (json.code === 'ACCOUNT_SUSPENDED' || res.status === 403) {
+          setIsAccountSuspended(true);
+          setSuspendedReason(json.error || 'Your account has been administratively suspended.');
+        }
+        throw new Error(json.error || 'Sign in failed');
+      }
 
       if (json.activeSessionExists) {
         setPendingSessionOverride({
@@ -579,7 +608,31 @@ export default function AuthModal({
           </div>
         )}
 
-        {error && (
+        {isAccountSuspended && (
+          <div style={{
+            padding: '16px',
+            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(185, 28, 28, 0.1) 100%)',
+            border: '1px solid rgba(239, 68, 68, 0.5)',
+            borderRadius: '16px',
+            marginBottom: '20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#F87171', fontWeight: '800', fontSize: '14px' }}>
+              <AlertCircle size={18} />
+              <span>ACCOUNT SUSPENDED</span>
+            </div>
+            <div style={{ fontSize: '12.5px', color: '#FCA5A5', lineHeight: '1.45' }}>
+              Your account has been administratively suspended: <strong style={{ color: '#FFFFFF' }}>{suspendedReason || 'Policy compliance review'}</strong>.
+            </div>
+            <div style={{ fontSize: '11.5px', color: 'rgba(255, 255, 255, 0.7)', marginTop: '2px' }}>
+              All authentication methods for this account are disabled. Please contact your platform administrator for assistance.
+            </div>
+          </div>
+        )}
+
+        {error && !isAccountSuspended && (
           <div style={{ padding: '10px 14px', background: 'rgba(239, 68, 68, 0.15)', color: '#FCA5A5', border: '1px solid #EF4444', borderRadius: '12px', marginBottom: '16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <AlertCircle size={16} /> {error}
           </div>
@@ -593,9 +646,9 @@ export default function AuthModal({
 
         {/* MODE 1: 4-DIGIT MPIN VIEW */}
         {authMethod === 'mpin' && (
-          <div style={{ textAlign: 'center' }}>
+          <div style={{ textAlign: 'center', opacity: isAccountSuspended ? 0.45 : 1, pointerEvents: isAccountSuspended ? 'none' : 'auto' }}>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-              Type or tap your 4-digit Security MPIN
+              {isAccountSuspended ? 'MPIN entry disabled (Account Suspended)' : 'Type or tap your 4-digit Security MPIN'}
             </p>
 
             {/* Tactile 4-Dot Indicator */}
@@ -766,6 +819,7 @@ export default function AuthModal({
                 placeholder="••••••••"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
+                disabled={loading || isAccountSuspended}
                 required
               />
             </div>
@@ -776,6 +830,7 @@ export default function AuthModal({
                   type="checkbox"
                   checked={rememberMe}
                   onChange={e => setRememberMe(e.target.checked)}
+                  disabled={loading || isAccountSuspended}
                   style={{ accentColor: 'var(--primary)' }}
                 />
                 <span>Remember me</span>
@@ -794,8 +849,13 @@ export default function AuthModal({
               </button>
             </div>
 
-            <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '12px', fontSize: '15px' }} disabled={loading}>
-              {loading ? 'Signing In...' : 'Sign In'}
+            <button
+              type="submit"
+              className="btn btn-primary"
+              style={{ width: '100%', padding: '12px', fontSize: '15px' }}
+              disabled={loading || isAccountSuspended}
+            >
+              {loading ? 'Signing In...' : isAccountSuspended ? 'Account Suspended' : 'Sign In'}
             </button>
 
             <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '13px', color: 'var(--text-muted)' }}>

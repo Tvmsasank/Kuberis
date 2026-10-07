@@ -246,20 +246,6 @@ export default function UserProfileModal({
               </div>
             </div>
           </div>
-          {onOpenAdminPortal && (user?.role === 'super_admin' || (user?.email && user.email.toLowerCase() === 'venkatamanishashankt@gmail.com') || (user?.email && user.email.toLowerCase() === 'admin@kuberis.com')) && (
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => {
-                onClose();
-                onOpenAdminPortal();
-              }}
-              style={{ fontSize: '10.5px', padding: '6px 10px', gap: '4px', color: '#F87171', borderColor: 'rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.08)' }}
-              title="Open Super Admin Command Center"
-            >
-              <ShieldAlert size={12} /> Admin
-            </button>
-          )}
         </div>
 
         {/* Fast Authentication Options */}

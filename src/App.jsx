@@ -38,8 +38,8 @@ import TwoFactorSetupModal from './components/TwoFactorSetupModal';
 import SecurityOnboardingModal from './components/SecurityOnboardingModal';
 import AppTour from './components/AppTour';
 import LandingPage from './components/LandingPage';
-import AdminPortalModal from './components/AdminPortalModal';
-import { CheckCircle2, FolderSync, X, Shield, Lock, UserPlus, LogIn, Fingerprint, KeyRound, Zap, Landmark, ShieldAlert } from 'lucide-react';
+import StandaloneAdminPortal from './components/StandaloneAdminPortal';
+import { CheckCircle2, FolderSync, X, Shield, Lock, UserPlus, LogIn, Fingerprint, KeyRound, Zap, Landmark, ShieldAlert, AlertCircle } from 'lucide-react';
 import { getDeviceHeaders } from './utils/deviceInfo';
 
 const getInitialTab = () => {
@@ -117,6 +117,17 @@ export default function App() {
     () => sessionStorage.getItem('kuberis_dismiss_security_toast') === 'true'
   );
 
+  // Standalone Super Admin Route Detection (/kuberisadmin or #kuberisadmin)
+  const [isAdminRoute, setIsAdminRoute] = useState(() => {
+    const path = window.location.pathname.toLowerCase();
+    const hash = window.location.hash.toLowerCase();
+    return path.includes('kuberisadmin') || hash.includes('kuberisadmin');
+  });
+
+  // Live Account Suspension Interceptor Modal State
+  const [accountSuspendedModalOpen, setAccountSuspendedModalOpen] = useState(false);
+  const [suspendedReasonMessage, setSuspendedReasonMessage] = useState('');
+
   // Check URL parameters for ?resetToken=... or ?resetMpinToken=... on load
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -137,6 +148,7 @@ export default function App() {
 
   // Sync activeTab state to clean URL Path & LocalStorage (Removes # from URL)
   useEffect(() => {
+    if (isAdminRoute) return;
     if (activeTab) {
       const targetPath = activeTab === 'home' ? '/' : '/' + activeTab;
       if (window.location.pathname !== targetPath) {
@@ -144,11 +156,20 @@ export default function App() {
       }
       localStorage.setItem('kuberis_active_tab', activeTab);
     }
-  }, [activeTab]);
+  }, [activeTab, isAdminRoute]);
 
   // Handle Browser Back/Forward buttons and URL changes
   useEffect(() => {
     const handleUrlChange = () => {
+      const path = window.location.pathname.toLowerCase();
+      const hash = window.location.hash.toLowerCase();
+      if (path.includes('kuberisadmin') || hash.includes('kuberisadmin')) {
+        setIsAdminRoute(true);
+        return;
+      } else {
+        setIsAdminRoute(false);
+      }
+
       const rawPath = window.location.pathname.replace('/', '').trim();
       const rawHash = window.location.hash.replace('#/', '').replace('#', '').trim();
       const currentTab = rawPath || rawHash;
@@ -285,7 +306,10 @@ export default function App() {
         return newAccessToken;
       } else {
         const errJson = await res.json().catch(() => ({}));
-        if (errJson.code === 'SESSION_TERMINATED') {
+        if (errJson.code === 'ACCOUNT_SUSPENDED' || res.status === 403) {
+          setSuspendedReasonMessage(errJson.error || 'Your account has been administratively suspended.');
+          setAccountSuspendedModalOpen(true);
+        } else if (errJson.code === 'SESSION_TERMINATED') {
           setSessionTerminatedModalOpen(true);
         }
         handleLogout();
@@ -318,6 +342,17 @@ export default function App() {
 
     try {
       let res = await fetch('/api/state', { headers: authHeaders });
+
+      // Immediate Account Suspension check
+      if (res.status === 403) {
+        const json = await res.clone().json().catch(() => ({}));
+        if (json.code === 'ACCOUNT_SUSPENDED' || (json.error && json.error.toLowerCase().includes('suspended'))) {
+          setSuspendedReasonMessage(json.error || 'Your account has been administratively suspended.');
+          setAccountSuspendedModalOpen(true);
+          handleLogout();
+          return;
+        }
+      }
 
       // Silent Refresh & Retry on 401
       if (res.status === 401) {
@@ -389,7 +424,15 @@ export default function App() {
     const interval = setInterval(async () => {
       try {
         const res = await fetch('/api/investments', { headers: authHeaders });
-        if (res.status === 401) {
+        if (res.status === 403) {
+          const json = await res.json().catch(() => ({}));
+          if (json.code === 'ACCOUNT_SUSPENDED' || (json.error && json.error.toLowerCase().includes('suspended'))) {
+            setSuspendedReasonMessage(json.error || 'Your account has been administratively suspended.');
+            setAccountSuspendedModalOpen(true);
+            handleLogout();
+            return;
+          }
+        } else if (res.status === 401) {
           const json = await res.json().catch(() => ({}));
           if (json.code === 'SESSION_TERMINATED') {
             setSessionTerminatedModalOpen(true);
@@ -844,6 +887,11 @@ export default function App() {
 
   const activeNav = NAV_ITEMS.find(n => n.id === activeTab) || NAV_ITEMS[0];
 
+  // Standalone Super Admin Route View (/kuberisadmin)
+  if (isAdminRoute) {
+    return <StandaloneAdminPortal />;
+  }
+
   return (
     <div className={`app-container theme-${theme}`}>
       {/* Sidebar Navigation */}
@@ -1079,23 +1127,9 @@ export default function App() {
         onOpenChangePassword={() => setIsChangePasswordOpen(true)}
         onOpenMpinModal={handleOpenMpinModal}
         onOpenTwoFactorModal={() => setIsTwoFactorModalOpen(true)}
-        onOpenAdminPortal={() => setIsAdminPortalOpen(true)}
         onStartTour={() => {
           setIsProfileModalOpen(false);
           setIsTourOpen(true);
-        }}
-      />
-
-      {/* Super Admin Command Center Modal (Phase 2 Governance) */}
-      <AdminPortalModal
-        isOpen={isAdminPortalOpen}
-        onClose={() => setIsAdminPortalOpen(false)}
-        token={token}
-        currentUser={user}
-        onUserRoleUpdated={(newRole) => {
-          const updatedUser = { ...user, role: newRole };
-          setUser(updatedUser);
-          localStorage.setItem('kuberis_user', JSON.stringify(updatedUser));
         }}
       />
 
@@ -1340,6 +1374,80 @@ export default function App() {
               }}
             >
               Sign In Again
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 🛑 Un-dismissible Live Account Suspended Modal */}
+      {accountSuspendedModalOpen && (
+        <div className="modal-backdrop" style={{ zIndex: 10200, background: 'rgba(0, 0, 0, 0.88)' }}>
+          <div
+            className="modal-content"
+            style={{
+              maxWidth: '460px',
+              textAlign: 'center',
+              padding: '36px 28px',
+              border: '1px solid rgba(239, 68, 68, 0.6)',
+              boxShadow: '0 24px 60px rgba(0, 0, 0, 0.9), 0 0 35px rgba(239, 68, 68, 0.25)'
+            }}
+          >
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: 'rgba(239, 68, 68, 0.15)',
+              color: '#EF4444',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 20px auto',
+              border: '2px solid rgba(239, 68, 68, 0.4)'
+            }}>
+              <ShieldAlert size={36} />
+            </div>
+
+            <h3 style={{ fontSize: '21px', fontWeight: '900', color: '#FFFFFF', marginBottom: '10px', letterSpacing: '-0.3px' }}>
+              Account Suspended
+            </h3>
+
+            <div style={{
+              padding: '12px 14px',
+              borderRadius: '10px',
+              background: 'rgba(239, 68, 68, 0.12)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              color: '#FCA5A5',
+              fontSize: '13px',
+              lineHeight: '1.5',
+              marginBottom: '20px'
+            }}>
+              {suspendedReasonMessage || 'Your account has been administratively suspended by the platform administrator.'}
+            </div>
+
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '24px' }}>
+              Your access has been terminated immediately. If you believe this is an error or need further assistance, please contact platform administration.
+            </p>
+
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{
+                width: '100%',
+                padding: '13px',
+                borderRadius: '12px',
+                fontWeight: '800',
+                fontSize: '14px',
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid var(--border-color)',
+                color: '#FFFFFF'
+              }}
+              onClick={() => {
+                setAccountSuspendedModalOpen(false);
+                setAuthModalMode('login');
+                setIsAuthModalOpen(true);
+              }}
+            >
+              Acknowledge & Sign Out
             </button>
           </div>
         </div>

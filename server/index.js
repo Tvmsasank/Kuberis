@@ -280,6 +280,14 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
+    // Check account suspension
+    if (user.isSuspended) {
+      return res.status(403).json({
+        code: 'ACCOUNT_SUSPENDED',
+        error: `Your account has been administratively suspended. Reason: ${user.suspendedReason || 'Policy compliance review'}`
+      });
+    }
+
     // Check Active Session for Multi-Device Session Detection (HDFC Pattern)
     const existingSessionId = dbEngine.getUserActiveSession(user.id);
     if (existingSessionId && !forceLogin) {
@@ -379,6 +387,13 @@ app.post('/api/auth/refresh', async (req, res) => {
     const user = dbEngine.getUserById(rotated.userId);
     if (!user) {
       return res.status(401).json({ error: 'User no longer exists' });
+    }
+
+    if (user.isSuspended) {
+      return res.status(403).json({
+        code: 'ACCOUNT_SUSPENDED',
+        error: `Your account has been administratively suspended. Reason: ${user.suspendedReason || 'Policy compliance review'}`
+      });
     }
 
     // Check active session continuity
@@ -1380,10 +1395,12 @@ app.post('/api/auth/check-methods', (req, res) => {
       exists: true,
       hasMpin: !!user.mpinHash,
       hasBiometrics: !!user.webauthnCredentialId,
-      name: user.name || ''
+      name: user.name || '',
+      isSuspended: !!user.isSuspended,
+      suspendedReason: user.suspendedReason || 'Account administratively suspended'
     });
   } catch (err) {
-    res.json({ exists: false, hasMpin: false, hasBiometrics: false });
+    res.json({ exists: false, hasMpin: false, hasBiometrics: false, isSuspended: false });
   }
 });
 
@@ -1462,6 +1479,13 @@ app.post('/api/auth/mpin/verify', async (req, res) => {
     const dbUser = dbEngine.getUserByEmail(cleanEmail);
     if (!dbUser) {
       return res.status(404).json({ error: 'No account found with this email' });
+    }
+
+    if (dbUser.isSuspended) {
+      return res.status(403).json({
+        code: 'ACCOUNT_SUSPENDED',
+        error: `Your account has been administratively suspended. Reason: ${dbUser.suspendedReason || 'Policy compliance review'}`
+      });
     }
 
     const user = dbEngine.verifyUserMpin({ email: cleanEmail, mpin });
@@ -2517,6 +2541,73 @@ app.delete('/api/state', (req, res) => {
 // SUPER ADMIN COMMAND CENTER ENDPOINTS (PHASE 2)
 // ZERO-KNOWLEDGE PRIVACY GUARANTEE: Identity & Governance ONLY, NO Financial Data Exposure
 // ==========================================
+
+// POST /api/admin/auth/login (Standalone Admin Login with Email, Password & Root Key)
+app.post('/api/admin/auth/login', async (req, res) => {
+  try {
+    const { email, password, adminKey } = req.body;
+    if (!email || !password || !adminKey) {
+      return res.status(400).json({ error: 'Admin Email, Password, and Super Admin Secret Key are required.' });
+    }
+
+    if (adminKey !== ADMIN_SECRET_KEY) {
+      const clientIp = getClientIp(req);
+      dbEngine.logSecurityEvent({
+        userId: 'admin_login_failed',
+        eventType: 'UNAUTHORIZED_ADMIN_ACCESS_ATTEMPT',
+        ipAddress: clientIp,
+        userAgent: req.headers['user-agent'],
+        status: 'BLOCKED',
+        metadata: { attemptedEmail: email, reason: 'Invalid Master Admin Key' }
+      });
+      return res.status(403).json({ error: 'Access Denied: Invalid Super Admin Secret Key' });
+    }
+
+    if (!isSuperAdminEmail(email)) {
+      return res.status(403).json({ error: 'Access Denied: This email is not designated as a Super Admin.' });
+    }
+
+    const user = dbEngine.verifyUserCredentials({ email, password });
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid admin credentials' });
+    }
+
+    if (user.isSuspended) {
+      return res.status(403).json({ error: 'Super Admin account is currently marked suspended' });
+    }
+
+    // Ensure role is super_admin
+    dbEngine.adminPromoteUser(user.id, 'super_admin');
+    const updatedUser = dbEngine.getUserById(user.id);
+
+    const sessionId = `admin_sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const adminToken = jwt.sign(
+      { userId: user.id, email: user.email, role: 'super_admin', isAdmin: true, sessionId },
+      JWT_SECRET,
+      { expiresIn: '8h' }
+    );
+
+    const clientIp = getClientIp(req);
+    dbEngine.logSecurityEvent({
+      userId: user.id,
+      eventType: 'ADMIN_PORTAL_SIGNIN',
+      ipAddress: clientIp,
+      userAgent: req.headers['user-agent'],
+      status: 'SUCCESS',
+      metadata: { role: 'super_admin' }
+    });
+
+    res.json({
+      success: true,
+      token: adminToken,
+      user: updatedUser,
+      adminKey: ADMIN_SECRET_KEY
+    });
+  } catch (err) {
+    console.error('POST /api/admin/auth/login error:', err);
+    res.status(500).json({ error: 'Admin authentication failed' });
+  }
+});
 
 // POST /api/admin/verify-key (Allows user or client to authenticate as admin using root key)
 app.post('/api/admin/verify-key', (req, res) => {
