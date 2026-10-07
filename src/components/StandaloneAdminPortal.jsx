@@ -56,6 +56,19 @@ export default function StandaloneAdminPortal() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(true);
   const [keyVerifying, setKeyVerifying] = useState(false);
 
+  // Admin credentials management state
+  const [updateName, setUpdateName] = useState('');
+  const [updateEmail, setUpdateEmail] = useState('');
+  const [updatePassword, setUpdatePassword] = useState('');
+  const [updateLoading, setUpdateLoading] = useState(false);
+
+  useEffect(() => {
+    if (adminUser) {
+      setUpdateName(adminUser.name || '');
+      setUpdateEmail(adminUser.email || '');
+    }
+  }, [adminUser]);
+
   const showNotification = (text, type = 'info') => {
     setActionMessage({ text, type });
     setTimeout(() => {
@@ -204,6 +217,38 @@ export default function StandaloneAdminPortal() {
       showNotification('Verification request failed', 'danger');
     } finally {
       setKeyVerifying(false);
+    }
+  };
+
+  const handleUpdateProfile = async (e) => {
+    e?.preventDefault();
+    if (!updateEmail.trim()) {
+      showNotification('Admin email cannot be empty', 'danger');
+      return;
+    }
+    setUpdateLoading(true);
+    try {
+      const res = await fetch('/api/admin/profile/update', {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({
+          name: updateName.trim(),
+          email: updateEmail.trim(),
+          newPassword: updatePassword || undefined
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to update credentials');
+      }
+      setAdminUser(data.user);
+      localStorage.setItem('kuberis_admin_portal_user', JSON.stringify(data.user));
+      setUpdatePassword('');
+      showNotification('Super Admin credentials and password successfully updated in database.', 'success');
+    } catch (err) {
+      showNotification(err.message || 'Error updating credentials', 'danger');
+    } finally {
+      setUpdateLoading(false);
     }
   };
 
@@ -933,6 +978,70 @@ export default function StandaloneAdminPortal() {
         {/* Tab 3: Super Admin Access Settings */}
         {activeTab === 'settings' && (
           <div style={{ flex: 1, overflowY: 'auto', padding: '16px', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '14px', background: 'rgba(3, 8, 20, 0.6)' }}>
+            {/* Admin Profile & Password Reset Form */}
+            <div style={{ marginBottom: '24px', padding: '16px', borderRadius: '12px', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: '800', color: '#FFFFFF', marginBottom: '6px' }}>
+                Super Admin Account Credentials & Password Reset
+              </h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.5', marginBottom: '16px' }}>
+                Update your Super Admin identity, primary administrative email, or reset your password. Credentials are encrypted directly into the dedicated <code>wealthpulse_super_admins</code> table using native bcrypt hashing.
+              </p>
+
+              <form onSubmit={handleUpdateProfile} style={{ maxWidth: '480px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-main)', display: 'block', marginBottom: '4px' }}>
+                    Admin Name:
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Super Admin Name..."
+                    value={updateName}
+                    onChange={e => setUpdateName(e.target.value)}
+                    style={{ fontSize: '12px', padding: '8px 12px', width: '100%' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-main)', display: 'block', marginBottom: '4px' }}>
+                    Admin Email:
+                  </label>
+                  <input
+                    type="email"
+                    className="form-control"
+                    placeholder="admin@example.com"
+                    value={updateEmail}
+                    onChange={e => setUpdateEmail(e.target.value)}
+                    style={{ fontSize: '12px', padding: '8px 12px', width: '100%' }}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-main)', display: 'block', marginBottom: '4px' }}>
+                    New Password (leave blank to keep current):
+                  </label>
+                  <input
+                    type="password"
+                    className="form-control"
+                    placeholder="••••••••••••"
+                    value={updatePassword}
+                    onChange={e => setUpdatePassword(e.target.value)}
+                    style={{ fontSize: '12px', padding: '8px 12px', width: '100%' }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={updateLoading}
+                  style={{ fontSize: '12px', padding: '8px 16px', alignSelf: 'flex-start', marginTop: '4px' }}
+                >
+                  {updateLoading ? 'Updating Credentials...' : 'Save & Update Credentials'}
+                </button>
+              </form>
+            </div>
+
             <h3 style={{ fontSize: '14px', fontWeight: '800', color: '#FFFFFF', marginBottom: '8px' }}>
               Super Admin Key Authentication & Elevation
             </h3>

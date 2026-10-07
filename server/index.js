@@ -161,12 +161,17 @@ const authenticateSuperAdmin = (req, res, next) => {
     return res.status(401).json({ error: 'Authentication required for Super Admin Command Center' });
   }
 
-  const user = dbEngine.getUserById(userId);
-  if (!user) {
-    return res.status(401).json({ error: 'User account not found' });
+  // Check dedicated Super Admins table
+  const superAdmin = dbEngine.getSuperAdminById(userId);
+  if (superAdmin && !superAdmin.isSuspended) {
+    req.userId = userId;
+    req.user = superAdmin;
+    req.isAdmin = true;
+    return next();
   }
 
-  if (user.role === 'super_admin' || isSuperAdminEmail(user.email)) {
+  const user = dbEngine.getUserById(userId);
+  if (user && (user.role === 'super_admin' || isSuperAdminEmail(user.email))) {
     req.userId = userId;
     req.user = user;
     req.isAdmin = true;
@@ -2544,7 +2549,7 @@ app.delete('/api/state', (req, res) => {
 // ZERO-KNOWLEDGE PRIVACY GUARANTEE: Identity & Governance ONLY, NO Financial Data Exposure
 // ==========================================
 
-// POST /api/admin/auth/login (Standalone Admin Login with Email, Password & Root Key)
+// POST /api/admin/auth/login (Standalone Admin Login with Dedicated Admin Table & Root Key)
 app.post('/api/admin/auth/login', async (req, res) => {
   try {
     const { email, password, adminKey } = req.body;
@@ -2565,50 +2570,50 @@ app.post('/api/admin/auth/login', async (req, res) => {
       return res.status(403).json({ error: 'Access Denied: Invalid Super Admin Secret Key' });
     }
 
-    if (!isSuperAdminEmail(email)) {
-      return res.status(403).json({ error: 'Access Denied: This email is not in the authorized Super Admin list.' });
-    }
-
     const cleanEmail = (email || '').trim().toLowerCase();
-    let user = dbEngine.getUserByEmail(cleanEmail);
-    if (!user) {
-      return res.status(404).json({
-        error: `No user account found for ${cleanEmail}. Please register this account on Kuberis first or insert it into Supabase.`
-      });
-    }
 
-    let verifiedUser = null;
+    // 1. Primary check: Verify against dedicated super admins table
+    let verifiedAdmin = null;
     try {
-      verifiedUser = dbEngine.verifyUserCredentials({ email: cleanEmail, password });
+      verifiedAdmin = await dbEngine.verifySuperAdminCredentials({ email: cleanEmail, password });
     } catch (e) {
       if (e.code === 'ACCOUNT_SUSPENDED') {
         return res.status(403).json({ error: 'This Super Admin account is currently marked suspended.' });
       }
     }
 
-    if (!verifiedUser) {
+    // 2. Legacy fallback: Check wealthpulse_users if authorized
+    if (!verifiedAdmin && isSuperAdminEmail(cleanEmail)) {
+      try {
+        verifiedAdmin = dbEngine.verifyUserCredentials({ email: cleanEmail, password });
+      } catch (e) {
+        if (e.code === 'ACCOUNT_SUSPENDED') {
+          return res.status(403).json({ error: 'Super Admin account is currently marked suspended.' });
+        }
+      }
+    }
+
+    if (!verifiedAdmin) {
+      const existingAdmin = await dbEngine.getSuperAdminByEmail(cleanEmail);
+      const existingUser = dbEngine.getUserByEmail(cleanEmail);
+      if (!existingAdmin && !existingUser) {
+        return res.status(404).json({
+          error: `No Super Admin record found for ${cleanEmail} in wealthpulse_super_admins table. Please insert it into Supabase.`
+        });
+      }
       return res.status(401).json({ error: 'Incorrect Account Password for this Super Admin email.' });
     }
-    const userObj = verifiedUser;
-
-    if (user.isSuspended) {
-      return res.status(403).json({ error: 'Super Admin account is currently marked suspended' });
-    }
-
-    // Ensure role is super_admin
-    dbEngine.adminPromoteUser(user.id, 'super_admin');
-    const updatedUser = dbEngine.getUserById(user.id);
 
     const sessionId = `admin_sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     const adminToken = jwt.sign(
-      { userId: user.id, email: user.email, role: 'super_admin', isAdmin: true, sessionId },
+      { userId: verifiedAdmin.id, email: verifiedAdmin.email, role: 'super_admin', isAdmin: true, sessionId },
       JWT_SECRET,
       { expiresIn: '8h' }
     );
 
     const clientIp = getClientIp(req);
     dbEngine.logSecurityEvent({
-      userId: user.id,
+      userId: verifiedAdmin.id,
       eventType: 'ADMIN_PORTAL_SIGNIN',
       ipAddress: clientIp,
       userAgent: req.headers['user-agent'],
@@ -2619,12 +2624,49 @@ app.post('/api/admin/auth/login', async (req, res) => {
     res.json({
       success: true,
       token: adminToken,
-      user: updatedUser,
+      user: verifiedAdmin,
       adminKey: ADMIN_SECRET_KEY
     });
   } catch (err) {
     console.error('POST /api/admin/auth/login error:', err);
     res.status(500).json({ error: 'Admin authentication failed' });
+  }
+});
+
+// POST /api/admin/profile/update (Allows Super Admin to update their name, email, or reset their password)
+app.post('/api/admin/profile/update', authenticateSuperAdmin, async (req, res) => {
+  try {
+    const { name, email, newPassword } = req.body;
+    const adminId = req.userId;
+
+    if (!adminId) {
+      return res.status(400).json({ error: 'Admin identity not resolved' });
+    }
+
+    const updated = await dbEngine.updateSuperAdminProfile(adminId, {
+      name,
+      email,
+      password: newPassword
+    });
+
+    const clientIp = getClientIp(req);
+    dbEngine.logSecurityEvent({
+      userId: adminId,
+      eventType: 'ADMIN_CREDENTIALS_UPDATED',
+      ipAddress: clientIp,
+      userAgent: req.headers['user-agent'],
+      status: 'SUCCESS',
+      metadata: { updatedEmail: updated.email }
+    });
+
+    res.json({
+      success: true,
+      message: 'Super Admin credentials updated successfully',
+      user: updated
+    });
+  } catch (err) {
+    console.error('POST /api/admin/profile/update error:', err);
+    res.status(500).json({ error: err.message || 'Failed to update admin credentials' });
   }
 });
 

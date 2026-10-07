@@ -65,6 +65,7 @@ const getInitialUserSettings = () => ({
 
 const getInitialDb = () => ({
   users: [],
+  superAdmins: [], // Dedicated Super Admin records isolated from customer accounts
   transactions: [],
   tags: [],
   rules: [],
@@ -142,6 +143,18 @@ if (process.env.DATABASE_URL) {
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
+      -- Dedicated isolated table for Super Administrators
+      CREATE TABLE IF NOT EXISTS public.wealthpulse_super_admins (
+        id VARCHAR(100) PRIMARY KEY,
+        name VARCHAR(255) DEFAULT 'Super Admin',
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        role VARCHAR(50) DEFAULT 'super_admin',
+        is_suspended BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        last_login_at TIMESTAMP WITH TIME ZONE
+      );
+
       -- Schema upgrades for WebAuthn Biometrics and Device Security Tracking
       ALTER TABLE public.wealthpulse_users ADD COLUMN IF NOT EXISTS webauthn_credential_id TEXT;
       ALTER TABLE public.wealthpulse_users ADD COLUMN IF NOT EXISTS webauthn_public_key TEXT;
@@ -209,6 +222,7 @@ if (process.env.DATABASE_URL) {
           syncRelationalTables(current);
           console.log('[Supabase PostgreSQL] Seeded local database to Supabase cloud!');
         }
+        await syncSuperAdminsFromPostgres();
       } catch (e) {
         console.error('[Supabase PostgreSQL] Cloud sync error:', e.message);
       }
@@ -342,18 +356,48 @@ function loadDb() {
   return memoryDb;
 }
 
-function ensureDefaultSuperAdmin(db) {
-  if (!db || !Array.isArray(db.users)) return;
-  const rawList = process.env.SUPER_ADMIN_EMAILS || 'venkatamanishashankt@gmail.com,venkatamanishashank@gmail.com,admin@kuberis.com';
-  const adminEmails = rawList.toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
-
-  adminEmails.forEach((adminEmail) => {
-    let admin = db.users.find(u => u.email.toLowerCase() === adminEmail);
-    if (admin && admin.role !== 'super_admin') {
-      admin.role = 'super_admin';
-      saveDb();
+async function syncSuperAdminsFromPostgres() {
+  if (!pgPool) return;
+  try {
+    const adminRes = await pgPool.query(
+      'SELECT id, name, email, password_hash, role, is_suspended, created_at, last_login_at FROM public.wealthpulse_super_admins'
+    );
+    if (adminRes && adminRes.rows) {
+      if (!memoryDb) memoryDb = loadDb();
+      if (!Array.isArray(memoryDb.superAdmins)) memoryDb.superAdmins = [];
+      adminRes.rows.forEach(row => {
+        const rowEmail = (row.email || '').toLowerCase().trim();
+        const existingIdx = memoryDb.superAdmins.findIndex(
+          a => (a.email && a.email.toLowerCase().trim() === rowEmail) || a.id === row.id
+        );
+        const adminObj = {
+          id: row.id,
+          name: row.name || 'Super Admin',
+          email: rowEmail,
+          passwordHash: row.password_hash,
+          role: row.role || 'super_admin',
+          isSuspended: Boolean(row.is_suspended),
+          createdAt: row.created_at,
+          lastLoginAt: row.last_login_at
+        };
+        if (existingIdx >= 0) {
+          memoryDb.superAdmins[existingIdx] = adminObj;
+        } else {
+          memoryDb.superAdmins.push(adminObj);
+        }
+      });
+      console.log(`[Supabase PostgreSQL] Synced ${adminRes.rows.length} super admin accounts from dedicated table!`);
     }
-  });
+  } catch (e) {
+    console.warn('[Supabase PostgreSQL] Super admins sync notice:', e.message);
+  }
+}
+
+function ensureDefaultSuperAdmin(db) {
+  if (!db) return;
+  if (!Array.isArray(db.superAdmins)) {
+    db.superAdmins = [];
+  }
 }
 
 let pgSaveTimeout = null;
@@ -381,9 +425,17 @@ function saveDb() {
 
 export function isSuperAdminEmail(email) {
   if (!email) return false;
-  const rawList = process.env.SUPER_ADMIN_EMAILS || 'admin@kuberis.com,venkatamanishashank@gmail.com,venkatamanishashankt@gmail.com';
+  const clean = email.toLowerCase().trim();
+  const rawList = process.env.SUPER_ADMIN_EMAILS || 'venkatamanishashankt@gmail.com,venkatamanishashank@gmail.com,admin@kuberis.com';
   const adminList = rawList.toLowerCase().split(',').map(s => s.trim());
-  return adminList.includes(email.toLowerCase());
+  if (adminList.includes(clean)) return true;
+
+  if (memoryDb && Array.isArray(memoryDb.superAdmins)) {
+    if (memoryDb.superAdmins.some(a => (a.email || '').toLowerCase().trim() === clean)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export const dbEngine = {
@@ -1661,5 +1713,168 @@ export const dbEngine = {
   getAdminAuditLogs(limit = 100) {
     const db = loadDb();
     return (db.auditLogs || []).slice(0, limit);
+  },
+
+  async getSuperAdminByEmail(email) {
+    if (!email) return null;
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (pgPool) {
+      try {
+        const res = await pgPool.query(
+          'SELECT id, name, email, password_hash, role, is_suspended, created_at, last_login_at FROM public.wealthpulse_super_admins WHERE LOWER(email) = $1 LIMIT 1',
+          [cleanEmail]
+        );
+        if (res.rows.length > 0) {
+          const row = res.rows[0];
+          return {
+            id: row.id,
+            name: row.name,
+            email: row.email,
+            passwordHash: row.password_hash,
+            role: row.role || 'super_admin',
+            isSuspended: Boolean(row.is_suspended),
+            createdAt: row.created_at,
+            lastLoginAt: row.last_login_at
+          };
+        }
+      } catch (e) {
+        console.warn('[Postgres] getSuperAdminByEmail error:', e.message);
+      }
+    }
+
+    const db = loadDb();
+    if (Array.isArray(db.superAdmins)) {
+      const match = db.superAdmins.find(a => (a.email || '').toLowerCase().trim() === cleanEmail);
+      if (match) return match;
+    }
+    return null;
+  },
+
+  getSuperAdminById(id) {
+    if (!id) return null;
+    const db = loadDb();
+    if (Array.isArray(db.superAdmins)) {
+      const match = db.superAdmins.find(a => a.id === id);
+      if (match) return match;
+    }
+    return null;
+  },
+
+  async verifySuperAdminCredentials({ email, password }) {
+    if (!email || !password) return null;
+    const cleanEmail = email.trim().toLowerCase();
+    const admin = await this.getSuperAdminByEmail(cleanEmail);
+    if (!admin) return null;
+
+    if (admin.isSuspended) {
+      const err = new Error('This Super Admin account is currently marked suspended.');
+      err.code = 'ACCOUNT_SUSPENDED';
+      throw err;
+    }
+
+    if (!admin.passwordHash) return null;
+    const isValid = bcrypt.compareSync(password, admin.passwordHash);
+    if (!isValid) return null;
+
+    const nowIso = new Date().toISOString();
+    admin.lastLoginAt = nowIso;
+
+    if (pgPool) {
+      try {
+        await pgPool.query(
+          'UPDATE public.wealthpulse_super_admins SET last_login_at = NOW() WHERE id = $1',
+          [admin.id]
+        );
+      } catch (e) {
+        console.warn('[Postgres] update super admin login time notice:', e.message);
+      }
+    }
+
+    const db = loadDb();
+    if (!db.superAdmins) db.superAdmins = [];
+    const idx = db.superAdmins.findIndex(a => a.id === admin.id);
+    if (idx >= 0) {
+      db.superAdmins[idx] = { ...db.superAdmins[idx], ...admin };
+    } else {
+      db.superAdmins.push(admin);
+    }
+    saveDb();
+
+    const { passwordHash, ...safeAdmin } = admin;
+    return safeAdmin;
+  },
+
+  async updateSuperAdminProfile(adminId, { email, name, password }) {
+    const db = loadDb();
+    if (!db.superAdmins) db.superAdmins = [];
+    let admin = db.superAdmins.find(a => a.id === adminId);
+
+    if (!admin && pgPool) {
+      const res = await pgPool.query('SELECT * FROM public.wealthpulse_super_admins WHERE id = $1', [adminId]);
+      if (res.rows.length > 0) {
+        const r = res.rows[0];
+        admin = {
+          id: r.id,
+          name: r.name,
+          email: r.email,
+          passwordHash: r.password_hash,
+          role: r.role || 'super_admin',
+          isSuspended: Boolean(r.is_suspended)
+        };
+        db.superAdmins.push(admin);
+      }
+    }
+
+    if (!admin) {
+      throw new Error('Super Admin account not found');
+    }
+
+    const updates = {};
+    if (email) {
+      const cleanEmail = email.trim().toLowerCase();
+      updates.email = cleanEmail;
+      admin.email = cleanEmail;
+    }
+    if (name) {
+      updates.name = name.trim();
+      admin.name = name.trim();
+    }
+    if (password) {
+      const newHash = bcrypt.hashSync(password, 10);
+      updates.passwordHash = newHash;
+      admin.passwordHash = newHash;
+    }
+
+    if (pgPool) {
+      const sets = [];
+      const vals = [];
+      let idx = 1;
+
+      if (updates.email) {
+        sets.push(`email = $${idx++}`);
+        vals.push(updates.email);
+      }
+      if (updates.name) {
+        sets.push(`name = $${idx++}`);
+        vals.push(updates.name);
+      }
+      if (updates.passwordHash) {
+        sets.push(`password_hash = $${idx++}`);
+        vals.push(updates.passwordHash);
+      }
+
+      if (sets.length > 0) {
+        vals.push(adminId);
+        await pgPool.query(
+          `UPDATE public.wealthpulse_super_admins SET ${sets.join(', ')} WHERE id = $${idx}`,
+          vals
+        );
+      }
+    }
+
+    saveDb();
+    const { passwordHash, ...safeAdmin } = admin;
+    return safeAdmin;
   }
 };
