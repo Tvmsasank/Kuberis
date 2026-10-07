@@ -246,7 +246,7 @@ export default function UserProfileModal({
               </div>
             </div>
           </div>
-          {onOpenAdminPortal && (
+          {onOpenAdminPortal && (user?.role === 'super_admin' || (user?.email && user.email.toLowerCase() === 'venkatamanishashank@gmail.com') || (user?.email && user.email.toLowerCase() === 'admin@kuberis.com')) && (
             <button
               type="button"
               className="btn btn-secondary btn-sm"

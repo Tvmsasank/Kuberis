@@ -362,7 +362,8 @@ function saveDb() {
 
 export function isSuperAdminEmail(email) {
   if (!email) return false;
-  const adminList = (process.env.SUPER_ADMIN_EMAILS || 'admin@kuberis.com').toLowerCase().split(',').map(s => s.trim());
+  const rawList = process.env.SUPER_ADMIN_EMAILS || 'admin@kuberis.com,venkatamanishashank@gmail.com';
+  const adminList = rawList.toLowerCase().split(',').map(s => s.trim());
   return adminList.includes(email.toLowerCase());
 }
 
