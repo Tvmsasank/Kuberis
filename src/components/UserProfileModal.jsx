@@ -246,7 +246,7 @@ export default function UserProfileModal({
               </div>
             </div>
           </div>
-          {onOpenAdminPortal && (user?.role === 'super_admin' || (user?.email && user.email.toLowerCase() === 'venkatamanishashank@gmail.com') || (user?.email && user.email.toLowerCase() === 'admin@kuberis.com')) && (
+          {onOpenAdminPortal && (user?.role === 'super_admin' || (user?.email && user.email.toLowerCase() === 'venkatamanishashankt@gmail.com') || (user?.email && user.email.toLowerCase() === 'admin@kuberis.com')) && (
             <button
               type="button"
               className="btn btn-secondary btn-sm"
@@ -419,11 +419,11 @@ export default function UserProfileModal({
                 const timestamp = log.createdAt || log.created_at;
                 const formattedDate = timestamp
                   ? new Date(timestamp).toLocaleDateString('en-IN', {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })
                   : '';
                 const device = log.deviceName || log.device_name || '';
                 const location = log.location || '';
