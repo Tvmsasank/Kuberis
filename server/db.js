@@ -424,6 +424,41 @@ export const dbEngine = {
     saveDb();
   },
 
+  ensureSuperAdmin(email) {
+    const db = loadDb();
+    const cleanEmail = (email || '').trim().toLowerCase();
+    let admin = db.users.find(u => u.email.toLowerCase() === cleanEmail);
+    if (!admin) {
+      const adminId = `usr_admin_root_${Date.now()}`;
+      const defaultInitialPasswordHash = bcrypt.hashSync('Admin@12345', 10);
+      admin = {
+        id: adminId,
+        name: cleanEmail.split('@')[0],
+        email: cleanEmail,
+        passwordHash: defaultInitialPasswordHash,
+        role: 'super_admin',
+        isSuspended: false,
+        isLocked: false,
+        failedMpinAttempts: 0,
+        createdAt: new Date().toISOString(),
+        lastLoginAt: null,
+        resetToken: null,
+        resetTokenExpiry: null
+      };
+      db.users.push(admin);
+      if (!db.userSettings) db.userSettings = {};
+      if (!db.userSettings[adminId]) {
+        db.userSettings[adminId] = getInitialUserSettings();
+      }
+      saveDb();
+      if (pgPool) {
+        upsertUserToPostgres(admin);
+      }
+      return admin;
+    }
+    return admin;
+  },
+
   createUser(args) {
     return this.registerUser(args);
   },

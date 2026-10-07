@@ -2566,13 +2566,30 @@ app.post('/api/admin/auth/login', async (req, res) => {
     }
 
     if (!isSuperAdminEmail(email)) {
-      return res.status(403).json({ error: 'Access Denied: This email is not designated as a Super Admin.' });
+      return res.status(403).json({ error: 'Access Denied: This email is not in the authorized Super Admin list.' });
     }
 
-    const user = dbEngine.verifyUserCredentials({ email, password });
+    const cleanEmail = (email || '').trim().toLowerCase();
+    let user = dbEngine.getUserByEmail(cleanEmail);
     if (!user) {
-      return res.status(401).json({ error: 'Invalid admin credentials' });
+      // Auto-provision if in super admin list
+      dbEngine.ensureSuperAdmin(cleanEmail);
+      user = dbEngine.getUserByEmail(cleanEmail);
     }
+
+    let verifiedUser = null;
+    try {
+      verifiedUser = dbEngine.verifyUserCredentials({ email: cleanEmail, password });
+    } catch (e) {
+      if (e.code === 'ACCOUNT_SUSPENDED') {
+        return res.status(403).json({ error: 'This Super Admin account is currently marked suspended.' });
+      }
+    }
+
+    if (!verifiedUser) {
+      return res.status(401).json({ error: 'Incorrect Account Password for this Super Admin email.' });
+    }
+    const userObj = verifiedUser;
 
     if (user.isSuspended) {
       return res.status(403).json({ error: 'Super Admin account is currently marked suspended' });
