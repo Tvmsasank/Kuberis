@@ -14,7 +14,7 @@ import nodemailer from 'nodemailer';
 import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
 import 'dotenv/config';
-import { dbEngine } from './db.js';
+import { dbEngine, isSuperAdminEmail } from './db.js';
 import { refreshHoldingsPrices } from './investments.js';
 import { parseUpiTransactionText } from './upiParser.js';
 import { SUPPORTED_BANKS, initiateAaConsent, verifyAaOtp, generateLiveBankFeed } from './accountAggregator.js';
@@ -39,6 +39,7 @@ const getAppOrigin = (req) => {
 const app = express();
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'kuberis_super_secret_jwt_key_2026';
+const ADMIN_SECRET_KEY = process.env.ADMIN_SECRET_KEY || 'kuberis_admin_root_access_key_2026';
 
 app.use(cors());
 app.use(express.json({ limit: '25mb' }));
@@ -104,6 +105,15 @@ const authenticateToken = (req, res, next) => {
     return res.status(401).json({ error: 'Authentication token required' });
   }
 
+  // Verify account is not suspended
+  const user = dbEngine.getUserById(userId);
+  if (user && user.isSuspended) {
+    return res.status(403).json({
+      code: 'ACCOUNT_SUSPENDED',
+      error: `Your account has been administratively suspended. Reason: ${user.suspendedReason || 'Policy compliance review'}`
+    });
+  }
+
   // Active Session validation for multi-device session control (HDFC pattern)
   const authHeader = req.headers.authorization || req.headers['x-auth-token'];
   let rawToken = null;
@@ -130,7 +140,51 @@ const authenticateToken = (req, res, next) => {
   }
 
   req.userId = userId;
+  req.user = user;
   next();
+};
+
+// Super Admin Authorization Gate (Zero-Trust Role + Root Key Verification)
+const authenticateSuperAdmin = (req, res, next) => {
+  // Option 1: Direct root admin key provided via header
+  const adminKey = req.headers['x-admin-key'] || req.query.adminKey;
+  if (adminKey && adminKey === ADMIN_SECRET_KEY) {
+    req.isAdmin = true;
+    return next();
+  }
+
+  // Option 2: Authenticated user token with super_admin role or authorized email
+  const userId = getUserIdFromReq(req);
+  if (!userId) {
+    return res.status(401).json({ error: 'Authentication required for Super Admin Command Center' });
+  }
+
+  const user = dbEngine.getUserById(userId);
+  if (!user) {
+    return res.status(401).json({ error: 'User account not found' });
+  }
+
+  if (user.role === 'super_admin' || isSuperAdminEmail(user.email)) {
+    req.userId = userId;
+    req.user = user;
+    req.isAdmin = true;
+    return next();
+  }
+
+  // Log unauthorized administrative intrusion attempt
+  const clientIp = getClientIp(req);
+  dbEngine.logSecurityEvent({
+    userId: user.id,
+    eventType: 'UNAUTHORIZED_ADMIN_ACCESS_ATTEMPT',
+    ipAddress: clientIp,
+    userAgent: req.headers['user-agent'],
+    status: 'BLOCKED',
+    metadata: { attemptedUrl: req.originalUrl }
+  });
+
+  return res.status(403).json({
+    error: 'Access Denied: Super Admin governance privileges required.'
+  });
 };
 
 // ==========================================
@@ -1844,6 +1898,18 @@ app.patch('/api/transactions', authenticateToken, (req, res) => {
     }
     res.json(updated);
   } catch (err) {
+    if (err.message && err.message.includes('TENANT_ISOLATION_VIOLATION')) {
+      const clientIp = getClientIp(req);
+      dbEngine.logSecurityEvent({
+        userId: req.userId,
+        eventType: 'IDOR_VIOLATION_BLOCKED',
+        ipAddress: clientIp,
+        userAgent: req.headers['user-agent'],
+        status: 'BLOCKED',
+        metadata: { targetId: req.body?.id, resource: 'transaction' }
+      });
+      return res.status(403).json({ error: 'Forbidden: Unauthorized access to tenant resource' });
+    }
     console.error('PATCH /api/transactions error:', err);
     res.status(500).json({ error: 'Failed to update transaction' });
   }
@@ -1863,6 +1929,18 @@ app.delete('/api/transactions', authenticateToken, (req, res) => {
     }
     res.json({ success: true, deletedId: id });
   } catch (err) {
+    if (err.message && err.message.includes('TENANT_ISOLATION_VIOLATION')) {
+      const clientIp = getClientIp(req);
+      dbEngine.logSecurityEvent({
+        userId: req.userId,
+        eventType: 'IDOR_VIOLATION_BLOCKED',
+        ipAddress: clientIp,
+        userAgent: req.headers['user-agent'],
+        status: 'BLOCKED',
+        metadata: { targetId: req.query.id || req.body.id, resource: 'transaction' }
+      });
+      return res.status(403).json({ error: 'Forbidden: Unauthorized access to tenant resource' });
+    }
     console.error('DELETE /api/transactions error:', err);
     res.status(500).json({ error: 'Failed to delete transaction' });
   }
@@ -2177,6 +2255,18 @@ app.patch('/api/investments', authenticateToken, (req, res) => {
     const updated = dbEngine.updateInvestment(userId, id, updates);
     res.json(updated);
   } catch (err) {
+    if (err.message && err.message.includes('TENANT_ISOLATION_VIOLATION')) {
+      const clientIp = getClientIp(req);
+      dbEngine.logSecurityEvent({
+        userId: req.userId,
+        eventType: 'IDOR_VIOLATION_BLOCKED',
+        ipAddress: clientIp,
+        userAgent: req.headers['user-agent'],
+        status: 'BLOCKED',
+        metadata: { targetId: req.body?.id, resource: 'investment' }
+      });
+      return res.status(403).json({ error: 'Forbidden: Unauthorized access to tenant resource' });
+    }
     console.error('PATCH /api/investments error:', err);
     res.status(500).json({ error: 'Failed to update investment' });
   }
@@ -2193,6 +2283,18 @@ app.delete('/api/investments', authenticateToken, (req, res) => {
     const deleted = dbEngine.deleteInvestment(userId, id);
     res.json({ success: true, deletedId: id });
   } catch (err) {
+    if (err.message && err.message.includes('TENANT_ISOLATION_VIOLATION')) {
+      const clientIp = getClientIp(req);
+      dbEngine.logSecurityEvent({
+        userId: req.userId,
+        eventType: 'IDOR_VIOLATION_BLOCKED',
+        ipAddress: clientIp,
+        userAgent: req.headers['user-agent'],
+        status: 'BLOCKED',
+        metadata: { targetId: req.query.id || req.body.id, resource: 'investment' }
+      });
+      return res.status(403).json({ error: 'Forbidden: Unauthorized access to tenant resource' });
+    }
     console.error('DELETE /api/investments error:', err);
     res.status(500).json({ error: 'Failed to delete investment' });
   }
@@ -2408,6 +2510,187 @@ app.delete('/api/state', (req, res) => {
   } catch (err) {
     console.error('DELETE /api/state error:', err);
     res.status(500).json({ error: 'Failed to wipe data' });
+  }
+});
+
+// ==========================================
+// SUPER ADMIN COMMAND CENTER ENDPOINTS (PHASE 2)
+// ZERO-KNOWLEDGE PRIVACY GUARANTEE: Identity & Governance ONLY, NO Financial Data Exposure
+// ==========================================
+
+// POST /api/admin/verify-key (Allows user or client to authenticate as admin using root key)
+app.post('/api/admin/verify-key', (req, res) => {
+  try {
+    const { adminKey } = req.body;
+    if (!adminKey || adminKey !== ADMIN_SECRET_KEY) {
+      return res.status(403).json({ error: 'Invalid Super Admin Secret Key' });
+    }
+    // If an authenticated user sent this, automatically promote their account role
+    const userId = getUserIdFromReq(req);
+    if (userId) {
+      dbEngine.adminPromoteUser(userId, 'super_admin');
+    }
+    res.json({ success: true, message: 'Super Admin access granted' });
+  } catch (err) {
+    console.error('POST /api/admin/verify-key error:', err);
+    res.status(500).json({ error: 'Failed to verify admin key' });
+  }
+});
+
+// GET /api/admin/stats
+app.get('/api/admin/stats', authenticateSuperAdmin, (req, res) => {
+  try {
+    const stats = dbEngine.getAdminPlatformStats();
+    res.json({ success: true, stats });
+  } catch (err) {
+    console.error('GET /api/admin/stats error:', err);
+    res.status(500).json({ error: 'Failed to retrieve platform stats' });
+  }
+});
+
+// GET /api/admin/users
+app.get('/api/admin/users', authenticateSuperAdmin, (req, res) => {
+  try {
+    const users = dbEngine.getAllUsersForAdmin();
+    res.json({ success: true, users });
+  } catch (err) {
+    console.error('GET /api/admin/users error:', err);
+    res.status(500).json({ error: 'Failed to retrieve users' });
+  }
+});
+
+// POST /api/admin/users/suspend
+app.post('/api/admin/users/suspend', authenticateSuperAdmin, (req, res) => {
+  try {
+    const { targetUserId, suspend, reason } = req.body;
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'Target user ID required' });
+    }
+    const result = dbEngine.adminSuspendUser(targetUserId, !!suspend, reason);
+
+    const clientIp = getClientIp(req);
+    dbEngine.logSecurityEvent({
+      userId: req.userId || 'system_super_admin',
+      eventType: suspend ? 'ADMIN_USER_SUSPENDED' : 'ADMIN_USER_REACTIVATED',
+      ipAddress: clientIp,
+      userAgent: req.headers['user-agent'],
+      status: 'SUCCESS',
+      metadata: { targetUserId, reason }
+    });
+
+    res.json({ success: true, user: result });
+  } catch (err) {
+    console.error('POST /api/admin/users/suspend error:', err);
+    res.status(500).json({ error: err.message || 'Failed to modify user suspension state' });
+  }
+});
+
+// POST /api/admin/users/unlock
+app.post('/api/admin/users/unlock', authenticateSuperAdmin, (req, res) => {
+  try {
+    const { targetUserId } = req.body;
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'Target user ID required' });
+    }
+    const result = dbEngine.adminUnlockUser(targetUserId);
+
+    const clientIp = getClientIp(req);
+    dbEngine.logSecurityEvent({
+      userId: req.userId || 'system_super_admin',
+      eventType: 'ADMIN_USER_UNLOCKED',
+      ipAddress: clientIp,
+      userAgent: req.headers['user-agent'],
+      status: 'SUCCESS',
+      metadata: { targetUserId }
+    });
+
+    res.json({ success: true, user: result });
+  } catch (err) {
+    console.error('POST /api/admin/users/unlock error:', err);
+    res.status(500).json({ error: err.message || 'Failed to unlock user' });
+  }
+});
+
+// POST /api/admin/users/terminate-sessions
+app.post('/api/admin/users/terminate-sessions', authenticateSuperAdmin, (req, res) => {
+  try {
+    const { targetUserId } = req.body;
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'Target user ID required' });
+    }
+    const result = dbEngine.adminTerminateUserSessions(targetUserId);
+
+    const clientIp = getClientIp(req);
+    dbEngine.logSecurityEvent({
+      userId: req.userId || 'system_super_admin',
+      eventType: 'ADMIN_SESSIONS_TERMINATED',
+      ipAddress: clientIp,
+      userAgent: req.headers['user-agent'],
+      status: 'SUCCESS',
+      metadata: { targetUserId }
+    });
+
+    res.json({ success: true, user: result });
+  } catch (err) {
+    console.error('POST /api/admin/users/terminate-sessions error:', err);
+    res.status(500).json({ error: err.message || 'Failed to terminate user sessions' });
+  }
+});
+
+// POST /api/admin/users/trigger-reset
+app.post('/api/admin/users/trigger-reset', authenticateSuperAdmin, async (req, res) => {
+  try {
+    const { targetUserId, resetType } = req.body; // 'password' or 'mpin'
+    if (!targetUserId) {
+      return res.status(400).json({ error: 'Target user ID required' });
+    }
+    const user = dbEngine.getUserById(targetUserId);
+    if (!user) {
+      return res.status(404).json({ error: 'Target user not found' });
+    }
+
+    const clientIp = getClientIp(req);
+    let resetUrl = '';
+
+    if (resetType === 'mpin') {
+      const result = dbEngine.createMpinResetToken(user.email);
+      resetUrl = `${getAppOrigin(req)}/?resetMpinToken=${result.resetMpinToken}`;
+      sendMpinResetEmail(user.email, resetUrl, false).catch(e => console.warn('[Admin reset email notice]:', e.message));
+    } else {
+      const resetToken = dbEngine.createPasswordResetToken(user.email);
+      resetUrl = `${getAppOrigin(req)}/?resetToken=${resetToken}`;
+      sendPasswordResetEmail(user.email, resetUrl).catch(e => console.warn('[Admin reset email notice]:', e.message));
+    }
+
+    dbEngine.logSecurityEvent({
+      userId: req.userId || 'system_super_admin',
+      eventType: 'ADMIN_RESET_LINK_DISPATCHED',
+      ipAddress: clientIp,
+      userAgent: req.headers['user-agent'],
+      status: 'SUCCESS',
+      metadata: { targetUserId, targetEmail: user.email, resetType }
+    });
+
+    res.json({
+      success: true,
+      message: `Direct ${resetType === 'mpin' ? 'MPIN' : 'Password'} reset link dispatched to ${user.email}`,
+      resetUrl
+    });
+  } catch (err) {
+    console.error('POST /api/admin/users/trigger-reset error:', err);
+    res.status(500).json({ error: err.message || 'Failed to trigger reset' });
+  }
+});
+
+// GET /api/admin/audit-logs
+app.get('/api/admin/audit-logs', authenticateSuperAdmin, (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit, 10) || 100;
+    const logs = dbEngine.getAdminAuditLogs(limit);
+    res.json({ success: true, logs });
+  } catch (err) {
+    console.error('GET /api/admin/audit-logs error:', err);
+    res.status(500).json({ error: 'Failed to retrieve admin audit logs' });
   }
 });
 

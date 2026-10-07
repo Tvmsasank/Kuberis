@@ -38,6 +38,7 @@ import TwoFactorSetupModal from './components/TwoFactorSetupModal';
 import SecurityOnboardingModal from './components/SecurityOnboardingModal';
 import AppTour from './components/AppTour';
 import LandingPage from './components/LandingPage';
+import AdminPortalModal from './components/AdminPortalModal';
 import { CheckCircle2, FolderSync, X, Shield, Lock, UserPlus, LogIn, Fingerprint, KeyRound, Zap, Landmark, ShieldAlert } from 'lucide-react';
 import { getDeviceHeaders } from './utils/deviceInfo';
 
@@ -88,6 +89,7 @@ export default function App() {
   const [authModalMode, setAuthModalMode] = useState('login');
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isAdminPortalOpen, setIsAdminPortalOpen] = useState(false);
 
   // MPIN Modal State
   const [isMpinModalOpen, setIsMpinModalOpen] = useState(false);
@@ -1077,9 +1079,23 @@ export default function App() {
         onOpenChangePassword={() => setIsChangePasswordOpen(true)}
         onOpenMpinModal={handleOpenMpinModal}
         onOpenTwoFactorModal={() => setIsTwoFactorModalOpen(true)}
+        onOpenAdminPortal={() => setIsAdminPortalOpen(true)}
         onStartTour={() => {
           setIsProfileModalOpen(false);
           setIsTourOpen(true);
+        }}
+      />
+
+      {/* Super Admin Command Center Modal (Phase 2 Governance) */}
+      <AdminPortalModal
+        isOpen={isAdminPortalOpen}
+        onClose={() => setIsAdminPortalOpen(false)}
+        token={token}
+        currentUser={user}
+        onUserRoleUpdated={(newRole) => {
+          const updatedUser = { ...user, role: newRole };
+          setUser(updatedUser);
+          localStorage.setItem('kuberis_user', JSON.stringify(updatedUser));
         }}
       />
 

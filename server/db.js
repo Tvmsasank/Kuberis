@@ -360,6 +360,12 @@ function saveDb() {
   }
 }
 
+export function isSuperAdminEmail(email) {
+  if (!email) return false;
+  const adminList = (process.env.SUPER_ADMIN_EMAILS || 'admin@kuberis.com').toLowerCase().split(',').map(s => s.trim());
+  return adminList.includes(email.toLowerCase());
+}
+
 export const dbEngine = {
   getRawDb() {
     return loadDb();
@@ -384,13 +390,19 @@ export const dbEngine = {
 
     const userId = `usr_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     const passwordHash = bcrypt.hashSync(password, 10);
+    const role = isSuperAdminEmail(cleanEmail) ? 'super_admin' : 'user';
 
     const newUser = {
       id: userId,
       name: (name || cleanEmail.split('@')[0]).trim(),
       email: cleanEmail,
       passwordHash,
+      role,
+      isSuspended: false,
+      isLocked: false,
+      failedMpinAttempts: 0,
       createdAt: new Date().toISOString(),
+      lastLoginAt: null,
       resetToken: null,
       resetTokenExpiry: null
     };
@@ -407,6 +419,7 @@ export const dbEngine = {
       id: newUser.id,
       name: newUser.name,
       email: newUser.email,
+      role: newUser.role,
       hasMpin: false,
       createdAt: newUser.createdAt
     };
@@ -418,13 +431,25 @@ export const dbEngine = {
     const user = db.users.find(u => u.email === cleanEmail);
     if (!user) return null;
 
+    if (user.isSuspended) {
+      const err = new Error('Your account has been suspended by security administrator. Please contact support.');
+      err.code = 'ACCOUNT_SUSPENDED';
+      throw err;
+    }
+
     const isValid = bcrypt.compareSync(password, user.passwordHash);
     if (!isValid) return null;
+
+    user.lastLoginAt = new Date().toISOString();
+    const role = user.role || (isSuperAdminEmail(cleanEmail) ? 'super_admin' : 'user');
+    user.role = role;
+    saveDb();
 
     return {
       id: user.id,
       name: user.name,
       email: user.email,
+      role,
       hasMpin: !!user.mpinHash,
       twoFactorEnabled: !!user.twoFactorEnabled,
       createdAt: user.createdAt
@@ -441,11 +466,16 @@ export const dbEngine = {
     const db = loadDb();
     const user = db.users.find(u => u.id === userId);
     if (!user) return null;
+    const role = user.role || (isSuperAdminEmail(user.email) ? 'super_admin' : 'user');
     return {
       id: user.id,
       name: user.name,
       email: user.email,
+      role,
+      isSuspended: !!user.isSuspended,
+      isLocked: !!(user.isLocked || (user.failedMpinAttempts && user.failedMpinAttempts >= 3)),
       createdAt: user.createdAt,
+      lastLoginAt: user.lastLoginAt || null,
       hasMpin: !!user.mpinHash,
       hasBiometrics: !!user.webauthnCredentialId,
       twoFactorEnabled: !!user.twoFactorEnabled,
@@ -602,16 +632,31 @@ export const dbEngine = {
     const db = loadDb();
     const cleanEmail = (email || '').trim().toLowerCase();
     const user = db.users.find(u => u.email === cleanEmail);
-    if (!user || !user.mpinHash) return null;
+    if (!user) return null;
+
+    if (user.isSuspended) {
+      const err = new Error('Your account has been suspended by security administrator. Please contact support.');
+      err.code = 'ACCOUNT_SUSPENDED';
+      throw err;
+    }
+
+    if (!user.mpinHash) return null;
 
     const isValid = bcrypt.compareSync(mpin, user.mpinHash);
     if (!isValid) return null;
+
+    user.lastLoginAt = new Date().toISOString();
+    const role = user.role || (isSuperAdminEmail(cleanEmail) ? 'super_admin' : 'user');
+    user.role = role;
+    saveDb();
 
     return {
       id: user.id,
       name: user.name,
       email: user.email,
+      role,
       hasMpin: true,
+      twoFactorEnabled: !!user.twoFactorEnabled,
       createdAt: user.createdAt
     };
   },
@@ -674,12 +719,25 @@ export const dbEngine = {
 
     if (!user) return null;
 
+    if (user.isSuspended) {
+      const err = new Error('Your account has been suspended by security administrator. Please contact support.');
+      err.code = 'ACCOUNT_SUSPENDED';
+      throw err;
+    }
+
+    user.lastLoginAt = new Date().toISOString();
+    const role = user.role || (isSuperAdminEmail(user.email) ? 'super_admin' : 'user');
+    user.role = role;
+    saveDb();
+
     return {
       id: user.id,
       name: user.name,
       email: user.email,
+      role,
       hasMpin: !!user.mpinHash,
       hasBiometrics: !!user.webauthnCredentialId,
+      twoFactorEnabled: !!user.twoFactorEnabled,
       createdAt: user.createdAt
     };
   },
@@ -911,17 +969,25 @@ export const dbEngine = {
 
   updateTransaction(userId, id, updates) {
     const db = loadDb();
-    const index = (db.transactions || []).findIndex(t => t.id === id && (t.userId === userId || !t.userId));
-    if (index === -1) throw new Error('Transaction not found');
+    const existingTx = (db.transactions || []).find(t => t.id === id);
+    if (!existingTx) throw new Error('Transaction not found');
 
-    const updatedRawDate = updates.date ? String(updates.date).trim() : db.transactions[index].date;
+    if (existingTx.userId && existingTx.userId !== userId) {
+      const err = new Error('TENANT_ISOLATION_VIOLATION: Access denied to another user financial record');
+      err.code = 'TENANT_ISOLATION_VIOLATION';
+      throw err;
+    }
+
+    const index = db.transactions.indexOf(existingTx);
+    const updatedRawDate = updates.date ? String(updates.date).trim() : existingTx.date;
     const safeUpdatedDate = (updatedRawDate && !isNaN(Date.parse(updatedRawDate))) ? updatedRawDate : new Date().toISOString().split('T')[0];
 
     db.transactions[index] = {
-      ...db.transactions[index],
+      ...existingTx,
       ...updates,
+      userId,
       date: safeUpdatedDate,
-      amount: updates.amount !== undefined ? Number(updates.amount) : db.transactions[index].amount,
+      amount: updates.amount !== undefined ? Number(updates.amount) : existingTx.amount,
       updatedAt: new Date().toISOString()
     };
     saveDb();
@@ -933,8 +999,8 @@ export const dbEngine = {
         [tx.id, tx.merchant, tx.amount, tx.type, tx.date, tx.category, tx.account, JSON.stringify(tx.tags)],
         `UPDATE public.wealthpulse_transactions
          SET merchant = $1, amount = $2, type = $3, date = COALESCE(NULLIF($4, '')::date, CURRENT_DATE), category = $5, account = $6, tags = $7::jsonb
-         WHERE id = $8`,
-        [tx.merchant, tx.amount, tx.type, tx.date, tx.category, tx.account, JSON.stringify(tx.tags), tx.id]
+         WHERE id = $8 AND user_id = $9`,
+        [tx.merchant, tx.amount, tx.type, tx.date, tx.category, tx.account, JSON.stringify(tx.tags), tx.id, userId]
       );
     }
 
@@ -943,13 +1009,20 @@ export const dbEngine = {
 
   deleteTransaction(userId, id) {
     const db = loadDb();
-    const initialLength = (db.transactions || []).length;
-    db.transactions = (db.transactions || []).filter(t => !(t.id === id && (t.userId === userId || !t.userId)));
-    if (db.transactions.length === initialLength) throw new Error('Transaction not found');
+    const existingTx = (db.transactions || []).find(t => t.id === id);
+    if (!existingTx) throw new Error('Transaction not found');
+
+    if (existingTx.userId && existingTx.userId !== userId) {
+      const err = new Error('TENANT_ISOLATION_VIOLATION: Access denied to another user financial record');
+      err.code = 'TENANT_ISOLATION_VIOLATION';
+      throw err;
+    }
+
+    db.transactions = db.transactions.filter(t => t.id !== id);
     saveDb();
 
     if (pgPool) {
-      pgPool.query('DELETE FROM public.wealthpulse_transactions WHERE id = $1', [id])
+      pgPool.query('DELETE FROM public.wealthpulse_transactions WHERE id = $1 AND user_id = $2', [id, userId])
         .catch(e => console.error('[Supabase PostgreSQL] Relational Tx delete error:', e.message));
     }
 
@@ -1010,15 +1083,23 @@ export const dbEngine = {
 
   updateInvestment(userId, id, updates) {
     const db = loadDb();
-    const index = (db.investments || []).findIndex(i => i.id === id && i.userId === userId);
-    if (index === -1) throw new Error('Investment not found');
+    const existing = (db.investments || []).find(i => i.id === id);
+    if (!existing) throw new Error('Investment not found');
 
+    if (existing.userId && existing.userId !== userId) {
+      const err = new Error('TENANT_ISOLATION_VIOLATION: Access denied to another user financial record');
+      err.code = 'TENANT_ISOLATION_VIOLATION';
+      throw err;
+    }
+
+    const index = db.investments.indexOf(existing);
     db.investments[index] = {
-      ...db.investments[index],
+      ...existing,
       ...updates,
-      quantity: updates.quantity !== undefined ? Number(updates.quantity) : db.investments[index].quantity,
-      buyPrice: updates.buyPrice !== undefined ? Number(updates.buyPrice) : db.investments[index].buyPrice,
-      currentPrice: updates.currentPrice !== undefined ? Number(updates.currentPrice) : db.investments[index].currentPrice,
+      userId,
+      quantity: updates.quantity !== undefined ? Number(updates.quantity) : existing.quantity,
+      buyPrice: updates.buyPrice !== undefined ? Number(updates.buyPrice) : existing.buyPrice,
+      currentPrice: updates.currentPrice !== undefined ? Number(updates.currentPrice) : existing.currentPrice,
       updatedAt: new Date().toISOString()
     };
     saveDb();
@@ -1028,8 +1109,8 @@ export const dbEngine = {
       pgPool.query(
         `UPDATE public.wealthpulse_investments
          SET name = $1, symbol = $2, type = $3, quantity = $4, buy_price = $5, current_price = $6, current_valuation = $7, unrealized_pnl = $8, pnl_percentage = $9
-         WHERE id = $10`,
-        [inv.name, inv.symbol, inv.type, inv.quantity, inv.buyPrice, inv.currentPrice, inv.currentValuation, inv.unrealizedPnL, inv.pnlPercentage, inv.id]
+         WHERE id = $10 AND user_id = $11`,
+        [inv.name, inv.symbol, inv.type, inv.quantity, inv.buyPrice, inv.currentPrice, inv.currentValuation, inv.unrealizedPnL, inv.pnlPercentage, inv.id, userId]
       ).catch(e => console.error('[Supabase PostgreSQL] Relational Inv update error:', e.message));
     }
 
@@ -1038,13 +1119,20 @@ export const dbEngine = {
 
   deleteInvestment(userId, id) {
     const db = loadDb();
-    const initialLength = (db.investments || []).length;
-    db.investments = (db.investments || []).filter(i => !(i.id === id && i.userId === userId));
-    if (db.investments.length === initialLength) throw new Error('Investment not found');
+    const existing = (db.investments || []).find(i => i.id === id);
+    if (!existing) throw new Error('Investment not found');
+
+    if (existing.userId && existing.userId !== userId) {
+      const err = new Error('TENANT_ISOLATION_VIOLATION: Access denied to another user financial record');
+      err.code = 'TENANT_ISOLATION_VIOLATION';
+      throw err;
+    }
+
+    db.investments = db.investments.filter(i => i.id !== id);
     saveDb();
 
     if (pgPool) {
-      pgPool.query('DELETE FROM public.wealthpulse_investments WHERE id = $1', [id])
+      pgPool.query('DELETE FROM public.wealthpulse_investments WHERE id = $1 AND user_id = $2', [id, userId])
         .catch(e => console.error('[Supabase PostgreSQL] Relational Inv delete error:', e.message));
     }
 
@@ -1426,5 +1514,132 @@ export const dbEngine = {
     }
 
     return [];
+  },
+
+  // ==========================================
+  // SUPER ADMIN GOVERNANCE ENGINE (ZERO-KNOWLEDGE)
+  // ==========================================
+
+  getAllUsersForAdmin() {
+    const db = loadDb();
+    const superAdminEmails = (process.env.SUPER_ADMIN_EMAILS || 'admin@kuberis.com').toLowerCase().split(',').map(e => e.trim());
+    return (db.users || []).map(u => ({
+      id: u.id,
+      name: u.name || 'User',
+      email: u.email,
+      role: u.role || (superAdminEmails.includes((u.email || '').toLowerCase()) ? 'super_admin' : 'user'),
+      createdAt: u.createdAt,
+      lastLoginAt: u.lastLoginAt || null,
+      isSuspended: !!u.isSuspended,
+      suspendedReason: u.suspendedReason || null,
+      isLocked: !!(u.isLocked || (u.failedMpinAttempts && u.failedMpinAttempts >= 3)),
+      failedMpinAttempts: u.failedMpinAttempts || 0,
+      hasMpin: !!u.mpinHash,
+      twoFactorEnabled: !!u.twoFactorEnabled,
+      hasBiometrics: !!u.webauthnCredentialId,
+      hasActiveSession: !!u.activeSessionId
+      // NOTE: ZERO-KNOWLEDGE PRIVACY GUARANTEE:
+      // Absolutely NO balances, net worth, investments, or transactions are returned.
+    }));
+  },
+
+  adminSuspendUser(userId, suspendFlag = true, reason = '') {
+    const db = loadDb();
+    const user = db.users.find(u => u.id === userId);
+    if (!user) throw new Error('User account not found');
+    user.isSuspended = !!suspendFlag;
+    user.suspendedReason = reason || (suspendFlag ? 'Administrative suspension' : null);
+    user.suspendedAt = suspendFlag ? new Date().toISOString() : null;
+
+    if (suspendFlag) {
+      // Instantly kill active session and revoke refresh tokens
+      user.activeSessionId = null;
+      if (db.refreshTokens) {
+        for (const t of db.refreshTokens) {
+          if (t.userId === userId) t.revoked = true;
+        }
+      }
+    }
+    saveDb();
+    return {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      isSuspended: user.isSuspended,
+      suspendedReason: user.suspendedReason
+    };
+  },
+
+  adminUnlockUser(userId) {
+    const db = loadDb();
+    const user = db.users.find(u => u.id === userId);
+    if (!user) throw new Error('User account not found');
+    user.isLocked = false;
+    user.failedMpinAttempts = 0;
+    saveDb();
+    return {
+      userId: user.id,
+      email: user.email,
+      isLocked: false,
+      failedMpinAttempts: 0
+    };
+  },
+
+  adminTerminateUserSessions(userId) {
+    const db = loadDb();
+    const user = db.users.find(u => u.id === userId);
+    if (!user) throw new Error('User account not found');
+    user.activeSessionId = null;
+    if (db.refreshTokens) {
+      for (const t of db.refreshTokens) {
+        if (t.userId === userId) t.revoked = true;
+      }
+    }
+    saveDb();
+    return {
+      userId: user.id,
+      email: user.email,
+      terminated: true
+    };
+  },
+
+  adminPromoteUser(userId, newRole = 'super_admin') {
+    const db = loadDb();
+    const user = db.users.find(u => u.id === userId);
+    if (!user) throw new Error('User account not found');
+    user.role = newRole;
+    saveDb();
+    return {
+      userId: user.id,
+      email: user.email,
+      role: user.role
+    };
+  },
+
+  getAdminPlatformStats() {
+    const db = loadDb();
+    const users = db.users || [];
+    const totalUsers = users.length;
+    const activeSessions = users.filter(u => !!u.activeSessionId).length;
+    const twoFactorCount = users.filter(u => !!u.twoFactorEnabled).length;
+    const mpinCount = users.filter(u => !!u.mpinHash).length;
+    const suspendedCount = users.filter(u => !!u.isSuspended).length;
+    const lockedCount = users.filter(u => !!(u.isLocked || (u.failedMpinAttempts && u.failedMpinAttempts >= 3))).length;
+    const totalSecurityLogs = (db.auditLogs || []).length;
+
+    return {
+      totalUsers,
+      activeSessions,
+      twoFactorAdoptionRate: totalUsers > 0 ? Math.round((twoFactorCount / totalUsers) * 100) : 0,
+      mpinAdoptionRate: totalUsers > 0 ? Math.round((mpinCount / totalUsers) * 100) : 0,
+      suspendedCount,
+      lockedCount,
+      totalSecurityLogs
+    };
+  },
+
+  getAdminAuditLogs(limit = 100) {
+    const db = loadDb();
+    return (db.auditLogs || []).slice(0, limit);
   }
 };

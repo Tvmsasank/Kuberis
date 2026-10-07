@@ -38,7 +38,8 @@ export default function UserProfileModal({
   onOpenChangePassword,
   onOpenMpinModal,
   onOpenTwoFactorModal,
-  onStartTour
+  onStartTour,
+  onOpenAdminPortal
 }) {
   if (!isOpen || !user) return null;
 
@@ -226,16 +227,39 @@ export default function UserProfileModal({
         </div>
 
         {/* User Identity Banner */}
-        <div style={{ padding: '14px', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(10, 25, 47, 0.8) 100%)', border: '1px solid var(--border-glass)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary) 0%, #059669 100%)', color: '#000000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '17px' }}>
-            {getInitials(user.name)}
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h3 style={{ fontSize: '14px', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>{user.name}</h3>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Mail size={11} /> {user.email}
+        <div style={{ padding: '14px', borderRadius: '14px', background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(10, 25, 47, 0.8) 100%)', border: '1px solid var(--border-glass)', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+            <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--primary) 0%, #059669 100%)', color: '#000000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', fontSize: '17px', flexShrink: 0 }}>
+              {getInitials(user.name)}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <h3 style={{ fontSize: '14px', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>{user.name}</h3>
+                {user.role === 'super_admin' && (
+                  <span style={{ fontSize: '9px', fontWeight: '800', padding: '1px 5px', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.2)', color: '#F87171', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                    SUPER ADMIN
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Mail size={11} /> {user.email}
+              </div>
             </div>
           </div>
+          {onOpenAdminPortal && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                onClose();
+                onOpenAdminPortal();
+              }}
+              style={{ fontSize: '10.5px', padding: '6px 10px', gap: '4px', color: '#F87171', borderColor: 'rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.08)' }}
+              title="Open Super Admin Command Center"
+            >
+              <ShieldAlert size={12} /> Admin
+            </button>
+          )}
         </div>
 
         {/* Fast Authentication Options */}
