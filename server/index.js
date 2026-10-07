@@ -2572,9 +2572,9 @@ app.post('/api/admin/auth/login', async (req, res) => {
     const cleanEmail = (email || '').trim().toLowerCase();
     let user = dbEngine.getUserByEmail(cleanEmail);
     if (!user) {
-      // Auto-provision if in super admin list
-      dbEngine.ensureSuperAdmin(cleanEmail);
-      user = dbEngine.getUserByEmail(cleanEmail);
+      return res.status(404).json({
+        error: `No user account found for ${cleanEmail}. Please register this account on Kuberis first or insert it into Supabase.`
+      });
     }
 
     let verifiedUser = null;

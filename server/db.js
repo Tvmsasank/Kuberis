@@ -347,37 +347,9 @@ function ensureDefaultSuperAdmin(db) {
   const rawList = process.env.SUPER_ADMIN_EMAILS || 'venkatamanishashankt@gmail.com,venkatamanishashank@gmail.com,admin@kuberis.com';
   const adminEmails = rawList.toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
 
-  const defaultInitialPasswordHash = bcrypt.hashSync('Admin@12345', 10);
-
-  adminEmails.forEach((adminEmail, idx) => {
+  adminEmails.forEach((adminEmail) => {
     let admin = db.users.find(u => u.email.toLowerCase() === adminEmail);
-    if (!admin) {
-      const adminId = `usr_admin_root_${idx + 1}`;
-      admin = {
-        id: adminId,
-        name: adminEmail.split('@')[0],
-        email: adminEmail,
-        passwordHash: defaultInitialPasswordHash,
-        role: 'super_admin',
-        isSuspended: false,
-        isLocked: false,
-        failedMpinAttempts: 0,
-        createdAt: new Date().toISOString(),
-        lastLoginAt: null,
-        resetToken: null,
-        resetTokenExpiry: null
-      };
-      db.users.push(admin);
-      if (!db.userSettings) db.userSettings = {};
-      if (!db.userSettings[adminId]) {
-        db.userSettings[adminId] = getInitialUserSettings();
-      }
-      saveDb();
-      if (pgPool) {
-        upsertUserToPostgres(admin);
-      }
-      console.log(`[Security Initialization] Super Admin provisioned for ${adminEmail} with initial credentials.`);
-    } else if (admin.role !== 'super_admin') {
+    if (admin && admin.role !== 'super_admin') {
       admin.role = 'super_admin';
       saveDb();
     }
@@ -422,41 +394,6 @@ export const dbEngine = {
   saveRawDb(newDb) {
     memoryDb = newDb;
     saveDb();
-  },
-
-  ensureSuperAdmin(email) {
-    const db = loadDb();
-    const cleanEmail = (email || '').trim().toLowerCase();
-    let admin = db.users.find(u => u.email.toLowerCase() === cleanEmail);
-    if (!admin) {
-      const adminId = `usr_admin_root_${Date.now()}`;
-      const defaultInitialPasswordHash = bcrypt.hashSync('Admin@12345', 10);
-      admin = {
-        id: adminId,
-        name: cleanEmail.split('@')[0],
-        email: cleanEmail,
-        passwordHash: defaultInitialPasswordHash,
-        role: 'super_admin',
-        isSuspended: false,
-        isLocked: false,
-        failedMpinAttempts: 0,
-        createdAt: new Date().toISOString(),
-        lastLoginAt: null,
-        resetToken: null,
-        resetTokenExpiry: null
-      };
-      db.users.push(admin);
-      if (!db.userSettings) db.userSettings = {};
-      if (!db.userSettings[adminId]) {
-        db.userSettings[adminId] = getInitialUserSettings();
-      }
-      saveDb();
-      if (pgPool) {
-        upsertUserToPostgres(admin);
-      }
-      return admin;
-    }
-    return admin;
   },
 
   createUser(args) {
