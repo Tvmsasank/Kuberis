@@ -13,6 +13,7 @@ import jwt from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
 import speakeasy from 'speakeasy';
 import QRCode from 'qrcode';
+import crypto from 'crypto';
 import 'dotenv/config';
 import { dbEngine, isSuperAdminEmail } from './db.js';
 import { refreshHoldingsPrices } from './investments.js';
@@ -38,8 +39,9 @@ const getAppOrigin = (req) => {
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const JWT_SECRET = process.env.JWT_SECRET || 'kuberis_super_secret_jwt_key_2026';
-const ADMIN_SECRET_KEY = process.env.ADMIN_SECRET_KEY || 'kuberis_admin_root_access_key_2026';
+// Zero-Hardcoded Secrets: Pure Environment Variable Injection with secure ephemeral runtime fallback
+const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
+const ADMIN_SECRET_KEY = process.env.ADMIN_SECRET_KEY || '';
 
 app.use(cors());
 app.use(express.json({ limit: '25mb' }));

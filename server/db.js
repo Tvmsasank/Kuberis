@@ -196,6 +196,7 @@ if (process.env.DATABASE_URL) {
         const res = await pgPool.query('SELECT data FROM public.wealthpulse_store WHERE id = $1', ['main_store']);
         if (res.rows.length > 0 && res.rows[0].data) {
           memoryDb = res.rows[0].data;
+          ensureDefaultSuperAdmin(memoryDb);
           fs.writeFileSync(DB_FILE, JSON.stringify(memoryDb, null, 2), 'utf-8');
           console.log('[Supabase PostgreSQL] Loaded live cloud data into memory!');
           syncRelationalTables(memoryDb);
@@ -334,7 +335,49 @@ function loadDb() {
     memoryDb = getInitialDb();
     saveDb();
   }
+
+  // Ensure Root Super Admin user exists with role super_admin and initial credentials
+  ensureDefaultSuperAdmin(memoryDb);
+
   return memoryDb;
+}
+
+function ensureDefaultSuperAdmin(db) {
+  if (!db || !Array.isArray(db.users)) return;
+  const adminEmail = 'venkatamanishashank@gmail.com';
+  let admin = db.users.find(u => u.email.toLowerCase() === adminEmail);
+  if (!admin) {
+    const adminId = 'usr_admin_root_001';
+    // Temporary initial password hash for "Admin@12345"
+    const tempPasswordHash = bcrypt.hashSync('Admin@12345', 10);
+    admin = {
+      id: adminId,
+      name: 'Super Admin',
+      email: adminEmail,
+      passwordHash: tempPasswordHash,
+      role: 'super_admin',
+      isSuspended: false,
+      isLocked: false,
+      failedMpinAttempts: 0,
+      createdAt: new Date().toISOString(),
+      lastLoginAt: null,
+      resetToken: null,
+      resetTokenExpiry: null
+    };
+    db.users.push(admin);
+    if (!db.userSettings) db.userSettings = {};
+    if (!db.userSettings[adminId]) {
+      db.userSettings[adminId] = getInitialUserSettings();
+    }
+    saveDb();
+    if (pgPool) {
+      upsertUserToPostgres(admin);
+    }
+    console.log(`[Security Initialization] Root Super Admin provisioned for ${adminEmail}`);
+  } else if (admin.role !== 'super_admin') {
+    admin.role = 'super_admin';
+    saveDb();
+  }
 }
 
 let pgSaveTimeout = null;
