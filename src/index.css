@@ -49,6 +49,9 @@
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-liquid: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-smooth: cubic-bezier(0.25, 1, 0.5, 1);
+  --glass-blur: 26px;
+  --glass-opacity: 0.72;
+  --glass-specular-opacity: 0.35;
 }
 
 /* Theme 1: Cyber Emerald Glass (Default / Dark) */
@@ -185,8 +188,8 @@ body::after {
 .sidebar {
   width: var(--sidebar-width);
   background: var(--bg-sidebar);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: blur(var(--glass-blur, 28px)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 28px)) saturate(180%);
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
@@ -318,8 +321,8 @@ body::after {
 /* Cards (Apple Liquid Glassmorphism) */
 .card {
   background: var(--bg-card);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(var(--glass-blur, 24px)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 24px)) saturate(180%);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   padding: 24px;
@@ -1539,3 +1542,91 @@ input[type=number] {
 
 
 
+
+/* ==========================================================================
+   Apple Liquid Glass: Dynamic Ambient Light Orbs & Specular Highlights
+   ========================================================================== */
+#kuberis-ambient-liquid-orbs {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.liquid-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.22;
+  animation: floatOrb 18s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.liquid-orb-1 {
+  width: 550px;
+  height: 550px;
+  top: -120px;
+  right: -80px;
+  background: radial-gradient(circle, #10B981 0%, rgba(16, 185, 129, 0.1) 70%, transparent 100%);
+}
+
+.liquid-orb-2 {
+  width: 480px;
+  height: 480px;
+  bottom: 8%;
+  left: 5%;
+  background: radial-gradient(circle, #0284C7 0%, rgba(2, 132, 199, 0.1) 70%, transparent 100%);
+  animation-duration: 24s;
+  animation-delay: -6s;
+}
+
+.liquid-orb-3 {
+  width: 380px;
+  height: 380px;
+  top: 40%;
+  right: 25%;
+  background: radial-gradient(circle, #8B5CF6 0%, rgba(139, 92, 246, 0.1) 70%, transparent 100%);
+  animation-duration: 20s;
+  animation-delay: -11s;
+}
+
+@keyframes floatOrb {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(45px, 60px) scale(1.12); }
+  100% { transform: translate(-35px, 30px) scale(0.95); }
+}
+
+[data-theme='light'] .liquid-orb {
+  opacity: 0.12;
+  filter: blur(110px);
+}
+
+/* Logout Pulse Feedback Modal */
+.logout-feedback-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(4, 13, 26, 0.78);
+  backdrop-filter: blur(36px) saturate(190%);
+  -webkit-backdrop-filter: blur(36px) saturate(190%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logout-feedback-capsule {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(10, 25, 47, 0.88) 100%);
+  border: 1.5px solid rgba(16, 185, 129, 0.4);
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.8), 0 0 45px rgba(16, 185, 129, 0.35);
+  border-radius: 28px;
+  padding: 36px 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}

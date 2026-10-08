@@ -39,6 +39,7 @@ import SecurityOnboardingModal from './components/SecurityOnboardingModal';
 import AppTour from './components/AppTour';
 import LandingPage from './components/LandingPage';
 import StandaloneAdminPortal from './components/StandaloneAdminPortal';
+import LiquidGlassController, { applyGlassConfig, DEFAULT_GLASS_CONFIG } from './components/LiquidGlassController';
 import { CheckCircle2, FolderSync, X, Shield, Lock, UserPlus, LogIn, Fingerprint, KeyRound, Zap, Landmark, ShieldAlert, AlertCircle } from 'lucide-react';
 import { getDeviceHeaders } from './utils/deviceInfo';
 
@@ -68,6 +69,8 @@ export default function App() {
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState(() => localStorage.getItem('kuberis_theme') || localStorage.getItem('wealthpulse_theme') || localStorage.getItem('ledgerly_theme') || 'dark');
+  const [isGlassControllerOpen, setIsGlassControllerOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const [isPrivacyMode, setIsPrivacyMode] = useState(() => {
     return (localStorage.getItem('kuberis_privacy_mode') || localStorage.getItem('wealthpulse_privacy_mode')) === 'true';
   });
@@ -116,6 +119,20 @@ export default function App() {
   const [isSecurityToastDismissed, setIsSecurityToastDismissed] = useState(
     () => sessionStorage.getItem('kuberis_dismiss_security_toast') === 'true'
   );
+
+  // Apply user-configured Liquid Glass properties on load
+  useEffect(() => {
+    try {
+      const savedGlass = localStorage.getItem('kuberis_liquid_glass');
+      if (savedGlass) {
+        applyGlassConfig(JSON.parse(savedGlass));
+      } else {
+        applyGlassConfig(DEFAULT_GLASS_CONFIG);
+      }
+    } catch (e) {
+      applyGlassConfig(DEFAULT_GLASS_CONFIG);
+    }
+  }, [theme]);
 
   // Standalone Super Admin Route Detection (/kuberisadmin or #kuberisadmin)
   const [isAdminRoute, setIsAdminRoute] = useState(() => {
@@ -933,6 +950,7 @@ export default function App() {
             setIsAaModalOpen(true);
           }}
           onStartTour={() => setIsTourOpen(true)}
+          onOpenGlassController={() => setIsGlassControllerOpen(true)}
         />
 
         <main className="page-body">

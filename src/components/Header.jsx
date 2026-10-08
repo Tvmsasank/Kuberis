@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
+  Sliders,
+  Sparkles,
   FolderSync,
   Upload,
   Plus,
@@ -46,7 +48,8 @@ export default function Header({
   onTriggerDriveSync,
   isPrivacyMode = false,
   onTogglePrivacyMode,
-  onStartTour
+  onStartTour,
+  onOpenGlassController
 }) {
   const isDark = theme !== 'light';
   const [tickers, setTickers] = useState(INITIAL_TICKERS);
