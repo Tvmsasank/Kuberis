@@ -1131,6 +1131,7 @@ export default function App() {
           setIsProfileModalOpen(false);
           setIsTourOpen(true);
         }}
+        theme={theme}
       />
 
       {/* Change Password Modal for Authenticated User */}
@@ -1191,6 +1192,7 @@ export default function App() {
         onLoginSuccess={handleLoginSuccess}
         onOpenForgotPassword={() => setIsForgotPasswordOpen(true)}
         onOpenMpinModal={handleOpenMpinModal}
+        theme={theme}
       />
 
       <ForgotPasswordModal
