@@ -252,6 +252,30 @@ export default function Header({
             </button>
           )}
 
+          {/* 🫧 Apple Liquid Glass Transparency Controls */}
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={onOpenGlassController}
+            style={{
+              padding: '7px 12px',
+              borderRadius: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'rgba(16, 185, 129, 0.12)',
+              border: '1px solid rgba(16, 185, 129, 0.35)',
+              fontSize: '12px',
+              fontWeight: '700',
+              color: 'var(--primary)',
+              cursor: 'pointer'
+            }}
+            title="Adjust Apple Liquid Glass Translucency & Blur"
+          >
+            <Sparkles size={14} style={{ color: 'var(--primary)' }} />
+            <span className="btn-text-desktop">Glass</span>
+          </button>
+
           {/* 🌓 Simple 2-State Theme Toggle (Dark / Light) */}
           <button
             type="button"

@@ -1572,6 +1572,48 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* Apple Liquid Glass Ambient Light Orbs */}
+      <div id="kuberis-ambient-liquid-orbs">
+        <div className="liquid-orb liquid-orb-1" />
+        <div className="liquid-orb liquid-orb-2" />
+        <div className="liquid-orb liquid-orb-3" />
+      </div>
+
+      {/* Real-time Apple Liquid Glass Transparency & Frost Controller Modal */}
+      <LiquidGlassController
+        isOpen={isGlassControllerOpen}
+        onClose={() => setIsGlassControllerOpen(false)}
+      />
+
+      {/* Animated Logout Feedback Capsule */}
+      {isSigningOut && (
+        <div className="logout-feedback-overlay">
+          <div className="logout-feedback-capsule">
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: 'rgba(16, 185, 129, 0.2)',
+              border: '2px solid #10B981',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#10B981',
+              boxShadow: '0 0 30px rgba(16, 185, 129, 0.4)'
+            }}>
+              <Lock size={32} />
+            </div>
+            <div>
+              <h3 style={{ fontSize: '20px', fontWeight: '800', color: '#FFFFFF', margin: '0 0 4px 0' }}>
+                Vault Secured
+              </h3>
+              <p style={{ fontSize: '13px', color: '#94A3B8', margin: 0 }}>
+                Signed out safely • Encrypted sessions locked
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
