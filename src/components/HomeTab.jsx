@@ -124,7 +124,7 @@ export default function HomeTab({ onNavigateTab, onOpenRegister, user }) {
 
         <div className="grid-3" style={{ gap: '20px' }}>
           {/* Step 1 */}
-          <div style={{ background: 'var(--bg-app)', padding: '20px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+          <div style={{ background: 'rgba(255, 255, 255, 0.04)', padding: '20px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backdropFilter: 'blur(10px)' }}>
             <div style={{ fontSize: '12px', fontWeight: '800', color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '6px' }}>
               Step 01
             </div>
@@ -135,7 +135,7 @@ export default function HomeTab({ onNavigateTab, onOpenRegister, user }) {
           </div>
 
           {/* Step 2 */}
-          <div style={{ background: 'var(--bg-app)', padding: '20px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+          <div style={{ background: 'rgba(255, 255, 255, 0.04)', padding: '20px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backdropFilter: 'blur(10px)' }}>
             <div style={{ fontSize: '12px', fontWeight: '800', color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '6px' }}>
               Step 02
             </div>
@@ -146,7 +146,7 @@ export default function HomeTab({ onNavigateTab, onOpenRegister, user }) {
           </div>
 
           {/* Step 3 */}
-          <div style={{ background: 'var(--bg-app)', padding: '20px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+          <div style={{ background: 'rgba(255, 255, 255, 0.04)', padding: '20px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', backdropFilter: 'blur(10px)' }}>
             <div style={{ fontSize: '12px', fontWeight: '800', color: 'var(--primary)', textTransform: 'uppercase', marginBottom: '6px' }}>
               Step 03
             </div>

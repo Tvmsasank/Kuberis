@@ -57,9 +57,9 @@
 /* Theme 1: Cyber Emerald Glass (Default / Dark) */
 [data-theme='emerald'], [data-theme='dark'], .theme-dark, .theme-emerald {
   --bg-app: #040D1A;
-  --bg-card: rgba(10, 25, 47, 0.75);
-  --bg-card-hover: rgba(15, 35, 65, 0.88);
-  --bg-sidebar: rgba(8, 18, 35, 0.88);
+  --bg-card: rgba(10, 25, 47, var(--glass-opacity, 0.75));
+  --bg-card-hover: rgba(15, 35, 65, calc(var(--glass-opacity, 0.75) + 0.12));
+  --bg-sidebar: rgba(8, 18, 35, var(--glass-sidebar-opacity, 0.88));
   --bg-navy: #06152B;
   --bg-navy-card: rgba(15, 35, 65, 0.92);
 
@@ -76,7 +76,7 @@
   --text-muted: #94A3B8;
   --text-light: #64748B;
 
-  --hero-bg: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(10, 25, 47, 0.9) 100%);
+  --hero-bg: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(10, 25, 47, var(--glass-opacity, 0.85)) 100%);
   --hero-border: 1px solid rgba(16, 185, 129, 0.3);
   --shadow-glow: 0 0 35px rgba(16, 185, 129, 0.3);
 }
@@ -86,7 +86,7 @@
   --bg-app: #F8FAFC;
   --bg-card: rgba(255, 255, 255, var(--glass-opacity, 0.78));
   --bg-card-hover: rgba(255, 255, 255, 0.92);
-  --bg-sidebar: rgba(255, 255, 255, 0.82);
+  --bg-sidebar: rgba(255, 255, 255, var(--glass-sidebar-opacity, 0.82));
   --bg-navy: #0F172A;
   --bg-navy-card: #1E293B;
 
@@ -1560,38 +1560,54 @@ input[type=number] {
 .liquid-orb {
   position: absolute;
   border-radius: 50%;
-  filter: blur(90px);
-  opacity: 0.22;
+  filter: blur(80px);
+  opacity: 0.38;
   animation: floatOrb 18s ease-in-out infinite alternate;
   pointer-events: none;
+  will-change: transform;
 }
 
 .liquid-orb-1 {
-  width: 550px;
-  height: 550px;
+  width: 580px;
+  height: 580px;
   top: -120px;
   right: -80px;
-  background: radial-gradient(circle, #10B981 0%, rgba(16, 185, 129, 0.1) 70%, transparent 100%);
+  background: radial-gradient(circle, #10B981 0%, rgba(16, 185, 129, 0.25) 50%, transparent 80%);
 }
 
 .liquid-orb-2 {
-  width: 480px;
-  height: 480px;
+  width: 520px;
+  height: 520px;
   bottom: 8%;
   left: 5%;
-  background: radial-gradient(circle, #0284C7 0%, rgba(2, 132, 199, 0.1) 70%, transparent 100%);
+  background: radial-gradient(circle, #0284C7 0%, rgba(2, 132, 199, 0.25) 50%, transparent 80%);
   animation-duration: 24s;
   animation-delay: -6s;
 }
 
 .liquid-orb-3 {
-  width: 380px;
-  height: 380px;
-  top: 40%;
-  right: 25%;
-  background: radial-gradient(circle, #8B5CF6 0%, rgba(139, 92, 246, 0.1) 70%, transparent 100%);
+  width: 440px;
+  height: 440px;
+  top: 35%;
+  right: 20%;
+  background: radial-gradient(circle, #8B5CF6 0%, rgba(139, 92, 246, 0.25) 50%, transparent 80%);
   animation-duration: 20s;
   animation-delay: -11s;
+}
+
+.liquid-orb-4 {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  width: 420px;
+  height: 420px;
+  bottom: 25%;
+  right: 10%;
+  background: radial-gradient(circle, #EC4899 0%, rgba(236, 72, 153, 0.2) 50%, transparent 80%);
+  animation: floatOrb 22s ease-in-out infinite alternate-reverse;
+  pointer-events: none;
+  opacity: 0.32;
+  will-change: transform;
 }
 
 @keyframes floatOrb {
@@ -1601,8 +1617,24 @@ input[type=number] {
 }
 
 [data-theme='light'] .liquid-orb {
-  opacity: 0.12;
-  filter: blur(110px);
+  opacity: 0.42;
+  filter: blur(75px);
+}
+
+[data-theme='light'] .liquid-orb-1 {
+  background: radial-gradient(circle, #059669 0%, rgba(16, 185, 129, 0.35) 45%, transparent 75%);
+}
+
+[data-theme='light'] .liquid-orb-2 {
+  background: radial-gradient(circle, #0284C7 0%, rgba(56, 189, 248, 0.35) 45%, transparent 75%);
+}
+
+[data-theme='light'] .liquid-orb-3 {
+  background: radial-gradient(circle, #7C3AED 0%, rgba(139, 92, 246, 0.32) 45%, transparent 75%);
+}
+
+[data-theme='light'] .liquid-orb-4 {
+  background: radial-gradient(circle, #DB2777 0%, rgba(244, 114, 182, 0.3) 45%, transparent 75%);
 }
 
 /* Logout Pulse Feedback Modal */

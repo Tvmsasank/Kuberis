@@ -203,7 +203,7 @@ export default function DashboardTab({
 
       {/* Real-Time Investment Portfolio Live Widget on Dashboard */}
       {safeInvestments.length > 0 && (
-        <div className="card" style={{ marginBottom: '28px', padding: '20px', background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%)', border: '1px solid var(--primary-light)' }}>
+        <div className="card" style={{ marginBottom: '28px', padding: '20px', border: '1px solid var(--primary-light)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
             <div>
               <h3 style={{ fontSize: '18px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'white' }}>

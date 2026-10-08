@@ -31,20 +31,24 @@ export const PRESETS = [
 export function applyGlassConfig(config) {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
-  const alpha = config.opacity / 100;
+  const alpha = Number((config.opacity / 100).toFixed(2));
+  const sidebarAlpha = Math.min(0.96, Number((alpha + 0.12).toFixed(2)));
 
   root.style.setProperty('--glass-blur', `${config.blur}px`);
   root.style.setProperty('--glass-opacity', `${alpha}`);
-  root.style.setProperty('--glass-specular-opacity', config.specular ? '0.35' : '0.0');
+  root.style.setProperty('--glass-sidebar-opacity', `${sidebarAlpha}`);
+  root.style.setProperty('--glass-specular-opacity', config.specular ? '0.45' : '0.0');
 
-  // Dynamically update card and sidebar translucent backgrounds
+  // Dynamically update card, hero, and sidebar backgrounds with priority
   const isLight = root.getAttribute('data-theme') === 'light';
   if (isLight) {
-    root.style.setProperty('--bg-card', `rgba(255, 255, 255, ${alpha})`);
-    root.style.setProperty('--bg-sidebar', `rgba(255, 255, 255, ${Math.min(0.96, alpha + 0.1)})`);
+    root.style.setProperty('--bg-card', `rgba(255, 255, 255, ${alpha})`, 'important');
+    root.style.setProperty('--bg-sidebar', `rgba(255, 255, 255, ${sidebarAlpha})`, 'important');
+    root.style.setProperty('--hero-bg', `linear-gradient(135deg, rgba(236, 253, 245, ${Math.min(0.85, alpha)}) 0%, rgba(240, 253, 244, ${Math.min(0.75, alpha)}) 50%, rgba(224, 242, 254, ${Math.min(0.8, alpha)}) 100%)`, 'important');
   } else {
-    root.style.setProperty('--bg-card', `rgba(10, 25, 47, ${alpha})`);
-    root.style.setProperty('--bg-sidebar', `rgba(8, 18, 35, ${Math.min(0.96, alpha + 0.1)})`);
+    root.style.setProperty('--bg-card', `rgba(10, 25, 47, ${alpha})`, 'important');
+    root.style.setProperty('--bg-sidebar', `rgba(8, 18, 35, ${sidebarAlpha})`, 'important');
+    root.style.setProperty('--hero-bg', `linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(10, 25, 47, ${alpha}) 100%)`, 'important');
   }
 
   // Toggle ambient orbs
@@ -72,21 +76,30 @@ export default function LiquidGlassController({ isOpen, onClose }) {
   }, [config]);
 
   const handleUpdate = (key, val) => {
-    setConfig(prev => ({ ...prev, [key]: val, preset: 'custom' }));
+    setConfig(prev => {
+      const next = { ...prev, [key]: val, preset: 'custom' };
+      applyGlassConfig(next);
+      return next;
+    });
   };
 
   const handleSelectPreset = (p) => {
-    setConfig(prev => ({
-      ...prev,
-      opacity: p.opacity,
-      blur: p.blur,
-      specular: p.specular,
-      preset: p.id
-    }));
+    setConfig(prev => {
+      const next = {
+        ...prev,
+        opacity: p.opacity,
+        blur: p.blur,
+        specular: p.specular,
+        preset: p.id
+      };
+      applyGlassConfig(next);
+      return next;
+    });
   };
 
   const handleReset = () => {
     setConfig(DEFAULT_GLASS_CONFIG);
+    applyGlassConfig(DEFAULT_GLASS_CONFIG);
   };
 
   return (
@@ -221,7 +234,7 @@ export default function LiquidGlassController({ isOpen, onClose }) {
                     fontWeight: '800'
                   }}
                 >
-                  ${config.opacity}%
+                  {config.opacity}%
                 </span>
               </div>
             </div>
