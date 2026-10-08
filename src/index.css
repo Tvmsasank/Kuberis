@@ -1345,3 +1345,114 @@ input[type=number] {
   -moz-appearance: textfield !important;
 }
 
+/* ==========================================================================
+   SLIDING SPLIT-SCREEN OVERLAY AUTH MODAL STYLES (FRAMER MOTION)
+   ========================================================================== */
+
+.kuberis-auth-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(2, 6, 18, 0.78);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.kuberis-auth-card {
+  position: relative;
+  width: 100%;
+  max-width: 980px;
+  min-height: 620px;
+  background: linear-gradient(135deg, rgba(8, 20, 36, 0.95) 0%, rgba(3, 10, 20, 0.98) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  border-radius: 28px;
+  box-shadow: 0 25px 80px -15px rgba(0, 0, 0, 0.8), 0 0 50px -10px rgba(16, 185, 129, 0.15);
+  overflow: hidden;
+  display: flex;
+}
+
+@media (max-width: 768px) {
+  .kuberis-auth-card {
+    max-width: 460px;
+    min-height: auto;
+    flex-direction: column;
+    border-radius: 22px;
+  }
+}
+
+/* Biometric Radar Sonar Scanner Effect */
+@keyframes kuberisRadarPing {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.4);
+    opacity: 0.35;
+  }
+  100% {
+    transform: scale(1.85);
+    opacity: 0;
+  }
+}
+
+.kuberis-radar-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 12px;
+  border: 1.5px solid #10B981;
+  pointer-events: none;
+  animation: kuberisRadarPing 2.2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+}
+
+.kuberis-radar-ring-2 {
+  position: absolute;
+  inset: -12px;
+  border-radius: 16px;
+  border: 1.5px solid rgba(52, 211, 153, 0.6);
+  pointer-events: none;
+  animation: kuberisRadarPing 2.2s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+  animation-delay: 0.7s;
+}
+
+/* Floating Focus Input Container */
+.kuberis-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: rgba(5, 15, 30, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.kuberis-input-container:focus-within {
+  border-color: #10B981;
+  background: rgba(6, 20, 38, 0.9);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18), 0 0 20px -3px rgba(16, 185, 129, 0.25);
+}
+
+.kuberis-input-container input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #FFFFFF;
+  font-size: 13.5px;
+  padding: 12px 14px 12px 42px;
+}
+
+.kuberis-input-container input::placeholder {
+  color: #64748B;
+  transition: opacity 0.2s ease;
+}
+
+.kuberis-input-container:focus-within input::placeholder {
+  opacity: 0.5;
+}
+
+

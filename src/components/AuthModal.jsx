@@ -1,5 +1,25 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Lock, Mail, User, CheckCircle2, AlertCircle, Fingerprint, KeyRound, Shield, Delete, RefreshCw } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  X,
+  Lock,
+  Mail,
+  User,
+  CheckCircle2,
+  AlertCircle,
+  Fingerprint,
+  KeyRound,
+  Shield,
+  Delete,
+  Eye,
+  EyeOff,
+  ArrowRight,
+  ShieldCheck,
+  Sparkles,
+  Smartphone,
+  RefreshCw,
+  AlertTriangle
+} from 'lucide-react';
 import { authenticateWithBiometrics, isBiometricsAvailable } from '../utils/biometrics';
 import { getDeviceHeaders } from '../utils/deviceInfo';
 
@@ -13,9 +33,19 @@ export default function AuthModal({
 }) {
   if (!isOpen) return null;
 
-  const rememberedEmail = localStorage.getItem('kuberis_remembered_email') || localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email') || '';
-  const hasMpin = localStorage.getItem('kuberis_has_mpin') === 'true' || localStorage.getItem('wealthpulse_has_mpin') === 'true' || localStorage.getItem('ledgerly_has_mpin') === 'true';
-  const hasBiometrics = localStorage.getItem('kuberis_has_biometrics') === 'true' || localStorage.getItem('wealthpulse_has_biometrics') === 'true' || localStorage.getItem('ledgerly_has_biometrics') === 'true';
+  const rememberedEmail =
+    localStorage.getItem('kuberis_remembered_email') ||
+    localStorage.getItem('wealthpulse_remembered_email') ||
+    localStorage.getItem('ledgerly_remembered_email') ||
+    '';
+  const hasMpin =
+    localStorage.getItem('kuberis_has_mpin') === 'true' ||
+    localStorage.getItem('wealthpulse_has_mpin') === 'true' ||
+    localStorage.getItem('ledgerly_has_mpin') === 'true';
+  const hasBiometrics =
+    localStorage.getItem('kuberis_has_biometrics') === 'true' ||
+    localStorage.getItem('wealthpulse_has_biometrics') === 'true' ||
+    localStorage.getItem('ledgerly_has_biometrics') === 'true';
 
   const getInitialAuthMethod = () => {
     if (initialMode === 'register') return 'register';
@@ -26,13 +56,16 @@ export default function AuthModal({
 
   const [authMethod, setAuthMethod] = useState(getInitialAuthMethod);
   const [name, setName] = useState('');
-  const [email, setEmail] = useState(() => initialMode === 'register' ? '' : rememberedEmail);
+  const [email, setEmail] = useState(() => (initialMode === 'register' ? '' : rememberedEmail));
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [mpin, setMpin] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [errorShakeKey, setErrorShakeKey] = useState(0);
   const [success, setSuccess] = useState('');
   const [biometricSupported, setBiometricSupported] = useState(false);
   const [emailHasMpin, setEmailHasMpin] = useState(false);
@@ -40,9 +73,29 @@ export default function AuthModal({
   const [isAccountSuspended, setIsAccountSuspended] = useState(false);
   const [suspendedReason, setSuspendedReason] = useState('');
   const [pendingSessionOverride, setPendingSessionOverride] = useState(null);
+  const [totpTempToken, setTotpTempToken] = useState('');
+  const [totpCode, setTotpCode] = useState('');
+
+  // Track responsive screen width for desktop split-screen vs mobile view
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 768 : false));
 
   useEffect(() => {
-    const savedEmail = localStorage.getItem('kuberis_remembered_email') || localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email') || '';
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const triggerError = (msg) => {
+    setError(msg);
+    setErrorShakeKey((prev) => prev + 1);
+  };
+
+  useEffect(() => {
+    const savedEmail =
+      localStorage.getItem('kuberis_remembered_email') ||
+      localStorage.getItem('wealthpulse_remembered_email') ||
+      localStorage.getItem('ledgerly_remembered_email') ||
+      '';
     setMpin('');
     setError('');
     setSuccess('');
@@ -68,12 +121,12 @@ export default function AuthModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: savedEmail })
       })
-        .then(res => res.json())
-        .then(data => {
+        .then((res) => res.json())
+        .then((data) => {
           if (data.isSuspended) {
             setIsAccountSuspended(true);
             setSuspendedReason(data.suspendedReason || 'Policy compliance review');
-            setError(`Account Suspended: ${data.suspendedReason || 'Contact platform administration.'}`);
+            triggerError(`Account Suspended: ${data.suspendedReason || 'Contact platform administration.'}`);
             return;
           }
           if (data.hasMpin) {
@@ -96,7 +149,6 @@ export default function AuthModal({
     }
   }, [initialMode, isOpen]);
 
-  // Dynamically check if typed email has MPIN or Biometrics set or is suspended
   const handleEmailChange = (val) => {
     setEmail(val);
     setEmailHasMpin(false);
@@ -109,35 +161,58 @@ export default function AuthModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: val.trim() })
       })
-        .then(res => res.json())
-        .then(data => {
+        .then((res) => res.json())
+        .then((data) => {
           if (data.isSuspended) {
             setIsAccountSuspended(true);
             setSuspendedReason(data.suspendedReason || 'Policy compliance review');
-            setError(`Account Suspended: ${data.suspendedReason || 'Contact platform administration.'}`);
+            triggerError(`Account Suspended: ${data.suspendedReason || 'Contact platform administration.'}`);
             return;
           }
           if (data.hasMpin) setEmailHasMpin(true);
           if (data.hasBiometrics) setEmailHasBiometrics(true);
         })
-        .catch(() => { });
+        .catch(() => {});
     }
   };
 
-  const handleKeyPress = useCallback((digit) => {
-    if (loading || isAccountSuspended || authMethod !== 'mpin') return;
-    if (mpin.length < 4) {
-      const nextMpin = mpin + digit;
-      setMpin(nextMpin);
-      if (nextMpin.length === 4) {
-        handleVerifyMpin(nextMpin);
+  const handleClearRemembered = () => {
+    localStorage.removeItem('kuberis_remembered_email');
+    localStorage.removeItem('wealthpulse_remembered_email');
+    localStorage.removeItem('ledgerly_remembered_email');
+    localStorage.removeItem('kuberis_has_mpin');
+    localStorage.removeItem('kuberis_has_biometrics');
+    setEmail('');
+    setMpin('');
+    setEmailHasMpin(false);
+    setEmailHasBiometrics(false);
+    setAuthMethod('password');
+  };
+
+  const getInitials = (em) => {
+    if (!em) return 'U';
+    const clean = em.split('@')[0];
+    return clean.slice(0, 2).toUpperCase();
+  };
+
+  // MPIN Keypad handlers
+  const handleKeyPress = useCallback(
+    (digit) => {
+      if (loading || isAccountSuspended || authMethod !== 'mpin') return;
+      if (mpin.length < 4) {
+        const nextMpin = mpin + digit;
+        setMpin(nextMpin);
+        if (nextMpin.length === 4) {
+          handleVerifyMpin(nextMpin);
+        }
       }
-    }
-  }, [mpin, loading, authMethod]);
+    },
+    [mpin, loading, authMethod, isAccountSuspended]
+  );
 
   const handleDeleteMpin = useCallback(() => {
     if (loading || authMethod !== 'mpin') return;
-    setMpin(prev => prev.slice(0, -1));
+    setMpin((prev) => prev.slice(0, -1));
   }, [loading, authMethod]);
 
   useEffect(() => {
@@ -183,7 +258,9 @@ export default function AuthModal({
           throw new Error(json.error || 'Account suspended. Contact administrator.');
         }
         if (json.locked || res.status === 423) {
-          throw new Error(json.error || 'Account locked: 3 incorrect MPIN attempts. An unlock link has been sent to your Gmail inbox.');
+          throw new Error(
+            json.error || 'Account locked: 3 incorrect MPIN attempts. An unlock link has been sent to your Gmail inbox.'
+          );
         }
         throw new Error(json.error || 'Invalid 4-Digit MPIN');
       }
@@ -206,13 +283,13 @@ export default function AuthModal({
         return;
       }
 
-      setSuccess('MPIN Verified! Logging in...');
+      setSuccess('MPIN Verified! Unlocking vault...');
       setTimeout(() => {
         onLoginSuccess(json.user, json.token, true, { refreshToken: json.refreshToken });
         onClose();
       }, 400);
     } catch (err) {
-      setError(err.message || 'MPIN verification failed');
+      triggerError(err.message || 'MPIN verification failed');
       setMpin('');
     } finally {
       setLoading(false);
@@ -222,7 +299,7 @@ export default function AuthModal({
   const handleForgotMpin = async () => {
     const targetEmail = (email || rememberedEmail || '').trim();
     if (!targetEmail) {
-      setError('Please enter your account email to receive an MPIN reset link');
+      triggerError('Please enter your account email to receive an MPIN reset link');
       return;
     }
     setLoading(true);
@@ -238,9 +315,9 @@ export default function AuthModal({
       if (!res.ok) throw new Error(json.error || 'Failed to send MPIN reset link');
 
       setTotpTempToken(json.resetMpinToken || '');
-      setSuccess(`MPIN reset authorized for ${targetEmail}! Check your Gmail inbox or click below to reset right now.`);
+      setSuccess(`MPIN reset authorized for ${targetEmail}! Check your inbox to reset.`);
     } catch (err) {
-      setError(err.message || 'Failed to send MPIN reset link');
+      triggerError(err.message || 'Failed to send MPIN reset link');
     } finally {
       setLoading(false);
     }
@@ -253,23 +330,20 @@ export default function AuthModal({
     try {
       const targetEmail = emailToUse || email || rememberedEmail;
       const result = await authenticateWithBiometrics(targetEmail);
-      setSuccess('Face ID / Biometric Verified! Unlocking...');
+      setSuccess('Touch ID / Biometric Verified! Unlocking...');
       setTimeout(() => {
         onLoginSuccess(result.user, result.token, true);
         onClose();
       }, 400);
     } catch (err) {
-      setError(err.message || 'Biometric scan failed');
+      triggerError(err.message || 'Biometric scan failed');
     } finally {
       setLoading(false);
     }
   };
 
-  const [totpTempToken, setTotpTempToken] = useState('');
-  const [totpCode, setTotpCode] = useState('');
-
   const handlePasswordLogin = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     setError('');
     setLoading(true);
     try {
@@ -307,53 +381,57 @@ export default function AuthModal({
         localStorage.setItem('kuberis_remembered_email', email.trim());
       }
 
-      setSuccess('Sign in successful!');
+      setSuccess('Sign in verified! Unlocking dashboard...');
       setTimeout(() => {
         onLoginSuccess(json.user, json.token, rememberMe, { refreshToken: json.refreshToken });
         onClose();
       }, 400);
     } catch (err) {
-      setError(err.message);
+      triggerError(err.message || 'Sign in failed');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleConfirmSessionOverride = async () => {
-    if (!pendingSessionOverride) return;
-    setLoading(true);
+  const handleRegisterSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
     setError('');
-    const { type, payload } = pendingSessionOverride;
-    setPendingSessionOverride(null);
+    if (!name.trim()) {
+      triggerError('Please enter your full name');
+      return;
+    }
+    if (!email.trim() || !email.includes('@')) {
+      triggerError('Please enter a valid email address');
+      return;
+    }
+    if (password !== confirmPassword) {
+      triggerError('Passwords do not match');
+      return;
+    }
+    if (password.length < 6) {
+      triggerError('Password must be at least 6 characters');
+      return;
+    }
 
+    setLoading(true);
     try {
-      const endpoint = type === 'mpin' ? '/api/auth/mpin/verify' : '/api/auth/login';
-      const res = await fetch(endpoint, {
+      const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getDeviceHeaders() },
-        body: JSON.stringify({ ...payload, forceLogin: true })
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), password })
       });
 
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Sign in failed');
+      if (!res.ok) throw new Error(json.error || 'Registration failed');
 
-      if (json.require2FA) {
-        setTotpTempToken(json.tempToken);
-        setAuthMethod('2fa_challenge');
-        setSuccess('Google Authenticator 2FA verification required');
-        return;
-      }
-
-      localStorage.setItem('kuberis_remembered_email', payload.email);
-      if (type === 'mpin') localStorage.setItem('kuberis_has_mpin', 'true');
-
-      setSuccess('Signed in successfully! Previous session closed.');
+      localStorage.setItem('kuberis_remembered_email', email.trim());
+      setSuccess('Account created successfully! Preparing dashboard...');
       setTimeout(() => {
-        onLoginSuccess(json.user, json.token, true, { refreshToken: json.refreshToken });
+        onLoginSuccess(json.user, json.token, true, { isNewRegistration: true, refreshToken: json.refreshToken });
         onClose();
       }, 400);
     } catch (err) {
-      setError(err.message || 'Sign in failed');
+      triggerError(err.message || 'Registration failed');
     } finally {
       setLoading(false);
     }
@@ -389,23 +467,14 @@ export default function AuthModal({
     } catch (err) {
       clearTimeout(timeout);
       if (err.name === 'AbortError') {
-        setError('Verification timed out. Please check your internet connection and try again.');
+        triggerError('Verification timed out. Please check your internet connection.');
       } else {
-        setError(err.message || 'Invalid 6-digit code. Please check Google Authenticator and try again.');
+        triggerError(err.message || 'Invalid 6-digit code. Please check Google Authenticator.');
       }
-      setTotpCode(''); // Reset so user can immediately type the fresh code
+      setTotpCode('');
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleTwoFactorLoginSubmit = async (e) => {
-    if (e && e.preventDefault) e.preventDefault();
-    if (!totpCode || !totpCode.trim()) {
-      setError('Please enter your 6-digit Google Authenticator code');
-      return;
-    }
-    await triggerTwoFactorLogin(totpCode);
   };
 
   const handleTotpCodeChange = (raw) => {
@@ -417,710 +486,1324 @@ export default function AuthModal({
     }
   };
 
-  const handleRegisterSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
-
+  const handleConfirmSessionOverride = async () => {
+    if (!pendingSessionOverride) return;
     setLoading(true);
+    setError('');
+    const { type, payload } = pendingSessionOverride;
+    setPendingSessionOverride(null);
+
     try {
-      const res = await fetch('/api/auth/register', {
+      const endpoint = type === 'mpin' ? '/api/auth/mpin/verify' : '/api/auth/login';
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getDeviceHeaders() },
-        body: JSON.stringify({ name: name.trim(), email: email.trim(), password })
+        body: JSON.stringify({ ...payload, forceLogin: true })
       });
 
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Registration failed');
+      if (!res.ok) throw new Error(json.error || 'Sign in failed');
 
-      localStorage.setItem('kuberis_remembered_email', email.trim());
-      setSuccess('Account created successfully!');
+      if (json.require2FA) {
+        setTotpTempToken(json.tempToken);
+        setAuthMethod('2fa_challenge');
+        setSuccess('Google Authenticator 2FA verification required');
+        return;
+      }
+
+      localStorage.setItem('kuberis_remembered_email', payload.email);
+      if (type === 'mpin') localStorage.setItem('kuberis_has_mpin', 'true');
+
+      setSuccess('Signed in successfully! Previous session terminated.');
       setTimeout(() => {
-        onLoginSuccess(json.user, json.token, true, { isNewRegistration: true, refreshToken: json.refreshToken });
+        onLoginSuccess(json.user, json.token, true, { refreshToken: json.refreshToken });
         onClose();
       }, 400);
     } catch (err) {
-      setError(err.message);
+      triggerError(err.message || 'Sign in failed');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSwitchAccount = () => {
-    localStorage.removeItem('kuberis_remembered_email');
-    localStorage.removeItem('wealthpulse_remembered_email');
-    localStorage.removeItem('ledgerly_remembered_email');
-    setEmail('');
-    setMpin('');
-    setEmailHasMpin(false);
-    setAuthMethod('password');
-  };
-
-  const getInitials = (emailStr) => {
-    if (!emailStr) return 'U';
-    const namePart = emailStr.split('@')[0];
-    return namePart.substring(0, 2).toUpperCase();
-  };
+  const isRegisterMode = authMethod === 'register';
+  const isSpecialMode = authMethod === 'mpin' || authMethod === '2fa_challenge' || authMethod === 'biometrics';
 
   return (
-    <div className="modal-backdrop">
-      <div
-        className="modal-content"
-        onClick={e => e.stopPropagation()}
-        style={{
-          maxWidth: '520px',
-          width: '100%',
-          padding: '28px',
-          borderRadius: '24px',
-          background: 'var(--bg-card)',
-          backdropFilter: 'blur(28px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(28px) saturate(180%)',
-          border: '1px solid var(--border-glass)',
-          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.6)'
-        }}
+    <AnimatePresence>
+      <motion.div
+        className="kuberis-auth-overlay"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.24 }}
+        onClick={onClose}
       >
-        {/* Modal Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ padding: '8px', borderRadius: '12px', background: 'var(--primary-light)', color: 'var(--primary)' }}>
-              <Lock size={20} />
-            </div>
-            <div>
-              <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
-                {authMethod === 'register' ? 'Create Kuberis Account' : 'Sign In to Kuberis'}
-              </h2>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                {authMethod === 'mpin' ? 'Enter 4-Digit MPIN to unlock' : 'Secure financial dashboard access'}
-              </div>
-            </div>
-          </div>
-          <button className="modal-close" onClick={onClose} aria-label="Close" style={{ padding: '6px' }}>
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Tab Toggle for Register / Sign In */}
-        {authMethod !== 'register' && !rememberedEmail && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', background: 'var(--bg-app)', padding: '5px', borderRadius: '14px', marginBottom: '20px', border: '1px solid var(--border-color)' }}>
-            <button
-              type="button"
-              className="btn"
-              style={{
-                padding: '8px',
-                borderRadius: '10px',
-                background: authMethod !== 'register' ? 'var(--primary)' : 'transparent',
-                color: authMethod !== 'register' ? '#000000' : 'var(--text-muted)',
-                fontSize: '13px',
-                fontWeight: '700'
-              }}
-              onClick={() => { setAuthMethod('password'); setError(''); }}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              className="btn"
-              style={{
-                padding: '8px',
-                borderRadius: '10px',
-                background: authMethod === 'register' ? 'var(--primary)' : 'transparent',
-                color: authMethod === 'register' ? '#000000' : 'var(--text-muted)',
-                fontSize: '13px',
-                fontWeight: '700'
-              }}
-              onClick={() => { setAuthMethod('register'); setError(''); }}
-            >
-              Create Account
-            </button>
-          </div>
-        )}
-
-        {/* Remembered User Card */}
-        {rememberedEmail && authMethod !== 'register' && (
+        {/* Main Fluid Animated Modal Box */}
+        <motion.div
+          key={`card-shake-${errorShakeKey}`}
+          className="kuberis-auth-card"
+          initial={{ scale: 0.94, opacity: 0, y: 15 }}
+          animate={{
+            scale: 1,
+            opacity: 1,
+            y: 0,
+            x: error ? [-12, 12, -8, 8, -4, 4, 0] : 0
+          }}
+          exit={{ scale: 0.94, opacity: 0, y: 15 }}
+          transition={{
+            type: 'spring',
+            stiffness: 280,
+            damping: 25,
+            x: { duration: 0.45, ease: 'easeInOut' }
+          }}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            borderColor: error ? 'rgba(239, 68, 68, 0.45)' : 'rgba(16, 185, 129, 0.22)',
+            boxShadow: error
+              ? '0 25px 80px -15px rgba(0, 0, 0, 0.8), 0 0 50px -10px rgba(239, 68, 68, 0.25)'
+              : '0 25px 80px -15px rgba(0, 0, 0, 0.8), 0 0 50px -10px rgba(16, 185, 129, 0.15)'
+          }}
+        >
+          {/* Top Glowing Ambient Light Beam */}
           <div
             style={{
-              padding: '16px 18px',
-              borderRadius: '18px',
-              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(10, 25, 47, 0.8) 100%)',
-              border: '1px solid var(--border-glass)',
-              marginBottom: '16px',
+              position: 'absolute',
+              top: 0,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: '60%',
+              height: '1px',
+              background: 'linear-gradient(90deg, transparent 0%, #10B981 50%, transparent 100%)',
+              boxShadow: '0 0 20px #10B981',
+              zIndex: 30
+            }}
+          />
+
+          {/* Close Button */}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            style={{
+              position: 'absolute',
+              top: '18px',
+              right: '18px',
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.06)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              color: '#94A3B8',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: '10px'
+              justifyContent: 'center',
+              cursor: 'pointer',
+              zIndex: 40,
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = '#FFFFFF';
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = '#94A3B8';
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+            <X size={18} />
+          </button>
+
+          {/* =========================================================================
+              MOBILE SEGMENTED SWITCHER (VISIBLE ONLY ON MOBILE VIEWPORTS < 768px)
+             ========================================================================= */}
+          {isMobile && !isSpecialMode && (
+            <div style={{ padding: '20px 20px 0 20px', zIndex: 10 }}>
               <div
                 style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, var(--primary) 0%, #059669 100%)',
-                  color: '#000000',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: '900',
-                  fontSize: '14px',
-                  flexShrink: 0
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  padding: '4px',
+                  borderRadius: '16px',
+                  background: 'rgba(5, 15, 30, 0.8)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  position: 'relative'
                 }}
               >
-                {getInitials(rememberedEmail)}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMethod('password');
+                    setError('');
+                  }}
+                  style={{
+                    position: 'relative',
+                    padding: '10px 16px',
+                    borderRadius: '12px',
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    border: 'none',
+                    background: 'transparent',
+                    color: !isRegisterMode ? '#FFFFFF' : '#94A3B8',
+                    cursor: 'pointer',
+                    zIndex: 2,
+                    transition: 'color 0.2s ease'
+                  }}
+                >
+                  {!isRegisterMode && (
+                    <motion.div
+                      layoutId="mobileActiveTab"
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        borderRadius: '12px',
+                        background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                        boxShadow: '0 4px 15px rgba(16, 185, 129, 0.35)',
+                        zIndex: -1
+                      }}
+                      transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                    />
+                  )}
+                  Sign In
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMethod('register');
+                    setError('');
+                  }}
+                  style={{
+                    position: 'relative',
+                    padding: '10px 16px',
+                    borderRadius: '12px',
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    border: 'none',
+                    background: 'transparent',
+                    color: isRegisterMode ? '#FFFFFF' : '#94A3B8',
+                    cursor: 'pointer',
+                    zIndex: 2,
+                    transition: 'color 0.2s ease'
+                  }}
+                >
+                  {isRegisterMode && (
+                    <motion.div
+                      layoutId="mobileActiveTab"
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        borderRadius: '12px',
+                        background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                        boxShadow: '0 4px 15px rgba(16, 185, 129, 0.35)',
+                        zIndex: -1
+                      }}
+                      transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+                    />
+                  )}
+                  Create Account
+                </button>
               </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={rememberedEmail}>
-                  {rememberedEmail}
-                </div>
-                <div style={{ fontSize: '10px', color: '#34D399', display: 'flex', alignItems: 'center', gap: '3px', marginTop: '2px' }}>
-                  <CheckCircle2 size={11} /> Remembered
-                </div>
-              </div>
             </div>
+          )}
 
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              style={{
-                fontSize: '11px',
-                fontWeight: '700',
-                padding: '6px 10px',
-                flexShrink: 0,
-                gap: '4px',
-                borderRadius: '10px',
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid var(--border-color)',
-                color: 'var(--text-main)',
-                whiteSpace: 'nowrap'
-              }}
-              onClick={handleSwitchAccount}
-              title="Switch Account"
-            >
-              <RefreshCw size={11} /> Switch
-            </button>
-          </div>
-        )}
-
-        {isAccountSuspended && (
-          <div style={{
-            padding: '16px',
-            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(185, 28, 28, 0.1) 100%)',
-            border: '1px solid rgba(239, 68, 68, 0.5)',
-            borderRadius: '16px',
-            marginBottom: '20px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#F87171', fontWeight: '800', fontSize: '14px' }}>
-              <AlertCircle size={18} />
-              <span>ACCOUNT SUSPENDED</span>
-            </div>
-            <div style={{ fontSize: '12.5px', color: '#FCA5A5', lineHeight: '1.45' }}>
-              Your account has been administratively suspended: <strong style={{ color: '#FFFFFF' }}>{suspendedReason || 'Policy compliance review'}</strong>.
-            </div>
-            <div style={{ fontSize: '11.5px', color: 'rgba(255, 255, 255, 0.7)', marginTop: '2px' }}>
-              All authentication methods for this account are disabled. Please contact your platform administrator for assistance.
-            </div>
-          </div>
-        )}
-
-        {error && !isAccountSuspended && (
-          <div style={{ padding: '10px 14px', background: 'rgba(239, 68, 68, 0.15)', color: '#FCA5A5', border: '1px solid #EF4444', borderRadius: '12px', marginBottom: '16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <AlertCircle size={16} /> {error}
-          </div>
-        )}
-
-        {success && (
-          <div style={{ padding: '10px 14px', background: 'var(--success-light)', color: 'var(--success)', borderRadius: '12px', marginBottom: '16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <CheckCircle2 size={16} /> {success}
-          </div>
-        )}
-
-        {/* MODE 1: 4-DIGIT MPIN VIEW */}
-        {authMethod === 'mpin' && (
-          <div style={{ textAlign: 'center', opacity: isAccountSuspended ? 0.45 : 1, pointerEvents: isAccountSuspended ? 'none' : 'auto' }}>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-              {isAccountSuspended ? 'MPIN entry disabled (Account Suspended)' : 'Type or tap your 4-digit Security MPIN'}
-            </p>
-
-            {/* Tactile 4-Dot Indicator */}
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginBottom: '24px' }}>
-              {[0, 1, 2, 3].map(index => {
-                const isFilled = mpin.length > index;
-                return (
+          {/* =========================================================================
+              SPECIAL SECURITY SUB-VIEWS (MPIN KEYPAD, 2FA, SESSIONS, SUSPENSION)
+             ========================================================================= */}
+          {isSpecialMode || isAccountSuspended || pendingSessionOverride ? (
+            <div style={{ flex: 1, padding: '36px 32px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              {/* Account Suspended Alert */}
+              {isAccountSuspended && (
+                <div style={{ textAlign: 'center' }}>
                   <div
-                    key={index}
                     style={{
-                      width: '20px',
-                      height: '20px',
+                      width: '64px',
+                      height: '64px',
                       borderRadius: '50%',
-                      background: isFilled ? 'var(--primary)' : 'transparent',
-                      border: isFilled ? '2px solid var(--primary)' : '2px solid var(--border-color)',
-                      boxShadow: isFilled ? '0 0 12px var(--primary-glow)' : 'none',
-                      transition: 'all 0.25s var(--ease-spring)',
-                      transform: isFilled ? 'scale(1.15)' : 'scale(1)'
+                      background: 'rgba(239, 68, 68, 0.15)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      color: '#EF4444',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto 16px auto'
+                    }}
+                  >
+                    <AlertTriangle size={32} />
+                  </div>
+                  <h3 style={{ fontSize: '20px', fontWeight: '800', color: '#FFFFFF', marginBottom: '8px' }}>
+                    Account Administratively Suspended
+                  </h3>
+                  <p style={{ fontSize: '13px', color: '#94A3B8', lineHeight: '1.6', maxWidth: '420px', margin: '0 auto 24px auto' }}>
+                    {suspendedReason ||
+                      'Your access to the Kuberis Platform has been locked by a Security Administrator. Please contact platform administration.'}
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={onClose}
+                    style={{ padding: '10px 24px', borderRadius: '12px', fontWeight: '700' }}
+                  >
+                    Acknowledge & Close
+                  </button>
+                </div>
+              )}
+
+              {/* Active Session Conflict Prompt */}
+              {!isAccountSuspended && pendingSessionOverride && (
+                <div style={{ textAlign: 'center' }}>
+                  <div
+                    style={{
+                      width: '64px',
+                      height: '64px',
+                      borderRadius: '50%',
+                      background: 'rgba(245, 158, 11, 0.15)',
+                      border: '1px solid rgba(245, 158, 11, 0.3)',
+                      color: '#F59E0B',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto 16px auto'
+                    }}
+                  >
+                    <Smartphone size={32} />
+                  </div>
+                  <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#FFFFFF', marginBottom: '8px' }}>
+                    Active Session Detected on Another Device
+                  </h3>
+                  <p style={{ fontSize: '13px', color: '#94A3B8', lineHeight: '1.5', maxWidth: '420px', margin: '0 auto 24px auto' }}>
+                    Another browser or device currently has an open session for <strong>{pendingSessionOverride.payload.email}</strong>.
+                    To safeguard your financial data, signing in here will instantly terminate the other session.
+                  </p>
+                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="btn btn-primary"
+                      onClick={handleConfirmSessionOverride}
+                      disabled={loading}
+                      style={{ padding: '10px 24px', borderRadius: '12px', fontWeight: '700' }}
+                    >
+                      {loading ? 'Terminating & Logging In...' : 'Terminate Other & Sign In'}
+                    </motion.button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => setPendingSessionOverride(null)}
+                      style={{ padding: '10px 20px', borderRadius: '12px' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 2FA Google Authenticator Challenge */}
+              {!isAccountSuspended && !pendingSessionOverride && authMethod === '2fa_challenge' && (
+                <div style={{ maxWidth: '420px', margin: '0 auto', textAlign: 'center' }}>
+                  <div
+                    style={{
+                      width: '56px',
+                      height: '56px',
+                      borderRadius: '50%',
+                      background: 'rgba(16, 185, 129, 0.15)',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      color: '#10B981',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto 16px auto'
+                    }}
+                  >
+                    <Shield size={28} />
+                  </div>
+                  <h3 style={{ fontSize: '19px', fontWeight: '800', color: '#FFFFFF', marginBottom: '6px' }}>
+                    Google Authenticator 2FA
+                  </h3>
+                  <p style={{ fontSize: '12.5px', color: '#94A3B8', marginBottom: '20px' }}>
+                    Enter the rolling 6-digit code from Google Authenticator on your phone for <strong>{email}</strong>
+                  </p>
+
+                  {error && (
+                    <div
+                      style={{
+                        padding: '10px 14px',
+                        borderRadius: '12px',
+                        background: 'rgba(239, 68, 68, 0.15)',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        color: '#FCA5A5',
+                        fontSize: '12px',
+                        marginBottom: '16px'
+                      }}
+                    >
+                      {error}
+                    </div>
+                  )}
+
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    autoFocus
+                    maxLength={6}
+                    value={totpCode}
+                    onChange={(e) => handleTotpCodeChange(e.target.value)}
+                    placeholder="000000"
+                    style={{
+                      width: '200px',
+                      fontSize: '28px',
+                      fontWeight: '800',
+                      letterSpacing: '10px',
+                      textAlign: 'center',
+                      padding: '12px 16px',
+                      borderRadius: '16px',
+                      border: '1px solid rgba(16, 185, 129, 0.4)',
+                      background: 'rgba(5, 15, 30, 0.8)',
+                      color: '#10B981',
+                      outline: 'none',
+                      margin: '0 auto 20px auto',
+                      display: 'block'
                     }}
                   />
-                );
-              })}
-            </div>
 
-            {/* Number Pad Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', maxWidth: '280px', margin: '0 auto 20px auto' }}>
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map(num => (
-                <button
-                  key={num}
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{
-                    height: '52px',
-                    fontSize: '20px',
-                    fontWeight: '700',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                  onClick={() => handleKeyPress(num)}
-                  disabled={loading}
-                >
-                  {num}
-                </button>
-              ))}
-              <div />
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{
-                  height: '52px',
-                  fontSize: '20px',
-                  fontWeight: '700',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-                onClick={() => handleKeyPress('0')}
-                disabled={loading}
-              >
-                0
-              </button>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                style={{
-                  height: '52px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--text-muted)'
-                }}
-                onClick={handleDeleteMpin}
-                disabled={loading}
-                title="Backspace"
-              >
-                <Delete size={22} />
-              </button>
-            </div>
+                  <button
+                    type="button"
+                    onClick={() => setAuthMethod('password')}
+                    style={{ background: 'none', border: 'none', color: '#94A3B8', fontSize: '12px', cursor: 'pointer' }}
+                  >
+                    ← Back to standard password login
+                  </button>
+                </div>
+              )}
 
-            {/* Bottom Actions Bar */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '14px', borderTop: '1px solid var(--border-color)', fontSize: '12px', gap: '6px', flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                style={{ color: 'var(--primary)', gap: '4px', padding: '6px 6px', fontSize: '11.5px' }}
-                onClick={() => handleBiometricLogin(rememberedEmail)}
-              >
-                <Fingerprint size={15} /> Face ID
-              </button>
+              {/* 4-Digit MPIN Keypad Mode */}
+              {!isAccountSuspended && !pendingSessionOverride && authMethod === 'mpin' && (
+                <div style={{ maxWidth: '380px', margin: '0 auto', textAlign: 'center' }}>
+                  <div
+                    style={{
+                      width: '52px',
+                      height: '52px',
+                      borderRadius: '50%',
+                      background: 'rgba(16, 185, 129, 0.15)',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      color: '#10B981',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto 12px auto'
+                    }}
+                  >
+                    <KeyRound size={26} />
+                  </div>
+                  <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#FFFFFF', marginBottom: '4px' }}>
+                    Enter 4-Digit MPIN
+                  </h3>
+                  <p style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '16px' }}>
+                    Fast unlock for <strong>{email || rememberedEmail}</strong>
+                  </p>
 
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                style={{ color: '#F87171', gap: '4px', padding: '6px 6px', fontSize: '11.5px' }}
-                onClick={() => {
-                  setError('');
-                  setSuccess('');
-                  setAuthMethod('forgot_mpin');
-                }}
-                disabled={loading}
-              >
-                <KeyRound size={13} /> Reset MPIN
-              </button>
+                  {error && (
+                    <div
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: '10px',
+                        background: 'rgba(239, 68, 68, 0.15)',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        color: '#FCA5A5',
+                        fontSize: '11.5px',
+                        marginBottom: '14px'
+                      }}
+                    >
+                      {error}
+                    </div>
+                  )}
 
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                style={{ color: 'var(--text-muted)', gap: '4px', padding: '6px 6px', fontSize: '11.5px', marginLeft: 'auto' }}
-                onClick={() => setAuthMethod('password')}
-              >
-                <Lock size={13} /> Password
-              </button>
-            </div>
-          </div>
-        )}
+                  {/* 4-Digit Pin Dots Indicator */}
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '14px', marginBottom: '24px' }}>
+                    {[0, 1, 2, 3].map((i) => (
+                      <motion.div
+                        key={i}
+                        animate={{
+                          scale: i < mpin.length ? 1.2 : 1,
+                          backgroundColor: i < mpin.length ? '#10B981' : 'rgba(255, 255, 255, 0.15)'
+                        }}
+                        style={{
+                          width: '14px',
+                          height: '14px',
+                          borderRadius: '50%',
+                          border: i < mpin.length ? '2px solid #34D399' : '1px solid rgba(255, 255, 255, 0.2)'
+                        }}
+                      />
+                    ))}
+                  </div>
 
-        {/* MODE 2: STANDARD EMAIL + PASSWORD LOGIN */}
-        {authMethod === 'password' && (
-          <form onSubmit={handlePasswordLogin}>
-            <div className="form-group">
-              <label className="form-label">Email Address</label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type="email"
-                  className="form-control"
-                  placeholder="name@example.com"
-                  value={email}
-                  onChange={e => handleEmailChange(e.target.value)}
-                  required
-                />
-              </div>
-
-              {(emailHasMpin || emailHasBiometrics || biometricSupported) && (
-                <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                  {emailHasMpin && (
+                  {/* Number Pad Grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', maxWidth: '280px', margin: '0 auto 16px auto' }}>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                      <motion.button
+                        key={num}
+                        whileHover={{ scale: 1.05, backgroundColor: 'rgba(255, 255, 255, 0.12)' }}
+                        whileTap={{ scale: 0.95 }}
+                        type="button"
+                        onClick={() => handleKeyPress(String(num))}
+                        style={{
+                          height: '52px',
+                          borderRadius: '14px',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.08)',
+                          color: '#FFFFFF',
+                          fontSize: '18px',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {num}
+                      </motion.button>
+                    ))}
                     <button
                       type="button"
-                      className="btn btn-secondary"
-                      style={{ flex: 1, fontSize: '11.5px', padding: '7px', color: 'var(--primary)', borderColor: 'var(--primary)', gap: '4px' }}
-                      onClick={() => setAuthMethod('mpin')}
+                      onClick={() => setMpin('')}
+                      style={{
+                        height: '52px',
+                        borderRadius: '14px',
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#94A3B8',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: 'pointer'
+                      }}
                     >
-                      <KeyRound size={13} /> 4-Digit MPIN
+                      Clear
                     </button>
-                  )}
-                  {(emailHasBiometrics || biometricSupported) && (
+                    <motion.button
+                      whileHover={{ scale: 1.05, backgroundColor: 'rgba(255, 255, 255, 0.12)' }}
+                      whileTap={{ scale: 0.95 }}
+                      type="button"
+                      onClick={() => handleKeyPress('0')}
+                      style={{
+                        height: '52px',
+                        borderRadius: '14px',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        color: '#FFFFFF',
+                        fontSize: '18px',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      0
+                    </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      type="button"
+                      onClick={handleDeleteMpin}
+                      style={{
+                        height: '52px',
+                        borderRadius: '14px',
+                        background: 'rgba(239, 68, 68, 0.08)',
+                        border: '1px solid rgba(239, 68, 68, 0.2)',
+                        color: '#F87171',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Delete size={18} />
+                    </motion.button>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', marginTop: '12px' }}>
                     <button
                       type="button"
-                      className="btn btn-secondary"
-                      style={{ flex: 1, fontSize: '11.5px', padding: '7px', color: '#38BDF8', borderColor: '#38BDF8', gap: '4px' }}
-                      onClick={() => handleBiometricLogin(email || rememberedEmail)}
+                      onClick={() => setAuthMethod('password')}
+                      style={{ background: 'none', border: 'none', color: '#10B981', cursor: 'pointer', fontWeight: '600' }}
                     >
-                      <Fingerprint size={13} /> Face ID / Passkey
+                      ← Use Password
                     </button>
-                  )}
+                    <button
+                      type="button"
+                      onClick={handleForgotMpin}
+                      style={{ background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer' }}
+                    >
+                      Forgot MPIN?
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
-
-            <div className="form-group">
-              <label className="form-label">Password</label>
-              <input
-                type="password"
-                className="form-control"
-                placeholder="••••••••"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                disabled={loading || isAccountSuspended}
-                required
-              />
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', fontSize: '13px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={e => setRememberMe(e.target.checked)}
-                  disabled={loading || isAccountSuspended}
-                  style={{ accentColor: 'var(--primary)' }}
-                />
-                <span>Remember me</span>
-              </label>
-
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                style={{ padding: 0, color: 'var(--primary)' }}
-                onClick={() => {
-                  onClose();
-                  onOpenForgotPassword();
-                }}
-              >
-                Forgot Password?
-              </button>
-            </div>
-
-            <button
-              type="submit"
-              className="btn btn-primary"
-              style={{ width: '100%', padding: '12px', fontSize: '15px' }}
-              disabled={loading || isAccountSuspended}
-            >
-              {loading ? 'Signing In...' : isAccountSuspended ? 'Account Suspended' : 'Sign In'}
-            </button>
-
-            <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '13px', color: 'var(--text-muted)' }}>
-              New to Kuberis?{' '}
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                style={{ padding: 0, color: 'var(--primary)', fontWeight: '700' }}
-                onClick={() => {
-                  setAuthMethod('register');
-                  setEmail('');
-                  setName('');
-                  setPassword('');
-                  setConfirmPassword('');
-                  setError('');
-                }}
-              >
-                Create Account
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* MODE 3: CREATE ACCOUNT */}
-        {authMethod === 'register' && (
-          <form onSubmit={handleRegisterSubmit}>
-            <div className="form-group">
-              <label className="form-label">Full Name</label>
-              <input
-                type="text"
-                className="form-control"
-                placeholder=""
-                value={name}
-                onChange={e => setName(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Email Address</label>
-              <input
-                type="email"
-                className="form-control"
-                placeholder=""
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Password</label>
-              <input
-                type="password"
-                className="form-control"
-                placeholder=""
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Confirm Password</label>
-              <input
-                type="password"
-                className="form-control"
-                placeholder=""
-                value={confirmPassword}
-                onChange={e => setConfirmPassword(e.target.value)}
-                required
-              />
-            </div>
-
-            <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '12px', fontSize: '15px' }} disabled={loading}>
-              {loading ? 'Creating Account...' : 'Create Account'}
-            </button>
-
-            <div style={{ textAlign: 'center', marginTop: '16px', fontSize: '13px', color: 'var(--text-muted)' }}>
-              Already have an account?{' '}
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                style={{ padding: 0, color: 'var(--primary)', fontWeight: '700' }}
-                onClick={() => {
-                  const savedEmail = localStorage.getItem('kuberis_remembered_email') || localStorage.getItem('wealthpulse_remembered_email') || localStorage.getItem('ledgerly_remembered_email') || '';
-                  setEmail(savedEmail);
-                  setAuthMethod('password');
-                  setError('');
-                }}
-              >
-                Sign In
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* MODE 4: FORGOT 4-DIGIT MPIN */}
-        {authMethod === 'forgot_mpin' && (
-          <form onSubmit={async (e) => { e.preventDefault(); await handleForgotMpin(); }}>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: '1.5' }}>
-              Enter your registered account email to receive a secure link to reset your 4-digit MPIN.
-            </p>
-
-            <div className="form-group">
-              <label className="form-label">Registered Email Address</label>
-              <div style={{ position: 'relative' }}>
-                <Mail size={16} style={{ position: 'absolute', left: '12px', top: '14px', color: 'var(--text-muted)' }} />
-                <input
-                  type="email"
-                  className="form-control"
-                  style={{ paddingLeft: '36px' }}
-                  placeholder="name@example.com"
-                  value={email || rememberedEmail}
-                  onChange={e => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="btn btn-primary"
-              style={{ width: '100%', padding: '12px', fontSize: '15px', marginTop: '8px' }}
-              disabled={loading}
-            >
-              {loading ? 'Sending Email Link...' : 'Send 4-Digit MPIN Reset Link →'}
-            </button>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '18px', fontSize: '13px' }}>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                style={{ color: 'var(--primary)', padding: 0, fontWeight: '600' }}
-                onClick={() => {
-                  setError('');
-                  setSuccess('');
-                  setAuthMethod('mpin');
-                }}
-              >
-                ← Back to MPIN Keypad
-              </button>
-
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                style={{ color: 'var(--text-muted)', padding: 0 }}
-                onClick={() => {
-                  setError('');
-                  setSuccess('');
-                  setAuthMethod('password');
-                }}
-              >
-                Password Login
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* MODE 5: 2FA GOOGLE AUTHENTICATOR CHALLENGE */}
-        {authMethod === '2fa_challenge' && (
-          <form onSubmit={handleTwoFactorLoginSubmit}>
-            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-              <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: 'rgba(16, 185, 129, 0.15)', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px auto' }}>
-                <Shield size={28} />
-              </div>
-              <h3 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
-                Two-Factor Verification
-              </h3>
-              <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: '1.4' }}>
-                Open <strong>Google Authenticator</strong> on your phone and enter the 6-digit code for <strong>{email}</strong>
-              </p>
-            </div>
-
-            <div className="form-group" style={{ marginBottom: '20px' }}>
-              <label className="form-label" style={{ fontSize: '12px', fontWeight: '700' }}>
-                6-Digit Authenticator Code (or Recovery Code)
-              </label>
-              <input
-                type="text"
-                autoFocus
-                className="form-control"
-                placeholder="e.g. 582910"
-                value={totpCode}
-                onChange={(e) => handleTotpCodeChange(e.target.value)}
+          ) : (
+            /* =========================================================================
+                MAIN DUAL-COLUMN DESKTOP SPLIT-SCREEN & MOBILE FORMS
+               ========================================================================= */
+            <>
+              {/* COLUMN 1: SIGN IN VIEWPORT (LEFT HALF) */}
+              <div
                 style={{
-                  fontSize: '22px',
-                  fontWeight: '900',
-                  letterSpacing: '6px',
-                  textAlign: 'center',
-                  padding: '12px',
-                  color: 'var(--primary)'
-                }}
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={loading || !totpCode.trim()}
-              style={{ width: '100%', padding: '12px', fontSize: '15px', fontWeight: '800', marginBottom: '14px' }}
-            >
-              {loading ? 'Verifying 2FA Code...' : 'Verify & Sign In'}
-            </button>
-
-            <div style={{ textAlign: 'center' }}>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                style={{ fontSize: '12px', color: 'var(--text-muted)' }}
-                onClick={() => {
-                  setError('');
-                  setSuccess('');
-                  setAuthMethod('password');
+                  width: isMobile ? '100%' : '50%',
+                  display: isMobile && isRegisterMode ? 'none' : 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  padding: isMobile ? '24px 24px 32px 24px' : '44px 40px',
+                  pointerEvents: !isMobile && isRegisterMode ? 'none' : 'auto',
+                  opacity: !isMobile && isRegisterMode ? 0.08 : 1,
+                  transition: 'opacity 0.3s ease',
+                  zIndex: 5
                 }}
               >
-                ← Back to Password Sign In
-              </button>
-            </div>
-          </form>
-        )}
+                <div style={{ marginBottom: '24px' }}>
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      background: 'rgba(16, 185, 129, 0.12)',
+                      border: '1px solid rgba(16, 185, 129, 0.25)',
+                      color: '#10B981',
+                      fontSize: '10.5px',
+                      fontWeight: '800',
+                      letterSpacing: '0.8px',
+                      textTransform: 'uppercase',
+                      marginBottom: '10px'
+                    }}
+                  >
+                    <Sparkles size={12} /> Kuberis Financial OS
+                  </div>
+                  <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#FFFFFF', letterSpacing: '-0.5px', margin: 0 }}>
+                    Sign In to Your Vault
+                  </h2>
+                  <p style={{ fontSize: '12.5px', color: '#94A3B8', marginTop: '6px', marginBottom: 0 }}>
+                    Real-time net worth tracking with institutional-grade security.
+                  </p>
+                </div>
 
-        {/* HDFC-Style Another Login Detected Modal */}
-        {pendingSessionOverride && (
-          <div className="modal-backdrop" style={{ zIndex: 10100 }}>
-            <div className="modal-content" style={{ maxWidth: '440px', textAlign: 'center', padding: '32px 24px' }}>
-              <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px auto', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
-                <Shield size={32} />
+                {/* Remembered User Badge (if applicable) */}
+                {rememberedEmail && (
+                  <div
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      background: 'rgba(16, 185, 129, 0.08)',
+                      border: '1px solid rgba(16, 185, 129, 0.2)',
+                      marginBottom: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '10px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                      <div
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '50%',
+                          background: '#10B981',
+                          color: '#000000',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: '800',
+                          fontSize: '11px',
+                          flexShrink: 0
+                        }}
+                      >
+                        {getInitials(rememberedEmail)}
+                      </div>
+                      <span
+                        style={{ fontSize: '12px', fontWeight: '600', color: '#FFFFFF', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                      >
+                        {rememberedEmail}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleClearRemembered}
+                      style={{ background: 'none', border: 'none', color: '#64748B', fontSize: '11px', cursor: 'pointer', padding: '2px 6px' }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = '#F87171')}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = '#64748B')}
+                    >
+                      Switch
+                    </button>
+                  </div>
+                )}
+
+                {/* Feedback Alerts */}
+                {error && !isRegisterMode && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      background: 'rgba(239, 68, 68, 0.14)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      color: '#FCA5A5',
+                      fontSize: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      marginBottom: '16px'
+                    }}
+                  >
+                    <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                    <span>{error}</span>
+                  </motion.div>
+                )}
+
+                {success && !isRegisterMode && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      background: 'rgba(16, 185, 129, 0.15)',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      color: '#34D399',
+                      fontSize: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      marginBottom: '16px'
+                    }}
+                  >
+                    <CheckCircle2 size={15} style={{ flexShrink: 0 }} />
+                    <span>{success}</span>
+                  </motion.div>
+                )}
+
+                {/* Sign In Form */}
+                <form onSubmit={handlePasswordLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>
+                      Email Address
+                    </label>
+                    <div className="kuberis-input-container">
+                      <Mail size={16} style={{ position: 'absolute', left: '14px', color: '#64748B' }} />
+                      <input
+                        type="email"
+                        required
+                        placeholder="you@domain.com"
+                        value={email}
+                        onChange={(e) => handleEmailChange(e.target.value)}
+                        autoComplete="email"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#94A3B8', display: 'block', marginBottom: '6px' }}>
+                      Account Password
+                    </label>
+                    <div className="kuberis-input-container">
+                      <Lock size={16} style={{ position: 'absolute', left: '14px', color: '#64748B' }} />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        placeholder="••••••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        autoComplete="current-password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '12px',
+                          background: 'none',
+                          border: 'none',
+                          color: '#64748B',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: '#94A3B8' }}>
+                      <input
+                        type="checkbox"
+                        checked={rememberMe}
+                        onChange={(e) => setRememberMe(e.target.checked)}
+                        style={{ accentColor: '#10B981', cursor: 'pointer' }}
+                      />
+                      Remember me
+                    </label>
+                    <button
+                      type="button"
+                      onClick={onOpenForgotPassword}
+                      style={{ background: 'none', border: 'none', color: '#10B981', cursor: 'pointer', fontWeight: '600', padding: 0 }}
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+
+                  {/* Primary Submit Button */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="submit"
+                    disabled={loading}
+                    className="btn btn-primary"
+                    style={{
+                      padding: '13px',
+                      borderRadius: '14px',
+                      fontWeight: '800',
+                      fontSize: '13.5px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      marginTop: '4px',
+                      cursor: loading ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {loading ? (
+                      <>
+                        <RefreshCw size={16} className="animate-spin" /> Unlocking Vault...
+                      </>
+                    ) : (
+                      <>
+                        Sign In to Dashboard <ArrowRight size={16} />
+                      </>
+                    )}
+                  </motion.button>
+
+                  {/* Alternate Fast Auth Divider */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', margin: '6px 0 2px 0' }}>
+                    <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+                    <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Instant Access
+                    </span>
+                    <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.08)' }} />
+                  </div>
+
+                  {/* Micro-Interaction 1: Touch ID / Face ID Radar Scanner Button */}
+                  <motion.div
+                    whileHover={{ scale: 1.015, borderColor: '#10B981' }}
+                    whileTap={{ scale: 0.985 }}
+                    onClick={() => handleBiometricLogin()}
+                    style={{
+                      position: 'relative',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '10px',
+                      padding: '11px 16px',
+                      borderRadius: '14px',
+                      background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(5, 15, 30, 0.8) 100%)',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      cursor: 'pointer',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    {/* Concentric Radar Sonar Rings */}
+                    <div className="kuberis-radar-ring" />
+                    <div className="kuberis-radar-ring-2" />
+
+                    <Fingerprint size={18} style={{ color: '#10B981', flexShrink: 0 }} />
+                    <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#FFFFFF' }}>
+                      Use Touch ID / Face ID Passkey
+                    </span>
+                  </motion.div>
+
+                  {/* 4-Digit MPIN Quick Switch Button */}
+                  {(emailHasMpin || hasMpin) && (
+                    <motion.button
+                      whileHover={{ scale: 1.015 }}
+                      whileTap={{ scale: 0.985 }}
+                      type="button"
+                      onClick={() => setAuthMethod('mpin')}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        padding: '10px 16px',
+                        borderRadius: '14px',
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        color: '#94A3B8',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <KeyRound size={15} style={{ color: '#F59E0B' }} />
+                      Unlock with 4-Digit MPIN Keypad
+                    </motion.button>
+                  )}
+                </form>
               </div>
 
-              <h3 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '12px' }}>
-                Another Login Detected
-              </h3>
+              {/* COLUMN 2: REGISTRATION VIEWPORT (RIGHT HALF) */}
+              <div
+                style={{
+                  width: isMobile ? '100%' : '50%',
+                  display: isMobile && !isRegisterMode ? 'none' : 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  padding: isMobile ? '24px 24px 32px 24px' : '44px 40px',
+                  pointerEvents: !isMobile && !isRegisterMode ? 'none' : 'auto',
+                  opacity: !isMobile && !isRegisterMode ? 0.08 : 1,
+                  transition: 'opacity 0.3s ease',
+                  zIndex: 5
+                }}
+              >
+                <div style={{ marginBottom: '20px' }}>
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      background: 'rgba(16, 185, 129, 0.12)',
+                      border: '1px solid rgba(16, 185, 129, 0.25)',
+                      color: '#10B981',
+                      fontSize: '10.5px',
+                      fontWeight: '800',
+                      letterSpacing: '0.8px',
+                      textTransform: 'uppercase',
+                      marginBottom: '10px'
+                    }}
+                  >
+                    <ShieldCheck size={12} /> Zero-Knowledge Security
+                  </div>
+                  <h2 style={{ fontSize: '24px', fontWeight: '800', color: '#FFFFFF', letterSpacing: '-0.5px', margin: 0 }}>
+                    Create Your Account
+                  </h2>
+                  <p style={{ fontSize: '12.5px', color: '#94A3B8', marginTop: '6px', marginBottom: 0 }}>
+                    Join sovereign wealth builders scaling multi-asset portfolios.
+                  </p>
+                </div>
 
-              <p style={{ fontSize: '13.5px', color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '24px' }}>
-                Looks like you're already logged in with another device. Please close the other session to continue here.
-              </p>
+                {/* Feedback Alerts */}
+                {error && isRegisterMode && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      background: 'rgba(239, 68, 68, 0.14)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      color: '#FCA5A5',
+                      fontSize: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      marginBottom: '14px'
+                    }}
+                  >
+                    <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                    <span>{error}</span>
+                  </motion.div>
+                )}
 
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{ flex: 1, padding: '12px', borderRadius: '12px', fontWeight: '700' }}
-                  onClick={() => {
-                    setPendingSessionOverride(null);
-                    setError('Sign in cancelled. Your existing session remains active.');
-                    setLoading(false);
+                {success && isRegisterMode && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    style={{
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      background: 'rgba(16, 185, 129, 0.15)',
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      color: '#34D399',
+                      fontSize: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      marginBottom: '14px'
+                    }}
+                  >
+                    <CheckCircle2 size={15} style={{ flexShrink: 0 }} />
+                    <span>{success}</span>
+                  </motion.div>
+                )}
+
+                {/* Register Form */}
+                <form onSubmit={handleRegisterSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#94A3B8', display: 'block', marginBottom: '5px' }}>
+                      Full Name
+                    </label>
+                    <div className="kuberis-input-container">
+                      <User size={16} style={{ position: 'absolute', left: '14px', color: '#64748B' }} />
+                      <input
+                        type="text"
+                        required
+                        placeholder="Alex Morgan"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        autoComplete="name"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '11px', fontWeight: '700', color: '#94A3B8', display: 'block', marginBottom: '5px' }}>
+                      Email Address
+                    </label>
+                    <div className="kuberis-input-container">
+                      <Mail size={16} style={{ position: 'absolute', left: '14px', color: '#64748B' }} />
+                      <input
+                        type="email"
+                        required
+                        placeholder="alex@domain.com"
+                        value={email}
+                        onChange={(e) => handleEmailChange(e.target.value)}
+                        autoComplete="email"
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: '700', color: '#94A3B8', display: 'block', marginBottom: '5px' }}>
+                        Password
+                      </label>
+                      <div className="kuberis-input-container">
+                        <Lock size={15} style={{ position: 'absolute', left: '12px', color: '#64748B' }} />
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          required
+                          placeholder="Min 6 chars"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          autoComplete="new-password"
+                          style={{ paddingLeft: '34px', paddingRight: '32px' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          style={{
+                            position: 'absolute',
+                            right: '8px',
+                            background: 'none',
+                            border: 'none',
+                            color: '#64748B',
+                            cursor: 'pointer',
+                            padding: '2px',
+                            display: 'flex'
+                          }}
+                        >
+                          {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: '11px', fontWeight: '700', color: '#94A3B8', display: 'block', marginBottom: '5px' }}>
+                        Confirm
+                      </label>
+                      <div className="kuberis-input-container">
+                        <Lock size={15} style={{ position: 'absolute', left: '12px', color: '#64748B' }} />
+                        <input
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          required
+                          placeholder="Repeat"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          autoComplete="new-password"
+                          style={{ paddingLeft: '34px', paddingRight: '32px' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          style={{
+                            position: 'absolute',
+                            right: '8px',
+                            background: 'none',
+                            border: 'none',
+                            color: '#64748B',
+                            cursor: 'pointer',
+                            padding: '2px',
+                            display: 'flex'
+                          }}
+                        >
+                          {showConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Trust Privacy Notice */}
+                  <div
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '10px',
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid rgba(255, 255, 255, 0.06)',
+                      fontSize: '11px',
+                      color: '#94A3B8',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      margin: '2px 0'
+                    }}
+                  >
+                    <Shield size={14} style={{ color: '#10B981', flexShrink: 0 }} />
+                    <span>Client-side privacy. Your balances & secrets are never shared.</span>
+                  </div>
+
+                  {/* Primary Submit Button */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="submit"
+                    disabled={loading}
+                    className="btn btn-primary"
+                    style={{
+                      padding: '13px',
+                      borderRadius: '14px',
+                      fontWeight: '800',
+                      fontSize: '13.5px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      marginTop: '4px',
+                      cursor: loading ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {loading ? (
+                      <>
+                        <RefreshCw size={16} className="animate-spin" /> Provisioning Vault...
+                      </>
+                    ) : (
+                      <>
+                        Create Free Account <ArrowRight size={16} />
+                      </>
+                    )}
+                  </motion.button>
+                </form>
+              </div>
+
+              {/* =========================================================================
+                  THE SLIDING BRAND PANEL ("THE SHIFTER") - DESKTOP ONLY
+                 ========================================================================= */}
+              {!isMobile && (
+                <motion.div
+                  initial={false}
+                  animate={{
+                    x: isRegisterMode ? '0%' : '100%'
+                  }}
+                  transition={{
+                    type: 'spring',
+                    stiffness: 220,
+                    damping: 26,
+                    mass: 0.9
+                  }}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    bottom: 0,
+                    left: 0,
+                    width: '50%',
+                    background:
+                      'radial-gradient(circle at 50% 20%, rgba(16, 185, 129, 0.28) 0%, rgba(4, 30, 22, 0.96) 50%, rgba(2, 6, 18, 0.98) 100%)',
+                    borderLeft: isRegisterMode ? 'none' : '1px solid rgba(16, 185, 129, 0.3)',
+                    borderRight: isRegisterMode ? '1px solid rgba(16, 185, 129, 0.3)' : 'none',
+                    boxShadow: '0 0 60px rgba(0, 0, 0, 0.7), inset 0 0 40px rgba(16, 185, 129, 0.12)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    padding: '48px',
+                    textAlign: 'center',
+                    zIndex: 20,
+                    overflow: 'hidden'
                   }}
                 >
-                  Cancel
-                </button>
+                  {/* Internal ambient glowing rings */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      width: '320px',
+                      height: '320px',
+                      borderRadius: '50%',
+                      background: 'radial-gradient(circle, rgba(16, 185, 129, 0.22) 0%, transparent 70%)',
+                      top: '15%',
+                      pointerEvents: 'none'
+                    }}
+                  />
 
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  style={{ flex: 1, padding: '12px', borderRadius: '12px', fontWeight: '800' }}
-                  onClick={handleConfirmSessionOverride}
-                >
-                  Okay
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+                  {/* Brand Insignia Icon */}
+                  <motion.div
+                    key={isRegisterMode ? 'icon-register' : 'icon-login'}
+                    initial={{ scale: 0.8, opacity: 0, rotate: -10 }}
+                    animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                    transition={{ duration: 0.35 }}
+                    style={{
+                      width: '72px',
+                      height: '72px',
+                      borderRadius: '24px',
+                      background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.25) 0%, rgba(6, 78, 59, 0.4) 100%)',
+                      border: '1.5px solid rgba(52, 211, 153, 0.4)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#34D399',
+                      marginBottom: '24px',
+                      boxShadow: '0 12px 30px rgba(16, 185, 129, 0.25)'
+                    }}
+                  >
+                    {isRegisterMode ? <KeyRound size={34} /> : <ShieldCheck size={36} />}
+                  </motion.div>
+
+                  {/* Dynamic Shifter Messaging */}
+                  <AnimatePresence mode="wait">
+                    {isRegisterMode ? (
+                      <motion.div
+                        key="panel-msg-register"
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -15 }}
+                        transition={{ duration: 0.25 }}
+                        style={{ maxWidth: '340px' }}
+                      >
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: '800',
+                            color: '#34D399',
+                            letterSpacing: '1px',
+                            textTransform: 'uppercase'
+                          }}
+                        >
+                          MEMBER ACCESS
+                        </span>
+                        <h3
+                          style={{
+                            fontSize: '25px',
+                            fontWeight: '800',
+                            color: '#FFFFFF',
+                            letterSpacing: '-0.5px',
+                            marginTop: '8px',
+                            marginBottom: '10px'
+                          }}
+                        >
+                          Already an Architect?
+                        </h3>
+                        <p style={{ fontSize: '13px', color: '#94A3B8', lineHeight: '1.6', marginBottom: '28px' }}>
+                          Your investment ledger and net worth analytics are ready. Return to your command center.
+                        </p>
+
+                        <motion.button
+                          whileHover={{ scale: 1.04, boxShadow: '0 0 25px rgba(16, 185, 129, 0.4)' }}
+                          whileTap={{ scale: 0.96 }}
+                          type="button"
+                          onClick={() => {
+                            setAuthMethod('password');
+                            setError('');
+                          }}
+                          style={{
+                            padding: '12px 32px',
+                            borderRadius: '16px',
+                            background: 'rgba(255, 255, 255, 0.1)',
+                            border: '1.5px solid rgba(255, 255, 255, 0.3)',
+                            color: '#FFFFFF',
+                            fontSize: '13.5px',
+                            fontWeight: '800',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            backdropFilter: 'blur(8px)'
+                          }}
+                        >
+                          Sign In Instead <ArrowRight size={16} />
+                        </motion.button>
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="panel-msg-login"
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -15 }}
+                        transition={{ duration: 0.25 }}
+                        style={{ maxWidth: '340px' }}
+                      >
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: '800',
+                            color: '#34D399',
+                            letterSpacing: '1px',
+                            textTransform: 'uppercase'
+                          }}
+                        >
+                          BEGIN YOUR JOURNEY
+                        </span>
+                        <h3
+                          style={{
+                            fontSize: '25px',
+                            fontWeight: '800',
+                            color: '#FFFFFF',
+                            letterSpacing: '-0.5px',
+                            marginTop: '8px',
+                            marginBottom: '10px'
+                          }}
+                        >
+                          New to Kuberis?
+                        </h3>
+                        <p style={{ fontSize: '13px', color: '#94A3B8', lineHeight: '1.6', marginBottom: '28px' }}>
+                          Scale your net worth with real-time asset tracking, bank sync, and zero-knowledge privacy.
+                        </p>
+
+                        <motion.button
+                          whileHover={{ scale: 1.04, boxShadow: '0 0 25px rgba(16, 185, 129, 0.4)' }}
+                          whileTap={{ scale: 0.96 }}
+                          type="button"
+                          onClick={() => {
+                            setAuthMethod('register');
+                            setError('');
+                          }}
+                          style={{
+                            padding: '12px 32px',
+                            borderRadius: '16px',
+                            background: 'rgba(255, 255, 255, 0.1)',
+                            border: '1.5px solid rgba(255, 255, 255, 0.3)',
+                            color: '#FFFFFF',
+                            fontSize: '13.5px',
+                            fontWeight: '800',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            backdropFilter: 'blur(8px)'
+                          }}
+                        >
+                          Create Free Account <ArrowRight size={16} />
+                        </motion.button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Trust Footer Pills */}
+                  <div style={{ position: 'absolute', bottom: '24px', display: 'flex', gap: '8px', opacity: 0.75 }}>
+                    <span style={{ fontSize: '10.5px', color: '#64748B' }}>AES-256 Cloud Encryption</span>
+                    <span style={{ fontSize: '10.5px', color: '#64748B' }}>•</span>
+                    <span style={{ fontSize: '10.5px', color: '#64748B' }}>100% Sovereign Data</span>
+                  </div>
+                </motion.div>
+              )}
+            </>
+          )}
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 }
