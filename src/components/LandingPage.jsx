@@ -177,9 +177,7 @@ export default function LandingPage({
               borderRadius: '16px',
               display: 'flex',
               alignItems: 'center',
-              gap: '14px',
-              border: '1px solid var(--border-color)',
-              background: 'var(--bg-card)'
+              gap: '14px'
             }}
           >
             <div style={{ padding: '10px', borderRadius: '12px', background: 'var(--primary-light)', color: 'var(--primary)', flexShrink: 0 }}>
@@ -198,9 +196,7 @@ export default function LandingPage({
               borderRadius: '16px',
               display: 'flex',
               alignItems: 'center',
-              gap: '14px',
-              border: '1px solid var(--border-color)',
-              background: 'var(--bg-card)'
+              gap: '14px'
             }}
           >
             <div style={{ padding: '10px', borderRadius: '12px', background: 'var(--info-light)', color: 'var(--info)', flexShrink: 0 }}>
@@ -219,9 +215,7 @@ export default function LandingPage({
               borderRadius: '16px',
               display: 'flex',
               alignItems: 'center',
-              gap: '14px',
-              border: '1px solid var(--border-color)',
-              background: 'var(--bg-card)'
+              gap: '14px'
             }}
           >
             <div style={{ padding: '10px', borderRadius: '12px', background: 'var(--warning-light)', color: 'var(--warning)', flexShrink: 0 }}>
@@ -316,7 +310,7 @@ export default function LandingPage({
       </section>
 
       {/* 🔄 3-STEP "HOW IT WORKS" PROCESS */}
-      <section style={{ margin: '60px 0', padding: '40px 24px', borderRadius: '24px', background: 'var(--bg-card)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
+      <section className="card" style={{ margin: '60px 0', padding: '40px 24px', borderRadius: '24px' }}>
         <div style={{ textAlign: 'center', marginBottom: '36px' }}>
           <h2 style={{ fontSize: 'clamp(20px, 3vw, 32px)', fontWeight: '900' }}>Get Started in 3 Simple Steps</h2>
           <p style={{ fontSize: '14px', color: 'var(--text-muted)', marginTop: '6px' }}>No complicated setup. Live portfolio tracking in under 60 seconds.</p>

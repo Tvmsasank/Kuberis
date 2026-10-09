@@ -34,22 +34,43 @@ export function applyGlassConfig(config) {
   const alpha = Number((config.opacity / 100).toFixed(2));
   const sidebarAlpha = Math.min(0.96, Number((alpha + 0.12).toFixed(2)));
 
+  // 1. Update CSS variables for blur, opacity and specular highlights
   root.style.setProperty('--glass-blur', `${config.blur}px`);
   root.style.setProperty('--glass-opacity', `${alpha}`);
   root.style.setProperty('--glass-sidebar-opacity', `${sidebarAlpha}`);
   root.style.setProperty('--glass-specular-opacity', config.specular ? '0.45' : '0.0');
 
-  // Dynamically update card, hero, and sidebar backgrounds with priority
-  const isLight = root.getAttribute('data-theme') === 'light';
-  if (isLight) {
-    root.style.setProperty('--bg-card', `rgba(255, 255, 255, ${alpha})`, 'important');
-    root.style.setProperty('--bg-sidebar', `rgba(255, 255, 255, ${sidebarAlpha})`, 'important');
-    root.style.setProperty('--hero-bg', `linear-gradient(135deg, rgba(236, 253, 245, ${Math.min(0.85, alpha)}) 0%, rgba(240, 253, 244, ${Math.min(0.75, alpha)}) 50%, rgba(224, 242, 254, ${Math.min(0.8, alpha)}) 100%)`, 'important');
-  } else {
-    root.style.setProperty('--bg-card', `rgba(10, 25, 47, ${alpha})`, 'important');
-    root.style.setProperty('--bg-sidebar', `rgba(8, 18, 35, ${sidebarAlpha})`, 'important');
-    root.style.setProperty('--hero-bg', `linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(10, 25, 47, ${alpha}) 100%)`, 'important');
+  // 2. Set dynamic inline stylesheet for immediate, unchallengeable cascade priority
+  let dynamicStyleEl = document.getElementById('kuberis-dynamic-liquid-glass-style');
+  if (!dynamicStyleEl) {
+    dynamicStyleEl = document.createElement('style');
+    dynamicStyleEl.id = 'kuberis-dynamic-liquid-glass-style';
+    document.head.appendChild(dynamicStyleEl);
   }
+
+  const isLight = root.getAttribute('data-theme') === 'light';
+  const cardBg = isLight ? `rgba(255, 255, 255, ${alpha})` : `rgba(10, 25, 47, ${alpha})`;
+  const sidebarBg = isLight ? `rgba(255, 255, 255, ${sidebarAlpha})` : `rgba(8, 18, 35, ${sidebarAlpha})`;
+  const heroBg = isLight
+    ? `linear-gradient(135deg, rgba(236, 253, 245, ${Math.min(0.85, alpha)}) 0%, rgba(240, 253, 244, ${Math.min(0.75, alpha)}) 50%, rgba(224, 242, 254, ${Math.min(0.8, alpha)}) 100%)`
+    : `linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(10, 25, 47, ${alpha}) 100%)`;
+
+  dynamicStyleEl.textContent = `
+    :root, [data-theme='light'], [data-theme='dark'], [data-theme='emerald'] {
+      --bg-card: ${cardBg} !important;
+      --bg-sidebar: ${sidebarBg} !important;
+      --hero-bg: ${heroBg} !important;
+      --glass-blur: ${config.blur}px !important;
+      --glass-opacity: ${alpha} !important;
+      --glass-sidebar-opacity: ${sidebarAlpha} !important;
+      --glass-specular-opacity: ${config.specular ? '0.45' : '0.0'} !important;
+    }
+    .card, .sidebar, .card-table {
+      background: ${cardBg} !important;
+      backdrop-filter: blur(${config.blur}px) saturate(190%) !important;
+      -webkit-backdrop-filter: blur(${config.blur}px) saturate(190%) !important;
+    }
+  `;
 
   // Toggle ambient orbs
   const orbContainer = document.getElementById('kuberis-ambient-liquid-orbs');
@@ -112,7 +133,7 @@ export default function LiquidGlassController({ isOpen, onClose }) {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
           onClick={onClose}
-          style={{ zIndex: 10050, backdropFilter: 'blur(16px)' }}
+          style={{ zIndex: 10050, backdropFilter: 'blur(4px)', background: 'rgba(0, 0, 0, 0.28)' }}
         >
           <motion.div
             className="modal-content"
@@ -208,7 +229,7 @@ export default function LiquidGlassController({ isOpen, onClose }) {
                   zIndex: 2,
                   padding: '12px 24px',
                   borderRadius: '16px',
-                  background: `rgba(15, 23, 42, ${config.opacity / 100})`,
+                  background: document.documentElement.getAttribute('data-theme') === 'light' ? `rgba(255, 255, 255, ${config.opacity / 100})` : `rgba(10, 25, 47, ${config.opacity / 100})`,
                   backdropFilter: `blur(${config.blur}px) saturate(190%)`,
                   WebkitBackdropFilter: `blur(${config.blur}px) saturate(190%)`,
                   border: config.specular ? '1px solid rgba(255, 255, 255, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
@@ -220,8 +241,8 @@ export default function LiquidGlassController({ isOpen, onClose }) {
                   gap: '10px'
                 }}
               >
-                <Sparkles size={16} style={{ color: '#10B981' }} />
-                <span style={{ fontSize: '13px', fontWeight: '800', color: '#FFFFFF' }}>
+                <Sparkles size={16} style={{ color: 'var(--primary)' }} />
+                <span style={{ fontSize: '13px', fontWeight: '800', color: document.documentElement.getAttribute('data-theme') === 'light' ? '#0F172A' : '#FFFFFF' }}>
                   Live Glass Refraction
                 </span>
                 <span
