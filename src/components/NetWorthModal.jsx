@@ -336,11 +336,7 @@ export default function NetWorthModal({
           maxHeight: '90vh',
           overflowY: 'auto',
           padding: '28px',
-          borderRadius: '24px',
-          background: 'var(--bg-card)',
-          backdropFilter: 'blur(28px)',
-          border: '1px solid var(--border-glass)',
-          boxShadow: 'var(--shadow-lg)'
+          borderRadius: '24px'
         }}
       >
         {/* Header */}
@@ -427,7 +423,7 @@ export default function NetWorthModal({
 
         {/* INLINE EDIT MODAL / DRAWER IF EDITING */}
         {editingItem && (
-          <div style={{ padding: '18px', borderRadius: '16px', background: 'var(--bg-app)', border: '2px solid var(--primary)', marginBottom: '24px', animation: 'fadeIn 0.2s ease' }}>
+          <div style={{ padding: '18px', borderRadius: '16px', background: 'var(--bg-glass-subtle)', border: '2px solid var(--primary)', marginBottom: '24px', animation: 'fadeIn 0.2s ease' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
               <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Edit2 size={15} style={{ color: 'var(--primary)' }} /> Edit {editingItem.type === 'asset' ? 'Asset' : 'Liability'} Details
@@ -566,8 +562,8 @@ export default function NetWorthModal({
                   style={{
                     padding: '14px 16px',
                     borderRadius: '14px',
-                    background: 'var(--bg-app)',
-                    border: '1px solid var(--border-color)',
+                    background: 'var(--bg-glass-subtle)',
+                    border: '1px solid var(--border-glass-subtle)',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '8px'
@@ -630,7 +626,7 @@ export default function NetWorthModal({
           </div>
 
           {/* Form to Add Itemized Asset with Description */}
-          <div style={{ padding: '16px', borderRadius: '16px', background: 'var(--bg-app)', border: '1px dashed var(--border-color)' }}>
+          <div style={{ padding: '16px', borderRadius: '16px', background: 'var(--bg-glass-subtle)', border: '1px dashed var(--border-glass-subtle)' }}>
             <div style={{ fontSize: '12.5px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Plus size={15} style={{ color: 'var(--primary)' }} /> Add Itemized Asset (Real Estate, Vehicle, Cash, etc.)
             </div>
@@ -717,7 +713,7 @@ export default function NetWorthModal({
             )}
 
             {customLiabilitiesList.length === 0 && manualLiabilities === 0 ? (
-              <div style={{ padding: '16px', textAlign: 'center', borderRadius: '14px', background: 'var(--bg-app)', border: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '12.5px' }}>
+              <div style={{ padding: '16px', textAlign: 'center', borderRadius: '14px', background: 'var(--bg-glass-subtle)', border: '1px solid var(--border-glass-subtle)', color: 'var(--text-muted)', fontSize: '12.5px' }}>
                 🎉 No active debts or loans recorded. Add your home loans, car loans, or credit cards below to track liabilities.
               </div>
             ) : (
@@ -730,8 +726,8 @@ export default function NetWorthModal({
                     style={{
                       padding: '14px 16px',
                       borderRadius: '14px',
-                      background: 'var(--bg-app)',
-                      border: '1px solid var(--border-color)',
+                      background: 'var(--bg-glass-subtle)',
+                      border: '1px solid var(--border-glass-subtle)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '8px'
@@ -795,7 +791,7 @@ export default function NetWorthModal({
           </div>
 
           {/* Form to Add Itemized Liability with Description */}
-          <div style={{ padding: '16px', borderRadius: '16px', background: 'var(--bg-app)', border: '1px dashed rgba(220, 38, 38, 0.3)' }}>
+          <div style={{ padding: '16px', borderRadius: '16px', background: 'var(--bg-glass-subtle)', border: '1px dashed rgba(220, 38, 38, 0.3)' }}>
             <div style={{ fontSize: '12.5px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Plus size={15} style={{ color: 'var(--danger)' }} /> Add Itemized Liability (Home Loan, Car Loan, Card Balance, etc.)
             </div>

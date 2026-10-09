@@ -65,12 +65,22 @@ export default function RecurringTab({
       </div>
 
       {/* Active Detection Banner */}
-      <div className="card" style={{ background: 'linear-gradient(135deg, #7C6EE6 0%, #4F46E5 100%)', color: 'white', marginBottom: '24px', padding: '20px' }}>
+      <div
+        className="card"
+        style={{
+          background: 'linear-gradient(135deg, rgba(124, 110, 230, 0.22) 0%, rgba(79, 70, 229, 0.28) 100%)',
+          border: '1.5px solid rgba(124, 110, 230, 0.45)',
+          marginBottom: '24px',
+          padding: '20px'
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-          <Sparkles size={22} style={{ color: '#FDE047' }} />
-          <h3 style={{ fontSize: '16px', fontWeight: '700' }}>Active Recurring Detection Engine</h3>
+          <Sparkles size={22} style={{ color: '#F59E0B' }} />
+          <h3 style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-main)', margin: 0 }}>
+            Active Recurring Detection Engine
+          </h3>
         </div>
-        <p style={{ fontSize: '13px', opacity: 0.9 }}>
+        <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0, lineHeight: '1.5' }}>
           Kuberis automatically normalizes merchants, evaluates interval windows (weekly to annual), and suggests recurring bills without false positives.
         </p>
       </div>

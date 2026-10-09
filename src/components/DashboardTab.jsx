@@ -203,21 +203,21 @@ export default function DashboardTab({
 
       {/* Real-Time Investment Portfolio Live Widget on Dashboard */}
       {safeInvestments.length > 0 && (
-        <div className="card" style={{ marginBottom: '28px', padding: '20px', border: '1px solid var(--primary-light)' }}>
+        <div className="card" style={{ marginBottom: '28px', padding: '20px', border: '1px solid var(--border-glass)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
             <div>
-              <h3 style={{ fontSize: '18px', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'white' }}>
-                <TrendingUp style={{ color: '#10B981' }} size={20} /> Live Stock & Investment Portfolio
+              <h3 style={{ fontSize: '18px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, color: 'var(--text-main)' }}>
+                <TrendingUp style={{ color: 'var(--primary)' }} size={20} /> Live Stock & Investment Portfolio
               </h3>
-              <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Activity size={13} className="spin" style={{ color: '#10B981' }} /> Real-time market prices auto-updating continuously
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Activity size={13} className="spin" style={{ color: 'var(--primary)' }} /> Real-time market prices auto-updating continuously
               </div>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
               <div>
-                <div style={{ fontSize: '11px', color: '#94A3B8' }}>Portfolio Value</div>
-                <div style={{ fontSize: '20px', fontWeight: '800', color: '#F8FAFC' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Portfolio Value</div>
+                <div style={{ fontSize: '20px', fontWeight: '900', color: 'var(--text-main)' }}>
                   ₹{totalInvestmentsValuation.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </div>
               </div>
@@ -231,8 +231,8 @@ export default function DashboardTab({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '4px',
-                  background: totalInvestmentsPnL >= 0 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                  color: totalInvestmentsPnL >= 0 ? '#34D399' : '#FCA5A5',
+                  background: totalInvestmentsPnL >= 0 ? 'rgba(16, 185, 129, 0.18)' : 'rgba(239, 68, 68, 0.18)',
+                  color: totalInvestmentsPnL >= 0 ? '#10B981' : '#EF4444',
                   border: `1px solid ${totalInvestmentsPnL >= 0 ? '#10B981' : '#EF4444'}`
                 }}
               >
@@ -256,13 +256,24 @@ export default function DashboardTab({
               const pnlPct = Number(item.pnlPercentage || (buyPrice > 0 ? (pnl / (buyPrice * item.quantity)) * 100 : 0));
 
               return (
-                <div key={item.id} style={{ padding: '12px', borderRadius: '8px', background: 'rgba(15, 23, 42, 0.7)', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                  <div style={{ fontWeight: '700', fontSize: '13px', color: '#F8FAFC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div
+                  key={item.id}
+                  style={{
+                    padding: '12px',
+                    borderRadius: '12px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid var(--border-color)',
+                    backdropFilter: 'blur(10px)'
+                  }}
+                >
+                  <div style={{ fontWeight: '800', fontSize: '13px', color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {item.name}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', fontSize: '12px' }}>
-                    <span style={{ color: '#94A3B8' }}>Live: <strong style={{ color: 'white' }}>₹{currentPrice.toLocaleString('en-IN')}</strong></span>
-                    <span style={{ fontWeight: '700', color: pnl >= 0 ? '#34D399' : '#FCA5A5' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      Live: <strong style={{ color: 'var(--text-main)' }}>₹{currentPrice.toLocaleString('en-IN')}</strong>
+                    </span>
+                    <span style={{ fontWeight: '800', color: pnl >= 0 ? '#10B981' : '#EF4444' }}>
                       {pnl >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%
                     </span>
                   </div>

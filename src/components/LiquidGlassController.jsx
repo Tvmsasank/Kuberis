@@ -40,7 +40,7 @@ export function applyGlassConfig(config) {
   root.style.setProperty('--glass-sidebar-opacity', `${sidebarAlpha}`);
   root.style.setProperty('--glass-specular-opacity', config.specular ? '0.45' : '0.0');
 
-  // 2. Set dynamic inline stylesheet for immediate, unchallengeable cascade priority
+  // 2. Set dynamic inline stylesheet with dual theme rules so light & dark both apply flawlessly
   let dynamicStyleEl = document.getElementById('kuberis-dynamic-liquid-glass-style');
   if (!dynamicStyleEl) {
     dynamicStyleEl = document.createElement('style');
@@ -48,27 +48,81 @@ export function applyGlassConfig(config) {
     document.head.appendChild(dynamicStyleEl);
   }
 
-  const isLight = root.getAttribute('data-theme') === 'light';
-  const cardBg = isLight ? `rgba(255, 255, 255, ${alpha})` : `rgba(10, 25, 47, ${alpha})`;
-  const sidebarBg = isLight ? `rgba(255, 255, 255, ${sidebarAlpha})` : `rgba(8, 18, 35, ${sidebarAlpha})`;
-  const heroBg = isLight
-    ? `linear-gradient(135deg, rgba(236, 253, 245, ${Math.min(0.85, alpha)}) 0%, rgba(240, 253, 244, ${Math.min(0.75, alpha)}) 50%, rgba(224, 242, 254, ${Math.min(0.8, alpha)}) 100%)`
-    : `linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(10, 25, 47, ${alpha}) 100%)`;
+  const lightAlpha = Math.max(0.65, alpha);
+  const lightSidebarAlpha = Math.max(0.78, sidebarAlpha);
+  const lightHeroAlpha = Math.min(0.85, alpha);
 
   dynamicStyleEl.textContent = `
-    :root, [data-theme='light'], [data-theme='dark'], [data-theme='emerald'] {
-      --bg-card: ${cardBg} !important;
-      --bg-sidebar: ${sidebarBg} !important;
-      --hero-bg: ${heroBg} !important;
+    /* Apple Liquid Glass: Dark / Cyber Emerald Theme Engine */
+    :root, [data-theme='dark'], [data-theme='emerald'] {
+      --bg-card: rgba(10, 25, 47, ${alpha}) !important;
+      --bg-sidebar: rgba(8, 18, 35, ${sidebarAlpha}) !important;
+      --hero-bg: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(10, 25, 47, ${alpha}) 100%) !important;
       --glass-blur: ${config.blur}px !important;
       --glass-opacity: ${alpha} !important;
       --glass-sidebar-opacity: ${sidebarAlpha} !important;
       --glass-specular-opacity: ${config.specular ? '0.45' : '0.0'} !important;
+      --bg-glass-subtle: rgba(255, 255, 255, 0.05) !important;
+      --border-glass-subtle: rgba(255, 255, 255, 0.1) !important;
     }
-    .card, .sidebar, .card-table {
-      background: ${cardBg} !important;
+
+    /* Apple Liquid Glass: Clean Light Theme Engine */
+    [data-theme='light'] {
+      --bg-card: rgba(255, 255, 255, ${lightAlpha}) !important;
+      --bg-sidebar: rgba(255, 255, 255, ${lightSidebarAlpha}) !important;
+      --hero-bg: linear-gradient(135deg, rgba(236, 253, 245, ${lightHeroAlpha}) 0%, rgba(240, 253, 244, ${Math.min(0.75, lightHeroAlpha)}) 50%, rgba(224, 242, 254, ${lightHeroAlpha}) 100%) !important;
+      --glass-blur: ${config.blur}px !important;
+      --glass-opacity: ${alpha} !important;
+      --glass-sidebar-opacity: ${sidebarAlpha} !important;
+      --glass-specular-opacity: ${config.specular ? '0.5' : '0.0'} !important;
+      --bg-glass-subtle: rgba(15, 23, 42, 0.04) !important;
+      --border-glass-subtle: rgba(226, 232, 240, 0.85) !important;
+    }
+
+    /* Common refraction on all glass surfaces */
+    .card, .sidebar, .card-table, .modal-content {
       backdrop-filter: blur(${config.blur}px) saturate(190%) !important;
       -webkit-backdrop-filter: blur(${config.blur}px) saturate(190%) !important;
+    }
+
+    /* Dark Mode Glass Cards & Modals */
+    :root:not([data-theme='light']) .card,
+    :root:not([data-theme='light']) .sidebar,
+    :root:not([data-theme='light']) .card-table,
+    [data-theme='dark'] .card,
+    [data-theme='dark'] .sidebar,
+    [data-theme='dark'] .card-table,
+    [data-theme='emerald'] .card,
+    [data-theme='emerald'] .sidebar,
+    [data-theme='emerald'] .card-table {
+      background: rgba(10, 25, 47, ${alpha}) !important;
+      border-color: rgba(255, 255, 255, ${config.specular ? '0.14' : '0.06'}) !important;
+      box-shadow: inset 0 1px 1px rgba(255, 255, 255, ${config.specular ? '0.35' : '0.0'}), 0 12px 32px -4px rgba(0, 0, 0, 0.5) !important;
+    }
+
+    :root:not([data-theme='light']) .modal-content,
+    [data-theme='dark'] .modal-content,
+    [data-theme='emerald'] .modal-content {
+      background: rgba(10, 25, 47, ${alpha}) !important;
+      border-color: rgba(255, 255, 255, ${config.specular ? '0.18' : '0.08'}) !important;
+      box-shadow: inset 0 1px 1.5px rgba(255, 255, 255, ${config.specular ? '0.45' : '0.0'}), 0 24px 60px -12px rgba(0, 0, 0, 0.7), 0 0 35px rgba(16, 185, 129, 0.12) !important;
+      color: #FFFFFF !important;
+    }
+
+    /* Light Mode Glass Cards & Modals */
+    [data-theme='light'] .card,
+    [data-theme='light'] .sidebar,
+    [data-theme='light'] .card-table {
+      background: rgba(255, 255, 255, ${lightAlpha}) !important;
+      border-color: rgba(226, 232, 240, 0.85) !important;
+      box-shadow: inset 0 1px 1.5px rgba(255, 255, 255, ${config.specular ? '0.9' : '0.0'}), 0 12px 28px rgba(15, 23, 42, 0.08) !important;
+    }
+
+    [data-theme='light'] .modal-content {
+      background: rgba(255, 255, 255, ${lightAlpha}) !important;
+      border-color: rgba(255, 255, 255, 0.9) !important;
+      box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.95), 0 24px 50px -12px rgba(15, 23, 42, 0.15) !important;
+      color: #0F172A !important;
     }
   `;
 

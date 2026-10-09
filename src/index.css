@@ -52,6 +52,8 @@
   --glass-blur: 26px;
   --glass-opacity: 0.72;
   --glass-specular-opacity: 0.35;
+  --bg-glass-subtle: rgba(255, 255, 255, 0.05);
+  --border-glass-subtle: rgba(255, 255, 255, 0.1);
 }
 
 /* Theme 1: Cyber Emerald Glass (Default / Dark) */
@@ -66,6 +68,8 @@
   --border-color: rgba(255, 255, 255, 0.1);
   --border-focus: #10B981;
   --border-glass: rgba(16, 185, 129, 0.25);
+  --bg-glass-subtle: rgba(255, 255, 255, 0.05);
+  --border-glass-subtle: rgba(255, 255, 255, 0.1);
 
   --primary: #10B981;
   --primary-hover: #059669;
@@ -93,6 +97,8 @@
   --border-color: rgba(226, 232, 240, 0.85);
   --border-focus: #10B981;
   --border-glass: rgba(16, 185, 129, 0.25);
+  --bg-glass-subtle: rgba(15, 23, 42, 0.04);
+  --border-glass-subtle: rgba(226, 232, 240, 0.85);
 
   --primary: #059669;
   --primary-hover: #047857;
@@ -721,16 +727,16 @@ select.form-control option {
   background: rgba(255, 255, 255, 0.03);
 }
 
-/* Modal Backdrop (Liquid Glassmorphism Blur) */
+/* Modal Backdrop (Apple Liquid Glass Translucency & Refraction) */
 .modal-backdrop {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background: rgba(4, 13, 26, 0.42);
+  backdrop-filter: blur(22px) saturate(190%);
+  -webkit-backdrop-filter: blur(22px) saturate(190%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -740,17 +746,21 @@ select.form-control option {
 }
 
 [data-theme='light'] .modal-backdrop {
-  background: rgba(15, 23, 42, 0.52);
+  background: rgba(15, 23, 42, 0.18);
+  backdrop-filter: blur(20px) saturate(190%);
+  -webkit-backdrop-filter: blur(20px) saturate(190%);
 }
 
 .modal-content {
   background: var(--bg-card);
+  backdrop-filter: blur(var(--glass-blur, 28px)) saturate(190%);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 28px)) saturate(190%);
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-xl);
   padding: 28px;
   width: 100%;
   max-width: 540px;
-  box-shadow: var(--shadow-lg);
+  box-shadow: inset 0 1px 1.5px rgba(255, 255, 255, var(--glass-specular-opacity, 0.35)), var(--shadow-lg);
   position: relative;
   max-height: 90vh;
   overflow-y: auto;
@@ -1560,37 +1570,37 @@ input[type=number] {
 .liquid-orb {
   position: absolute;
   border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.38;
+  filter: blur(75px);
+  opacity: 0.52;
   animation: floatOrb 18s ease-in-out infinite alternate;
   pointer-events: none;
   will-change: transform;
 }
 
 .liquid-orb-1 {
-  width: 580px;
-  height: 580px;
-  top: -120px;
-  right: -80px;
-  background: radial-gradient(circle, #10B981 0%, rgba(16, 185, 129, 0.25) 50%, transparent 80%);
+  width: 640px;
+  height: 640px;
+  top: -100px;
+  right: -60px;
+  background: radial-gradient(circle, #10B981 0%, rgba(16, 185, 129, 0.45) 40%, transparent 75%);
 }
 
 .liquid-orb-2 {
-  width: 520px;
-  height: 520px;
-  bottom: 8%;
-  left: 5%;
-  background: radial-gradient(circle, #0284C7 0%, rgba(2, 132, 199, 0.25) 50%, transparent 80%);
+  width: 580px;
+  height: 580px;
+  bottom: 6%;
+  left: 4%;
+  background: radial-gradient(circle, #0284C7 0%, rgba(14, 165, 233, 0.42) 40%, transparent 75%);
   animation-duration: 24s;
   animation-delay: -6s;
 }
 
 .liquid-orb-3 {
-  width: 440px;
-  height: 440px;
-  top: 35%;
-  right: 20%;
-  background: radial-gradient(circle, #8B5CF6 0%, rgba(139, 92, 246, 0.25) 50%, transparent 80%);
+  width: 480px;
+  height: 480px;
+  top: 32%;
+  right: 18%;
+  background: radial-gradient(circle, #8B5CF6 0%, rgba(139, 92, 246, 0.42) 40%, transparent 75%);
   animation-duration: 20s;
   animation-delay: -11s;
 }
@@ -1598,15 +1608,15 @@ input[type=number] {
 .liquid-orb-4 {
   position: absolute;
   border-radius: 50%;
-  filter: blur(80px);
-  width: 420px;
-  height: 420px;
-  bottom: 25%;
-  right: 10%;
-  background: radial-gradient(circle, #EC4899 0%, rgba(236, 72, 153, 0.2) 50%, transparent 80%);
+  filter: blur(75px);
+  width: 460px;
+  height: 460px;
+  bottom: 22%;
+  right: 8%;
+  background: radial-gradient(circle, #EC4899 0%, rgba(236, 72, 153, 0.38) 40%, transparent 75%);
   animation: floatOrb 22s ease-in-out infinite alternate-reverse;
   pointer-events: none;
-  opacity: 0.32;
+  opacity: 0.46;
   will-change: transform;
 }
 

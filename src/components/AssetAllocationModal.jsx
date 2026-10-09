@@ -361,11 +361,7 @@ export default function AssetAllocationModal({
           maxWidth: '780px',
           width: '100%',
           padding: '24px',
-          borderRadius: '24px',
-          background: 'var(--bg-card)',
-          backdropFilter: 'blur(28px)',
-          border: '1px solid var(--border-glass)',
-          boxShadow: 'var(--shadow-lg)'
+          borderRadius: '24px'
         }}
       >
         {/* Header */}
@@ -470,8 +466,8 @@ export default function AssetAllocationModal({
             marginBottom: '18px',
             padding: '12px 16px',
             borderRadius: '16px',
-            background: 'rgba(255, 255, 255, 0.03)',
-            border: '1px solid var(--border-color)'
+            background: 'var(--bg-glass-subtle)',
+            border: '1px solid var(--border-glass-subtle)'
           }}
         >
           <div>
@@ -513,7 +509,8 @@ export default function AssetAllocationModal({
           style={{
             display: 'flex',
             gap: '6px',
-            background: 'rgba(255, 255, 255, 0.04)',
+            background: 'var(--bg-glass-subtle)',
+            border: '1px solid var(--border-glass-subtle)',
             padding: '4px',
             borderRadius: '12px',
             marginBottom: '18px',
@@ -881,8 +878,8 @@ export default function AssetAllocationModal({
                           justifyContent: 'space-between',
                           padding: '10px 14px',
                           borderRadius: '12px',
-                          background: 'rgba(255, 255, 255, 0.03)',
-                          border: '1px solid var(--border-color)'
+                          background: 'var(--bg-glass-subtle)',
+                          border: '1px solid var(--border-glass-subtle)'
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -916,8 +913,8 @@ export default function AssetAllocationModal({
                           justifyContent: 'space-between',
                           padding: '10px 14px',
                           borderRadius: '12px',
-                          background: 'rgba(255, 255, 255, 0.03)',
-                          border: '1px solid var(--border-color)'
+                          background: 'var(--bg-glass-subtle)',
+                          border: '1px solid var(--border-glass-subtle)'
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
@@ -961,8 +958,8 @@ export default function AssetAllocationModal({
                           justifyContent: 'space-between',
                           padding: '10px 14px',
                           borderRadius: '12px',
-                          background: 'rgba(255, 255, 255, 0.03)',
-                          border: '1px solid var(--border-color)'
+                          background: 'var(--bg-glass-subtle)',
+                          border: '1px solid var(--border-glass-subtle)'
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
@@ -1007,8 +1004,8 @@ export default function AssetAllocationModal({
                             justifyContent: 'space-between',
                             padding: '10px 14px',
                             borderRadius: '12px',
-                            background: 'rgba(255, 255, 255, 0.03)',
-                            border: '1px solid var(--border-color)'
+                            background: 'var(--bg-glass-subtle)',
+                            border: '1px solid var(--border-glass-subtle)'
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
@@ -1068,8 +1065,8 @@ export default function AssetAllocationModal({
                             justifyContent: 'space-between',
                             padding: '10px 14px',
                             borderRadius: '12px',
-                            background: 'rgba(255, 255, 255, 0.03)',
-                            border: '1px solid var(--border-color)'
+                            background: 'var(--bg-glass-subtle)',
+                            border: '1px solid var(--border-glass-subtle)'
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
