@@ -148,12 +148,16 @@ export async function authenticateWithBiometrics(targetEmail) {
     try {
       allowCredentials.push({
         id: base64UrlToBuffer(rawIdBase64),
-        type: 'public-key',
-        transports: ['internal']
+        type: 'public-key'
       });
-    } catch (e) {
-      // Fallback
-    }
+    } catch (e) {}
+  } else if (credentialId) {
+    try {
+      allowCredentials.push({
+        id: base64UrlToBuffer(credentialId),
+        type: 'public-key'
+      });
+    } catch (e) {}
   }
 
   const requestOptions = {
@@ -198,5 +202,5 @@ export async function authenticateWithBiometrics(targetEmail) {
 
   if (!res.ok) throw new Error(json.error || 'Biometric authentication failed');
 
-  return json;
+  return { ...json, credentialId: finalCredentialId };
 }

@@ -205,6 +205,7 @@
       stroke-width: 4;
       stroke-linecap: round;
       stroke-linejoin: round;
+      transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .trace-liquid {
@@ -214,7 +215,11 @@
       stroke-linecap: round;
       stroke-linejoin: round;
       filter: drop-shadow(0 0 12px #F59E0B) drop-shadow(0 0 24px #10B981);
-      transition: stroke-dashoffset 0.05s linear;
+      transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), stroke-dashoffset 0.05s linear;
+    }
+
+    .dimmed {
+      opacity: 0.06 !important;
     }
 
     .revealed-text {
@@ -541,27 +546,27 @@
           <!-- 2. MODERN SLEEK SANS PATH -->
           <g id="groupModern" style="display: none;">
             <path id="trackModern" class="trace-track" d="
-              M 80,180 L 80,60 M 80,120 L 140,60 M 105,115 L 145,180
-              M 190,60 L 190,145 C 190,175 240,175 240,145 L 240,60
-              M 290,180 L 290,60 L 335,60 C 355,60 355,110 335,110 L 290,110 L 340,110 C 360,110 360,180 340,180 Z
-              M 400,60 L 460,60 M 400,60 L 400,180 L 460,180 M 400,120 L 445,120
-              M 510,180 L 510,60 L 555,60 C 575,60 575,115 555,115 L 510,115 M 535,115 L 575,180
-              M 630,60 L 630,180
-              M 740,75 C 725,60 690,60 680,85 C 670,110 740,125 735,155 C 730,180 695,185 675,170
+              M 85,180 L 85,60 M 85,120 L 145,60 M 110,118 L 150,180
+              M 195,60 L 195,145 C 195,175 245,175 245,145 L 245,60
+              M 295,180 L 295,60 L 335,60 C 360,60 360,110 335,110 L 295,110 L 340,110 C 365,110 365,180 340,180 Z
+              M 405,60 L 465,60 M 405,60 L 405,180 L 465,180 M 405,120 L 450,120
+              M 515,180 L 515,60 L 555,60 C 580,60 580,115 555,115 L 515,115 M 540,115 L 585,180
+              M 635,60 L 635,180
+              M 745,75 C 730,60 695,60 685,85 C 675,110 745,125 740,155 C 735,180 700,185 680,170
             " />
 
             <path id="liquidModern" class="trace-liquid" d="
-              M 80,180 L 80,60 M 80,120 L 140,60 M 105,115 L 145,180
-              M 190,60 L 190,145 C 190,175 240,175 240,145 L 240,60
-              M 290,180 L 290,60 L 335,60 C 355,60 355,110 335,110 L 290,110 L 340,110 C 360,110 360,180 340,180 Z
-              M 400,60 L 460,60 M 400,60 L 400,180 L 460,180 M 400,120 L 445,120
-              M 510,180 L 510,60 L 555,60 C 575,60 575,115 555,115 L 510,115 M 535,115 L 575,180
-              M 630,60 L 630,180
-              M 740,75 C 725,60 690,60 680,85 C 670,110 740,125 735,155 C 730,180 695,185 675,170
+              M 85,180 L 85,60 M 85,120 L 145,60 M 110,118 L 150,180
+              M 195,60 L 195,145 C 195,175 245,175 245,145 L 245,60
+              M 295,180 L 295,60 L 335,60 C 360,60 360,110 335,110 L 295,110 L 340,110 C 365,110 365,180 340,180 Z
+              M 405,60 L 465,60 M 405,60 L 405,180 L 465,180 M 405,120 L 450,120
+              M 515,180 L 515,60 L 555,60 C 580,60 580,115 555,115 L 515,115 M 540,115 L 585,180
+              M 635,60 L 635,180
+              M 745,75 C 730,60 695,60 685,85 C 675,110 745,125 740,155 C 735,180 700,185 680,170
             " />
 
-            <text id="textModern" class="revealed-text" x="450" y="150" text-anchor="middle"
-                  font-family="'Plus Jakarta Sans', sans-serif" font-weight="900" font-size="105" letter-spacing="18"
+            <text id="textModern" class="revealed-text" x="450" y="152" text-anchor="middle"
+                  font-family="'Plus Jakarta Sans', sans-serif" font-weight="900" font-size="106" letter-spacing="18"
                   fill="url(#textGoldFill)" filter="url(#goldGlow)">
               KUBERIS
             </text>
@@ -742,6 +747,10 @@
         }
       });
 
+      document.querySelectorAll('.trace-track, .trace-liquid').forEach(el => {
+        el.classList.remove('dimmed');
+      });
+
       leadCoin.style.display = 'flex';
       trailNote1.style.display = 'flex';
       trailNote2.style.display = 'flex';
@@ -808,6 +817,11 @@
     }
 
     function onTraceComplete(textEl) {
+      // Dim out tracing tracks so the clean solid typography shines alone without overlaps
+      document.querySelectorAll('.trace-track, .trace-liquid').forEach(el => {
+        el.classList.add('dimmed');
+      });
+
       // Reveal Solid Illuminated Typography
       textEl.classList.add('show');
       taglinePill.classList.add('show');

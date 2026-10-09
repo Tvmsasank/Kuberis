@@ -335,9 +335,34 @@ export default function AuthModal({
     try {
       const targetEmail = emailToUse || signInEmail || rememberedEmail;
       const result = await authenticateWithBiometrics(targetEmail);
+
+      if (result.activeSessionExists) {
+        setPendingSessionOverride({
+          type: 'biometric',
+          payload: { email: targetEmail, credentialId: result.credentialId }
+        });
+        return;
+      }
+
+      if (result.require2FA) {
+        setTotpTempToken(result.tempToken);
+        setAuthMethod('2fa_challenge');
+        setSuccess('Google Authenticator 2FA verification required');
+        return;
+      }
+
+      if (!result.token || !result.user) {
+        throw new Error(result.message || 'Biometric verification did not return a valid session.');
+      }
+
+      if (targetEmail) {
+        localStorage.setItem('kuberis_remembered_email', targetEmail.trim());
+      }
+      localStorage.setItem('kuberis_has_biometrics', 'true');
+
       setSuccess('Touch ID / Biometric Verified! Unlocking...');
       setTimeout(() => {
-        onLoginSuccess(result.user, result.token, true);
+        onLoginSuccess(result.user, result.token, true, { refreshToken: result.refreshToken });
         onClose();
       }, 400);
     } catch (err) {
@@ -504,7 +529,11 @@ export default function AuthModal({
     setPendingSessionOverride(null);
 
     try {
-      const endpoint = type === 'mpin' ? '/api/auth/mpin/verify' : '/api/auth/login';
+      const endpoint = type === 'mpin'
+        ? '/api/auth/mpin/verify'
+        : type === 'biometric'
+          ? '/api/auth/webauthn/verify'
+          : '/api/auth/login';
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getDeviceHeaders() },
@@ -523,6 +552,7 @@ export default function AuthModal({
 
       localStorage.setItem('kuberis_remembered_email', payload.email);
       if (type === 'mpin') localStorage.setItem('kuberis_has_mpin', 'true');
+      if (type === 'biometric') localStorage.setItem('kuberis_has_biometrics', 'true');
 
       setSuccess('Signed in successfully! Previous session terminated.');
       setTimeout(() => {

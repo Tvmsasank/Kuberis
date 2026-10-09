@@ -40,6 +40,7 @@ import AppTour from './components/AppTour';
 import LandingPage from './components/LandingPage';
 import StandaloneAdminPortal from './components/StandaloneAdminPortal';
 import LiquidGlassController, { applyGlassConfig, DEFAULT_GLASS_CONFIG } from './components/LiquidGlassController';
+import KuberisPreloader from './components/KuberisPreloader';
 import { CheckCircle2, FolderSync, X, Shield, Lock, UserPlus, LogIn, Fingerprint, KeyRound, Zap, Landmark, ShieldAlert, AlertCircle } from 'lucide-react';
 import { getDeviceHeaders } from './utils/deviceInfo';
 
@@ -70,6 +71,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState(() => localStorage.getItem('kuberis_theme') || localStorage.getItem('wealthpulse_theme') || localStorage.getItem('ledgerly_theme') || 'dark');
   const [isGlassControllerOpen, setIsGlassControllerOpen] = useState(false);
+  const [showPreloader, setShowPreloader] = useState(true);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isPrivacyMode, setIsPrivacyMode] = useState(() => {
     return (localStorage.getItem('kuberis_privacy_mode') || localStorage.getItem('wealthpulse_privacy_mode')) === 'true';
@@ -1581,6 +1583,8 @@ export default function App() {
       </div>
 
       {/* Real-time Apple Liquid Glass Transparency & Frost Controller Modal */}
+      {showPreloader && <KuberisPreloader onFinish={() => setShowPreloader(false)} />}
+
       <LiquidGlassController
         isOpen={isGlassControllerOpen}
         onClose={() => setIsGlassControllerOpen(false)}

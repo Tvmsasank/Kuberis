@@ -453,52 +453,6 @@ export default function LiquidGlassController({ isOpen, onClose }) {
                   Dynamic Light Orbs
                 </label>
               </div>
-
-              {/* Quick Link to Money Trace Preloader Showcase */}
-              <div style={{
-                marginTop: '16px',
-                padding: '12px 14px',
-                borderRadius: '14px',
-                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(16, 185, 129, 0.12) 100%)',
-                border: '1px solid rgba(245, 158, 11, 0.3)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '10px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '18px' }}>🪙</span>
-                  <div>
-                    <div style={{ fontSize: '12px', fontWeight: '800', color: '#FCD34D' }}>
-                      Money Trace Preloader Showcase
-                    </div>
-                    <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
-                      Gold coins & notes tracing Kuberis (Cursive & Modern)
-                    </div>
-                  </div>
-                </div>
-                <a
-                  href="/preloader-preview.html"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-sm"
-                  style={{
-                    background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
-                    color: '#000',
-                    fontSize: '11px',
-                    fontWeight: '800',
-                    padding: '6px 12px',
-                    borderRadius: '8px',
-                    textDecoration: 'none',
-                    whiteSpace: 'nowrap',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  Watch Demo ▶
-                </a>
-              </div>
             </div>
 
             {/* Footer */}
