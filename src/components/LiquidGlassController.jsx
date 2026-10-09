@@ -48,9 +48,13 @@ export function applyGlassConfig(config) {
     document.head.appendChild(dynamicStyleEl);
   }
 
-  const lightAlpha = Math.max(0.65, alpha);
-  const lightSidebarAlpha = Math.max(0.78, sidebarAlpha);
+  const lightAlpha = Math.max(0.10, alpha);
+  const lightSidebarAlpha = Math.min(0.96, Math.max(0.15, Number((alpha + 0.12).toFixed(2))));
   const lightHeroAlpha = Math.min(0.85, alpha);
+
+  const modalSelectors = '.modal-content, .kuberis-auth-card, .kuberis-profile-card, .modal-box, .modal-card, [class*="-modal-card"], [class*="-auth-card"], [class*="-profile-card"], [class*="-modal-content"]';
+  const cardSelectors = '.card, .sidebar, .card-table';
+  const allGlassSelectors = `${cardSelectors}, ${modalSelectors}`;
 
   dynamicStyleEl.textContent = `
     /* Apple Liquid Glass: Dark / Cyber Emerald Theme Engine */
@@ -62,7 +66,7 @@ export function applyGlassConfig(config) {
       --glass-opacity: ${alpha} !important;
       --glass-sidebar-opacity: ${sidebarAlpha} !important;
       --glass-specular-opacity: ${config.specular ? '0.45' : '0.0'} !important;
-      --bg-glass-subtle: rgba(255, 255, 255, 0.05) !important;
+      --bg-glass-subtle: rgba(255, 255, 255, ${Math.min(0.12, Math.max(0.03, alpha * 0.08))}) !important;
       --border-glass-subtle: rgba(255, 255, 255, 0.1) !important;
     }
 
@@ -75,17 +79,17 @@ export function applyGlassConfig(config) {
       --glass-opacity: ${alpha} !important;
       --glass-sidebar-opacity: ${sidebarAlpha} !important;
       --glass-specular-opacity: ${config.specular ? '0.5' : '0.0'} !important;
-      --bg-glass-subtle: rgba(15, 23, 42, 0.04) !important;
-      --border-glass-subtle: rgba(226, 232, 240, 0.85) !important;
+      --bg-glass-subtle: rgba(255, 255, 255, ${Math.min(0.55, Math.max(0.08, lightAlpha * 0.7))}) !important;
+      --border-glass-subtle: rgba(226, 232, 240, 0.8) !important;
     }
 
     /* Common refraction on all glass surfaces */
-    .card, .sidebar, .card-table, .modal-content {
+    ${allGlassSelectors} {
       backdrop-filter: blur(${config.blur}px) saturate(190%) !important;
       -webkit-backdrop-filter: blur(${config.blur}px) saturate(190%) !important;
     }
 
-    /* Dark Mode Glass Cards & Modals */
+    /* Dark Mode Glass Cards */
     :root:not([data-theme='light']) .card,
     :root:not([data-theme='light']) .sidebar,
     :root:not([data-theme='light']) .card-table,
@@ -100,16 +104,41 @@ export function applyGlassConfig(config) {
       box-shadow: inset 0 1px 1px rgba(255, 255, 255, ${config.specular ? '0.35' : '0.0'}), 0 12px 32px -4px rgba(0, 0, 0, 0.5) !important;
     }
 
+    /* Dark Mode Glass Modals & Dialogs (Auth, Profile, and all current & future modals) */
     :root:not([data-theme='light']) .modal-content,
+    :root:not([data-theme='light']) .kuberis-auth-card,
+    :root:not([data-theme='light']) .kuberis-profile-card,
+    :root:not([data-theme='light']) .modal-box,
+    :root:not([data-theme='light']) .modal-card,
+    :root:not([data-theme='light']) [class*="-modal-card"],
+    :root:not([data-theme='light']) [class*="-auth-card"],
+    :root:not([data-theme='light']) [class*="-profile-card"],
+    :root:not([data-theme='light']) [class*="-modal-content"],
     [data-theme='dark'] .modal-content,
-    [data-theme='emerald'] .modal-content {
+    [data-theme='dark'] .kuberis-auth-card,
+    [data-theme='dark'] .kuberis-profile-card,
+    [data-theme='dark'] .modal-box,
+    [data-theme='dark'] .modal-card,
+    [data-theme='dark'] [class*="-modal-card"],
+    [data-theme='dark'] [class*="-auth-card"],
+    [data-theme='dark'] [class*="-profile-card"],
+    [data-theme='dark'] [class*="-modal-content"],
+    [data-theme='emerald'] .modal-content,
+    [data-theme='emerald'] .kuberis-auth-card,
+    [data-theme='emerald'] .kuberis-profile-card,
+    [data-theme='emerald'] .modal-box,
+    [data-theme='emerald'] .modal-card,
+    [data-theme='emerald'] [class*="-modal-card"],
+    [data-theme='emerald'] [class*="-auth-card"],
+    [data-theme='emerald'] [class*="-profile-card"],
+    [data-theme='emerald'] [class*="-modal-content"] {
       background: rgba(10, 25, 47, ${alpha}) !important;
       border-color: rgba(255, 255, 255, ${config.specular ? '0.18' : '0.08'}) !important;
       box-shadow: inset 0 1px 1.5px rgba(255, 255, 255, ${config.specular ? '0.45' : '0.0'}), 0 24px 60px -12px rgba(0, 0, 0, 0.7), 0 0 35px rgba(16, 185, 129, 0.12) !important;
       color: #FFFFFF !important;
     }
 
-    /* Light Mode Glass Cards & Modals */
+    /* Light Mode Glass Cards */
     [data-theme='light'] .card,
     [data-theme='light'] .sidebar,
     [data-theme='light'] .card-table {
@@ -118,10 +147,19 @@ export function applyGlassConfig(config) {
       box-shadow: inset 0 1px 1.5px rgba(255, 255, 255, ${config.specular ? '0.9' : '0.0'}), 0 12px 28px rgba(15, 23, 42, 0.08) !important;
     }
 
-    [data-theme='light'] .modal-content {
+    /* Light Mode Glass Modals & Dialogs (Auth, Profile, and all current & future modals) */
+    [data-theme='light'] .modal-content,
+    [data-theme='light'] .kuberis-auth-card,
+    [data-theme='light'] .kuberis-profile-card,
+    [data-theme='light'] .modal-box,
+    [data-theme='light'] .modal-card,
+    [data-theme='light'] [class*="-modal-card"],
+    [data-theme='light'] [class*="-auth-card"],
+    [data-theme='light'] [class*="-profile-card"],
+    [data-theme='light'] [class*="-modal-content"] {
       background: rgba(255, 255, 255, ${lightAlpha}) !important;
-      border-color: rgba(255, 255, 255, 0.9) !important;
-      box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.95), 0 24px 50px -12px rgba(15, 23, 42, 0.15) !important;
+      border-color: rgba(255, 255, 255, 0.85) !important;
+      box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.95), 0 24px 50px -12px rgba(15, 23, 42, 0.12) !important;
       color: #0F172A !important;
     }
   `;
@@ -365,14 +403,14 @@ export default function LiquidGlassController({ isOpen, onClose }) {
                 </div>
                 <input
                   type="range"
-                  min="25"
+                  min="10"
                   max="95"
                   value={config.opacity}
                   onChange={(e) => handleUpdate('opacity', Number(e.target.value))}
                   style={{ width: '100%', accentColor: 'var(--primary)', cursor: 'pointer' }}
                 />
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  <span>Crystal Clear (25%)</span>
+                  <span>Ultra Translucent (10%)</span>
                   <span>Frosted Satin (95%)</span>
                 </div>
               </div>

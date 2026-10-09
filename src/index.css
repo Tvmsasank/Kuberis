@@ -1370,16 +1370,16 @@ input[type=number] {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(2, 6, 18, 0.78);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  background: rgba(2, 6, 18, 0.45);
+  backdrop-filter: blur(20px) saturate(190%);
+  -webkit-backdrop-filter: blur(20px) saturate(190%);
 }
 
 [data-theme='light'] .kuberis-auth-overlay,
 .theme-light .kuberis-auth-overlay {
-  background: rgba(15, 23, 42, 0.42);
-  backdrop-filter: blur(24px) saturate(160%);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  background: rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(20px) saturate(190%);
+  -webkit-backdrop-filter: blur(20px) saturate(190%);
 }
 
 .kuberis-auth-card {
@@ -1387,19 +1387,23 @@ input[type=number] {
   width: 100%;
   max-width: 980px;
   min-height: 620px;
-  background: linear-gradient(135deg, rgba(8, 20, 36, 0.95) 0%, rgba(3, 10, 20, 0.98) 100%);
-  border: 1px solid rgba(16, 185, 129, 0.22);
+  background: var(--bg-card);
+  backdrop-filter: blur(var(--glass-blur, 28px)) saturate(190%);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 28px)) saturate(190%);
+  border: 1px solid var(--border-glass, rgba(16, 185, 129, 0.22));
   border-radius: 28px;
-  box-shadow: 0 25px 80px -15px rgba(0, 0, 0, 0.8), 0 0 50px -10px rgba(16, 185, 129, 0.15);
+  box-shadow: inset 0 1px 1.5px rgba(255, 255, 255, var(--glass-specular-opacity, 0.35)), 0 25px 80px -15px rgba(0, 0, 0, 0.75), 0 0 50px -10px rgba(16, 185, 129, 0.15);
   overflow: hidden;
   display: flex;
 }
 
 [data-theme='light'] .kuberis-auth-card,
 .theme-light .kuberis-auth-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.98) 100%);
-  border: 1px solid rgba(16, 185, 129, 0.35);
-  box-shadow: 0 25px 80px -15px rgba(15, 23, 42, 0.18), 0 0 50px -10px rgba(16, 185, 129, 0.12);
+  background: var(--bg-card);
+  backdrop-filter: blur(var(--glass-blur, 28px)) saturate(190%);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 28px)) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.95), 0 24px 50px -12px rgba(15, 23, 42, 0.12), 0 0 50px -10px rgba(16, 185, 129, 0.12);
 }
 
 @media (max-width: 768px) {
@@ -1416,15 +1420,17 @@ input[type=number] {
   position: relative;
   display: flex;
   align-items: center;
-  background: rgba(5, 15, 30, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(5, 15, 30, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 14px;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .kuberis-input-container:focus-within {
   border-color: #10B981;
-  background: rgba(6, 20, 38, 0.9);
+  background: rgba(6, 20, 38, 0.75);
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18), 0 0 20px -3px rgba(16, 185, 129, 0.25);
 }
 
@@ -1450,14 +1456,16 @@ input[type=number] {
 /* Light Mode Input Containers */
 [data-theme='light'] .kuberis-input-container,
 .theme-light .kuberis-input-container {
-  background: rgba(241, 245, 249, 0.85);
-  border: 1px solid rgba(203, 213, 225, 0.85);
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(203, 213, 225, 0.75);
 }
 
 [data-theme='light'] .kuberis-input-container:focus-within,
 .theme-light .kuberis-input-container:focus-within {
   border-color: #059669;
-  background: #FFFFFF;
+  background: rgba(255, 255, 255, 0.95);
   box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.16), 0 0 16px -2px rgba(5, 150, 105, 0.2);
 }
 
@@ -1501,16 +1509,16 @@ input[type=number] {
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(2, 6, 18, 0.82);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  background: rgba(2, 6, 18, 0.45);
+  backdrop-filter: blur(20px) saturate(190%);
+  -webkit-backdrop-filter: blur(20px) saturate(190%);
 }
 
 [data-theme='light'] .kuberis-profile-overlay,
 .theme-light .kuberis-profile-overlay {
-  background: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(24px) saturate(160%);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  background: rgba(15, 23, 42, 0.16);
+  backdrop-filter: blur(20px) saturate(190%);
+  -webkit-backdrop-filter: blur(20px) saturate(190%);
 }
 
 .kuberis-profile-card {
@@ -1522,16 +1530,20 @@ input[type=number] {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(135deg, rgba(8, 20, 36, 0.95) 0%, rgba(3, 10, 20, 0.98) 100%);
-  border: 1px solid rgba(16, 185, 129, 0.25);
-  box-shadow: 0 30px 90px -20px rgba(0, 0, 0, 0.85), 0 0 50px -10px rgba(16, 185, 129, 0.15);
+  background: var(--bg-card);
+  backdrop-filter: blur(var(--glass-blur, 28px)) saturate(190%);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 28px)) saturate(190%);
+  border: 1px solid var(--border-glass, rgba(16, 185, 129, 0.25));
+  box-shadow: inset 0 1px 1.5px rgba(255, 255, 255, var(--glass-specular-opacity, 0.35)), 0 30px 90px -20px rgba(0, 0, 0, 0.8), 0 0 50px -10px rgba(16, 185, 129, 0.15);
 }
 
 [data-theme='light'] .kuberis-profile-card,
 .theme-light .kuberis-profile-card {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.98) 100%);
-  border: 1px solid rgba(16, 185, 129, 0.35);
-  box-shadow: 0 30px 90px -20px rgba(15, 23, 42, 0.18), 0 0 50px -10px rgba(16, 185, 129, 0.12);
+  background: var(--bg-card);
+  backdrop-filter: blur(var(--glass-blur, 28px)) saturate(190%);
+  -webkit-backdrop-filter: blur(var(--glass-blur, 28px)) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.95), 0 30px 90px -20px rgba(15, 23, 42, 0.12), 0 0 50px -10px rgba(16, 185, 129, 0.12);
 }
 
 .kuberis-profile-body {

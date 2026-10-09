@@ -163,8 +163,8 @@ export default function UserProfileModal({
   // Dynamic colors
   const textHeading = isLight ? '#0F172A' : '#FFFFFF';
   const textSub = isLight ? '#64748B' : '#94A3B8';
-  const cardItemBg = isLight ? 'rgba(241, 245, 249, 0.85)' : 'rgba(5, 15, 30, 0.7)';
-  const cardItemBorder = isLight ? '1px solid rgba(203, 213, 225, 0.85)' : '1px solid rgba(255, 255, 255, 0.08)';
+  const cardItemBg = isLight ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.04)';
+  const cardItemBorder = isLight ? '1px solid rgba(226, 232, 240, 0.8)' : '1px solid rgba(255, 255, 255, 0.08)';
 
   return (
     <AnimatePresence>
