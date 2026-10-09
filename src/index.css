@@ -88,42 +88,42 @@
 /* Theme 4: Apple Slate Clean Light */
 [data-theme='light'], .theme-light {
   --bg-app: #F8FAFC;
-  --bg-card: rgba(255, 255, 255, var(--glass-opacity, 0.78));
-  --bg-card-hover: rgba(255, 255, 255, 0.92);
-  --bg-sidebar: rgba(255, 255, 255, var(--glass-sidebar-opacity, 0.82));
+  --bg-card: rgba(255, 255, 255, var(--glass-opacity, 0.88));
+  --bg-card-hover: rgba(255, 255, 255, 0.98);
+  --bg-sidebar: rgba(255, 255, 255, var(--glass-sidebar-opacity, 0.9));
   --bg-navy: #0F172A;
-  --bg-navy-card: #1E293B;
+  --bg-navy-card: #FFFFFF;
 
-  --border-color: rgba(226, 232, 240, 0.85);
-  --border-focus: #10B981;
-  --border-glass: rgba(16, 185, 129, 0.25);
-  --bg-glass-subtle: rgba(15, 23, 42, 0.04);
-  --border-glass-subtle: rgba(226, 232, 240, 0.85);
+  --border-color: rgba(226, 232, 240, 0.9);
+  --border-focus: #047857;
+  --border-glass: rgba(4, 120, 87, 0.25);
+  --bg-glass-subtle: rgba(255, 255, 255, 0.88);
+  --border-glass-subtle: rgba(226, 232, 240, 0.95);
 
-  --primary: #059669;
-  --primary-hover: #047857;
-  --primary-light: rgba(5, 150, 105, 0.12);
-  --primary-glow: rgba(5, 150, 105, 0.25);
+  --primary: #047857;
+  --primary-hover: #065F46;
+  --primary-light: rgba(4, 120, 87, 0.12);
+  --primary-glow: rgba(4, 120, 87, 0.25);
 
-  --success: #059669;
-  --success-light: rgba(5, 150, 105, 0.12);
-  --warning: #D97706;
-  --warning-light: rgba(217, 119, 6, 0.12);
-  --danger: #DC2626;
-  --danger-light: rgba(220, 38, 38, 0.12);
-  --info: #0284C7;
-  --info-light: rgba(2, 132, 199, 0.12);
+  --success: #047857;
+  --success-light: rgba(4, 120, 87, 0.12);
+  --warning: #B45309;
+  --warning-light: rgba(180, 83, 9, 0.12);
+  --danger: #B91C1C;
+  --danger-light: rgba(185, 28, 28, 0.12);
+  --info: #0369A1;
+  --info-light: rgba(3, 105, 161, 0.12);
 
-  --text-main: #0F172A;
-  --text-muted: #475569;
-  --text-light: #64748B;
+  --text-main: #090D16;
+  --text-muted: #334155;
+  --text-light: #475569;
   
-  --hero-bg: linear-gradient(135deg, rgba(236, 253, 245, 0.85) 0%, rgba(240, 253, 244, 0.75) 50%, rgba(224, 242, 254, 0.8) 100%);
-  --hero-border: 1px solid rgba(167, 243, 208, 0.6);
-  --shadow-sm: 0 4px 16px rgba(15, 23, 42, 0.05);
-  --shadow-md: 0 12px 28px rgba(15, 23, 42, 0.08);
-  --shadow-lg: 0 24px 48px rgba(15, 23, 42, 0.12);
-  --shadow-glow: 0 0 24px rgba(5, 150, 105, 0.18);
+  --hero-bg: linear-gradient(135deg, rgba(236, 253, 245, 0.92) 0%, rgba(240, 253, 244, 0.85) 50%, rgba(224, 242, 254, 0.9) 100%);
+  --hero-border: 1px solid rgba(167, 243, 208, 0.8);
+  --shadow-sm: 0 4px 16px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 12px 28px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 24px 48px rgba(15, 23, 42, 0.08);
+  --shadow-glow: 0 0 24px rgba(4, 120, 87, 0.18);
 }
 
 * {
@@ -746,9 +746,9 @@ select.form-control option {
 }
 
 [data-theme='light'] .modal-backdrop {
-  background: rgba(15, 23, 42, 0.18);
-  backdrop-filter: blur(20px) saturate(190%);
-  -webkit-backdrop-filter: blur(20px) saturate(190%);
+  background: rgba(15, 23, 42, 0.05);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
 }
 
 .modal-content {
@@ -1377,9 +1377,9 @@ input[type=number] {
 
 [data-theme='light'] .kuberis-auth-overlay,
 .theme-light .kuberis-auth-overlay {
-  background: rgba(15, 23, 42, 0.16);
-  backdrop-filter: blur(20px) saturate(190%);
-  -webkit-backdrop-filter: blur(20px) saturate(190%);
+  background: rgba(15, 23, 42, 0.05);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
 }
 
 .kuberis-auth-card {
@@ -1516,9 +1516,9 @@ input[type=number] {
 
 [data-theme='light'] .kuberis-profile-overlay,
 .theme-light .kuberis-profile-overlay {
-  background: rgba(15, 23, 42, 0.16);
-  backdrop-filter: blur(20px) saturate(190%);
-  -webkit-backdrop-filter: blur(20px) saturate(190%);
+  background: rgba(15, 23, 42, 0.05);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
 }
 
 .kuberis-profile-card {

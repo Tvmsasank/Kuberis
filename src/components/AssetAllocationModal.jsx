@@ -474,7 +474,7 @@ export default function AssetAllocationModal({
             <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
               {activeCategory === 'all' ? 'Total Portfolio' : `${categoryName} Value`}
             </div>
-            <div style={{ fontSize: '17px', fontWeight: '900', color: '#38BDF8', marginTop: '2px' }}>
+            <div style={{ fontSize: '17px', fontWeight: '900', color: 'var(--info)', marginTop: '2px' }}>
               {formatInr(totalValuation)}
             </div>
           </div>
@@ -490,7 +490,7 @@ export default function AssetAllocationModal({
             <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
               Day's P&L
             </div>
-            <div style={{ fontSize: '17px', fontWeight: '900', color: totalDayPnL >= 0 ? '#10B981' : '#F87171', marginTop: '2px' }}>
+            <div style={{ fontSize: '17px', fontWeight: '900', color: totalDayPnL >= 0 ? 'var(--primary)' : 'var(--danger)', marginTop: '2px' }}>
               {totalDayPnL >= 0 ? '+' : ''}{formatInr(totalDayPnL)} ({dayPnLPct >= 0 ? '+' : ''}{dayPnLPct.toFixed(2)}%)
             </div>
           </div>
@@ -498,7 +498,7 @@ export default function AssetAllocationModal({
             <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
               Total Net Return
             </div>
-            <div style={{ fontSize: '17px', fontWeight: '900', color: totalPnL >= 0 ? '#10B981' : '#F87171', marginTop: '2px' }}>
+            <div style={{ fontSize: '17px', fontWeight: '900', color: totalPnL >= 0 ? 'var(--primary)' : 'var(--danger)', marginTop: '2px' }}>
               {totalPnL >= 0 ? '+' : ''}{formatInr(totalPnL)} ({totalPnLPct >= 0 ? '+' : ''}{totalPnLPct.toFixed(1)}%)
             </div>
           </div>
@@ -749,9 +749,9 @@ export default function AssetAllocationModal({
                           padding: '5px 12px',
                           borderRadius: '8px',
                           fontWeight: '800',
-                          color: dayFilter === 'gainers' ? '#FFFFFF' : '#10B981',
-                          background: dayFilter === 'gainers' ? '#10B981' : 'rgba(16, 185, 129, 0.12)',
-                          borderColor: '#10B981'
+                          color: dayFilter === 'gainers' ? '#FFFFFF' : 'var(--primary)',
+                          background: dayFilter === 'gainers' ? 'var(--primary)' : 'var(--primary-light)',
+                          borderColor: 'var(--primary)'
                         }}
                         onClick={() => setDayFilter('gainers')}
                       >
@@ -765,9 +765,9 @@ export default function AssetAllocationModal({
                           padding: '5px 12px',
                           borderRadius: '8px',
                           fontWeight: '800',
-                          color: dayFilter === 'losers' ? '#FFFFFF' : '#EF4444',
-                          background: dayFilter === 'losers' ? '#EF4444' : 'rgba(239, 68, 68, 0.12)',
-                          borderColor: '#EF4444'
+                          color: dayFilter === 'losers' ? '#FFFFFF' : 'var(--danger)',
+                          background: dayFilter === 'losers' ? 'var(--danger)' : 'var(--danger-light)',
+                          borderColor: 'var(--danger)'
                         }}
                         onClick={() => setDayFilter('losers')}
                       >
@@ -809,9 +809,9 @@ export default function AssetAllocationModal({
                           padding: '5px 12px',
                           borderRadius: '8px',
                           fontWeight: '800',
-                          color: pnlFilter === 'profit' ? '#FFFFFF' : '#10B981',
-                          background: pnlFilter === 'profit' ? '#10B981' : 'rgba(16, 185, 129, 0.12)',
-                          borderColor: '#10B981'
+                          color: pnlFilter === 'profit' ? '#FFFFFF' : 'var(--primary)',
+                          background: pnlFilter === 'profit' ? 'var(--primary)' : 'var(--primary-light)',
+                          borderColor: 'var(--primary)'
                         }}
                         onClick={() => setPnlFilter('profit')}
                       >
@@ -825,9 +825,9 @@ export default function AssetAllocationModal({
                           padding: '5px 12px',
                           borderRadius: '8px',
                           fontWeight: '800',
-                          color: pnlFilter === 'loss' ? '#FFFFFF' : '#EF4444',
-                          background: pnlFilter === 'loss' ? '#EF4444' : 'rgba(239, 68, 68, 0.12)',
-                          borderColor: '#EF4444'
+                          color: pnlFilter === 'loss' ? '#FFFFFF' : 'var(--danger)',
+                          background: pnlFilter === 'loss' ? 'var(--danger)' : 'var(--danger-light)',
+                          borderColor: 'var(--danger)'
                         }}
                         onClick={() => setPnlFilter('loss')}
                       >
@@ -974,10 +974,10 @@ export default function AssetAllocationModal({
                           </div>
                         </div>
                         <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                          <div style={{ fontSize: '13px', fontWeight: '900', color: '#38BDF8' }}>
+                          <div style={{ fontSize: '13px', fontWeight: '900', color: 'var(--info)' }}>
                             {formatInr(item.value)}
                           </div>
-                          <div style={{ fontSize: '11px', fontWeight: '700', color: item.pnl >= 0 ? '#10B981' : '#F87171' }}>
+                          <div style={{ fontSize: '11px', fontWeight: '700', color: item.pnl >= 0 ? 'var(--primary)' : 'var(--danger)' }}>
                             {item.pct}% weight • {item.pnl >= 0 ? '+' : ''}{item.pnlPct}%
                           </div>
                         </div>
@@ -1014,8 +1014,8 @@ export default function AssetAllocationModal({
                                 width: '28px',
                                 height: '28px',
                                 borderRadius: '8px',
-                                background: isUp ? 'rgba(16, 185, 129, 0.15)' : isDown ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                                color: isUp ? '#10B981' : isDown ? '#EF4444' : 'var(--text-muted)',
+                                background: isUp ? 'var(--primary-light)' : isDown ? 'var(--danger-light)' : 'rgba(255, 255, 255, 0.05)',
+                                color: isUp ? 'var(--primary)' : isDown ? 'var(--danger)' : 'var(--text-muted)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -1034,10 +1034,10 @@ export default function AssetAllocationModal({
                             </div>
                           </div>
                           <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                            <div style={{ fontSize: '13px', fontWeight: '900', color: isUp ? '#10B981' : isDown ? '#EF4444' : 'var(--text-muted)' }}>
+                            <div style={{ fontSize: '13px', fontWeight: '900', color: isUp ? 'var(--primary)' : isDown ? 'var(--danger)' : 'var(--text-muted)' }}>
                               {isUp ? '+' : ''}{formatInr(item.dayRupees)}
                             </div>
-                            <div style={{ fontSize: '11px', fontWeight: '800', color: isUp ? '#10B981' : isDown ? '#EF4444' : 'var(--text-muted)' }}>
+                            <div style={{ fontSize: '11px', fontWeight: '800', color: isUp ? 'var(--primary)' : isDown ? 'var(--danger)' : 'var(--text-muted)' }}>
                               {isUp ? '+' : ''}{item.dayPct}% Today
                             </div>
                           </div>
@@ -1075,8 +1075,8 @@ export default function AssetAllocationModal({
                                 width: '28px',
                                 height: '28px',
                                 borderRadius: '8px',
-                                background: isProfit ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                                color: isProfit ? '#10B981' : '#EF4444',
+                                background: isProfit ? 'var(--primary-light)' : 'var(--danger-light)',
+                                color: isProfit ? 'var(--primary)' : 'var(--danger)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -1095,10 +1095,10 @@ export default function AssetAllocationModal({
                             </div>
                           </div>
                           <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                            <div style={{ fontSize: '13px', fontWeight: '900', color: isProfit ? '#10B981' : '#EF4444' }}>
+                            <div style={{ fontSize: '13px', fontWeight: '900', color: isProfit ? 'var(--primary)' : 'var(--danger)' }}>
                               {isProfit ? '+' : ''}{formatInr(item.pnl)}
                             </div>
-                            <div style={{ fontSize: '11px', fontWeight: '800', color: isProfit ? '#10B981' : '#EF4444' }}>
+                            <div style={{ fontSize: '11px', fontWeight: '800', color: isProfit ? 'var(--primary)' : 'var(--danger)' }}>
                               {isProfit ? '+' : ''}{item.pnlPct}% Return
                             </div>
                           </div>

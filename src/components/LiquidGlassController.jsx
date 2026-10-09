@@ -72,15 +72,21 @@ export function applyGlassConfig(config) {
 
     /* Apple Liquid Glass: Clean Light Theme Engine */
     [data-theme='light'] {
-      --bg-card: rgba(255, 255, 255, ${lightAlpha}) !important;
-      --bg-sidebar: rgba(255, 255, 255, ${lightSidebarAlpha}) !important;
+      --bg-card: rgba(255, 255, 255, ${Math.max(0.85, lightAlpha)}) !important;
+      --bg-sidebar: rgba(255, 255, 255, ${Math.max(0.88, lightSidebarAlpha)}) !important;
       --hero-bg: linear-gradient(135deg, rgba(236, 253, 245, ${lightHeroAlpha}) 0%, rgba(240, 253, 244, ${Math.min(0.75, lightHeroAlpha)}) 50%, rgba(224, 242, 254, ${lightHeroAlpha}) 100%) !important;
       --glass-blur: ${config.blur}px !important;
       --glass-opacity: ${alpha} !important;
       --glass-sidebar-opacity: ${sidebarAlpha} !important;
       --glass-specular-opacity: ${config.specular ? '0.5' : '0.0'} !important;
-      --bg-glass-subtle: rgba(255, 255, 255, ${Math.min(0.55, Math.max(0.08, lightAlpha * 0.7))}) !important;
-      --border-glass-subtle: rgba(226, 232, 240, 0.8) !important;
+      --bg-glass-subtle: rgba(255, 255, 255, 0.88) !important;
+      --border-glass-subtle: rgba(226, 232, 240, 0.95) !important;
+      --text-main: #090D16 !important;
+      --text-muted: #334155 !important;
+      --primary: #047857 !important;
+      --info: #0369A1 !important;
+      --danger: #B91C1C !important;
+      --success: #047857 !important;
     }
 
     /* Common refraction on all glass surfaces */
@@ -142,9 +148,9 @@ export function applyGlassConfig(config) {
     [data-theme='light'] .card,
     [data-theme='light'] .sidebar,
     [data-theme='light'] .card-table {
-      background: rgba(255, 255, 255, ${lightAlpha}) !important;
-      border-color: rgba(226, 232, 240, 0.85) !important;
-      box-shadow: inset 0 1px 1.5px rgba(255, 255, 255, ${config.specular ? '0.9' : '0.0'}), 0 12px 28px rgba(15, 23, 42, 0.08) !important;
+      background: rgba(255, 255, 255, ${Math.max(0.85, lightAlpha)}) !important;
+      border-color: rgba(226, 232, 240, 0.9) !important;
+      box-shadow: inset 0 1px 1.5px rgba(255, 255, 255, ${config.specular ? '0.9' : '0.0'}), 0 12px 28px rgba(15, 23, 42, 0.05) !important;
     }
 
     /* Light Mode Glass Modals & Dialogs (Auth, Profile, and all current & future modals) */
@@ -157,10 +163,10 @@ export function applyGlassConfig(config) {
     [data-theme='light'] [class*="-auth-card"],
     [data-theme='light'] [class*="-profile-card"],
     [data-theme='light'] [class*="-modal-content"] {
-      background: rgba(255, 255, 255, ${lightAlpha}) !important;
-      border-color: rgba(255, 255, 255, 0.85) !important;
-      box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.95), 0 24px 50px -12px rgba(15, 23, 42, 0.12) !important;
-      color: #0F172A !important;
+      background: rgba(255, 255, 255, ${Math.max(0.88, lightAlpha)}) !important;
+      border-color: rgba(255, 255, 255, 0.95) !important;
+      box-shadow: inset 0 1px 2px #FFFFFF, 0 25px 60px -15px rgba(15, 23, 42, 0.08) !important;
+      color: #090D16 !important;
     }
   `;
 

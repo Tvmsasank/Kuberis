@@ -612,14 +612,16 @@ export default function AuthModal({
             }}
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: 'var(--bg-card)',
+              background: isLight ? 'rgba(255, 255, 255, 0.94)' : 'rgba(8, 20, 36, 0.88)',
+              backdropFilter: 'blur(28px) saturate(190%)',
+              WebkitBackdropFilter: 'blur(28px) saturate(190%)',
               borderColor: error ? 'rgba(239, 68, 68, 0.45)' : cardBorder,
               boxShadow: error
                 ? isLight
                   ? '0 30px 90px -20px rgba(239, 68, 68, 0.25), 0 0 40px rgba(239, 68, 68, 0.15)'
                   : '0 25px 80px -15px rgba(0, 0, 0, 0.8), 0 0 50px -10px rgba(239, 68, 68, 0.25)'
                 : isLight
-                ? '0 30px 90px -20px rgba(15, 23, 42, 0.18), 0 0 45px -10px rgba(16, 185, 129, 0.15)'
+                ? '0 30px 90px -20px rgba(15, 23, 42, 0.12), 0 0 45px -10px rgba(16, 185, 129, 0.15)'
                 : '0 25px 80px -15px rgba(0, 0, 0, 0.8), 0 0 50px -10px rgba(16, 185, 129, 0.15)'
             }}
           >
@@ -634,7 +636,8 @@ export default function AuthModal({
                 height: '1.5px',
                 background: 'linear-gradient(90deg, transparent 0%, #10B981 50%, transparent 100%)',
                 boxShadow: '0 0 20px #10B981',
-                zIndex: 30
+                zIndex: 10,
+                pointerEvents: 'none'
               }}
             />
 
@@ -1864,16 +1867,16 @@ export default function AuthModal({
                       top: 0,
                       bottom: 0,
                       left: 0,
+                      width: '50%',
                       background: isLight
-                        ? 'linear-gradient(145deg, rgba(4, 120, 87, 0.82) 0%, rgba(5, 150, 105, 0.76) 45%, rgba(16, 185, 129, 0.82) 100%)'
-                        : 'radial-gradient(circle at 50% 20%, rgba(16, 185, 129, 0.35) 0%, rgba(4, 30, 22, 0.78) 50%, rgba(2, 6, 18, 0.84) 100%)',
-                      backdropFilter: 'blur(20px) saturate(180%)',
-                      WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                        ? 'linear-gradient(145deg, #047857 0%, #059669 45%, #10B981 100%)'
+                        : 'radial-gradient(circle at 50% 20%, rgba(16, 185, 129, 0.28) 0%, #041E16 50%, #020612 100%)',
+                      backgroundColor: isLight ? '#059669' : '#020612',
                       borderLeft: isRegisterMode ? 'none' : '1px solid rgba(16, 185, 129, 0.3)',
                       borderRight: isRegisterMode ? '1px solid rgba(16, 185, 129, 0.3)' : 'none',
                       boxShadow: isLight
-                        ? '0 0 60px rgba(5, 150, 105, 0.3), inset 0 0 35px rgba(255, 255, 255, 0.2)'
-                        : '0 0 60px rgba(0, 0, 0, 0.7), inset 0 0 35px rgba(16, 185, 129, 0.15)',
+                        ? '0 0 60px rgba(5, 150, 105, 0.35), inset 0 0 40px rgba(255, 255, 255, 0.15)'
+                        : '0 0 60px rgba(0, 0, 0, 0.8), inset 0 0 40px rgba(16, 185, 129, 0.12)',
                       display: 'flex',
                       flexDirection: 'column',
                       justifyContent: 'center',
