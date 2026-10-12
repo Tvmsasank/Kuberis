@@ -1,10 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Check } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { ChevronDown, Check, Search, X } from 'lucide-react';
 
 /**
  * Modern, theme-adaptive glassmorphism CustomSelect component.
- * Replaces ugly OS-native <select> boxes with sleek, responsive dropdowns
- * that smoothly transform across Light, Dark, Cyan, and Gold themes.
+ * Features in-dropdown instant search bar, solid opaque contrast popover,
+ * and smooth keyboard/mouse interactions.
  */
 export default function CustomSelect({
   value,
@@ -19,30 +19,59 @@ export default function CustomSelect({
   size = 'md', // 'sm' | 'md' | 'lg'
   icon: PrefixIcon = null,
   name = '',
-  id = ''
+  id = '',
+  searchable = true
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const containerRef = useRef(null);
+  const searchInputRef = useRef(null);
 
   // Normalize options: can be array of strings or array of { value, label, icon?, subtitle? }
-  const normalizedOptions = options.map((opt) => {
-    if (typeof opt === 'object' && opt !== null) {
+  const normalizedOptions = useMemo(() => {
+    return options.map((opt) => {
+      if (typeof opt === 'object' && opt !== null) {
+        return {
+          value: opt.value !== undefined ? String(opt.value) : '',
+          label: opt.label !== undefined ? opt.label : String(opt.value),
+          icon: opt.icon || null,
+          subtitle: opt.subtitle || null
+        };
+      }
       return {
-        value: opt.value !== undefined ? String(opt.value) : '',
-        label: opt.label !== undefined ? opt.label : String(opt.value),
-        icon: opt.icon || null,
-        subtitle: opt.subtitle || null
+        value: String(opt),
+        label: String(opt),
+        icon: null,
+        subtitle: null
       };
-    }
-    return {
-      value: String(opt),
-      label: String(opt),
-      icon: null,
-      subtitle: null
-    };
-  });
+    });
+  }, [options]);
 
   const selectedOption = normalizedOptions.find((o) => String(o.value) === String(value));
+
+  // Filter options by search query
+  const filteredOptions = useMemo(() => {
+    if (!searchQuery.trim()) return normalizedOptions;
+    const q = searchQuery.toLowerCase().trim();
+    return normalizedOptions.filter((opt) => {
+      const labelMatch = (opt.label || '').toLowerCase().includes(q);
+      const subMatch = (opt.subtitle || '').toLowerCase().includes(q);
+      const valMatch = (opt.value || '').toLowerCase().includes(q);
+      return labelMatch || subMatch || valMatch;
+    });
+  }, [normalizedOptions, searchQuery]);
+
+  // Focus search input when menu opens
+  useEffect(() => {
+    if (isOpen) {
+      setSearchQuery('');
+      setTimeout(() => {
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+        }
+      }, 50);
+    }
+  }, [isOpen]);
 
   // Close on outside click
   useEffect(() => {
@@ -72,7 +101,6 @@ export default function CustomSelect({
     if (disabled) return;
     setIsOpen(false);
     if (onChange) {
-      // Support both direct value or synthesized event object: onChange(val) or onChange({ target: { value: val, name } })
       onChange({ target: { value: val, name } });
     }
   };
@@ -84,6 +112,8 @@ export default function CustomSelect({
     md: { height: '38px', fontSize: '13px', padding: '0 13px', iconSize: 15 },
     lg: { height: '46px', fontSize: '14px', padding: '0 16px', iconSize: 16 }
   }[size] || { height: '38px', fontSize: '13px', padding: '0 13px', iconSize: 15 };
+
+  const isSearchEnabled = searchable && normalizedOptions.length >= 4;
 
   return (
     <div
@@ -170,84 +200,158 @@ export default function CustomSelect({
             boxShadow: typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light'
               ? '0 20px 48px rgba(15, 23, 42, 0.18), 0 4px 12px rgba(15, 23, 42, 0.08)'
               : '0 24px 55px rgba(0, 0, 0, 0.9), 0 4px 16px rgba(0, 0, 0, 0.6)',
-            maxHeight: '260px',
-            overflowY: 'auto',
+            maxHeight: '300px',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
             padding: '6px',
             animation: 'customSelectFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
             ...menuStyle
           }}
         >
-          {normalizedOptions.length === 0 ? (
-            <div style={{ padding: '12px 14px', fontSize: '12.5px', color: 'var(--text-muted)', textAlign: 'center' }}>
-              No options available
-            </div>
-          ) : (
-            normalizedOptions.map((opt) => {
-              const isSelected = String(opt.value) === String(value);
-              const OptIcon = opt.icon;
-
-              return (
-                <div
-                  key={opt.value}
-                  onClick={() => handleSelect(opt.value)}
-                  className="custom-select-option"
+          {/* In-Menu Search Input */}
+          {isSearchEnabled && (
+            <div
+              style={{
+                position: 'relative',
+                padding: '4px 6px 8px 6px',
+                borderBottom: '1px solid var(--border-color)',
+                marginBottom: '4px',
+                flexShrink: 0
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Search
+                size={14}
+                style={{
+                  position: 'absolute',
+                  left: '14px',
+                  top: '13px',
+                  color: 'var(--text-muted)'
+                }}
+              />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search or scroll options..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  height: '32px',
+                  background: 'var(--bg-app)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  paddingLeft: '32px',
+                  paddingRight: searchQuery ? '28px' : '10px',
+                  fontSize: '12px',
+                  color: 'var(--text-main)',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '9px 12px',
-                    borderRadius: '10px',
+                    position: 'absolute',
+                    right: '12px',
+                    top: '11px',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-muted)',
                     cursor: 'pointer',
-                    fontSize: sizeStyles.fontSize,
-                    fontWeight: isSelected ? '700' : '500',
-                    color: isSelected ? 'var(--primary)' : 'var(--text-main)',
-                    background: isSelected ? 'var(--primary-light)' : 'transparent',
-                    transition: 'all 0.12s ease',
-                    marginBottom: '2px',
-                    gap: '8px'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isSelected) {
-                      e.currentTarget.style.background = 'var(--bg-card-hover)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isSelected) {
-                      e.currentTarget.style.background = 'transparent';
-                    }
+                    padding: '2px'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-                    {OptIcon && (
-                      <OptIcon
-                        size={14}
-                        style={{
-                          color: isSelected ? 'var(--primary)' : 'var(--text-muted)',
-                          flexShrink: 0
-                        }}
-                      />
-                    )}
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {opt.label}
-                      </div>
-                      {opt.subtitle && (
-                        <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '1px' }}>
-                          {opt.subtitle}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {isSelected && (
-                    <Check size={14} style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                  )}
-                </div>
-              );
-            })
+                  <X size={13} />
+                </button>
+              )}
+            </div>
           )}
+
+          {/* Scrollable Options List */}
+          <div
+            style={{
+              overflowY: 'auto',
+              flex: 1,
+              maxHeight: '240px'
+            }}
+          >
+            {filteredOptions.length === 0 ? (
+              <div style={{ padding: '16px 14px', fontSize: '12.5px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                No matching options found
+              </div>
+            ) : (
+              filteredOptions.map((opt) => {
+                const isSelected = String(opt.value) === String(value);
+                const OptIcon = opt.icon;
+
+                return (
+                  <div
+                    key={opt.value}
+                    onClick={() => handleSelect(opt.value)}
+                    className="custom-select-option"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '9px 12px',
+                      borderRadius: '10px',
+                      cursor: 'pointer',
+                      fontSize: sizeStyles.fontSize,
+                      fontWeight: isSelected ? '700' : '500',
+                      color: isSelected ? 'var(--primary)' : 'var(--text-main)',
+                      background: isSelected ? 'var(--primary-light)' : 'transparent',
+                      transition: 'all 0.12s ease',
+                      marginBottom: '2px',
+                      gap: '8px'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.background = 'var(--bg-card-hover)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) {
+                        e.currentTarget.style.background = 'transparent';
+                      }
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                      {OptIcon && (
+                        <OptIcon
+                          size={14}
+                          style={{
+                            color: isSelected ? 'var(--primary)' : 'var(--text-muted)',
+                            flexShrink: 0
+                          }}
+                        />
+                      )}
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {opt.label}
+                        </div>
+                        {opt.subtitle && (
+                          <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '1px' }}>
+                            {opt.subtitle}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {isSelected && (
+                      <Check size={14} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
       )}
     </div>
   );
 }
+

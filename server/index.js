@@ -21,7 +21,7 @@ import { parseUpiTransactionText } from './upiParser.js';
 import { SUPPORTED_BANKS, initiateAaConsent, verifyAaOtp, generateLiveBankFeed } from './accountAggregator.js';
 import { resolveIpLocation } from './geoIp.js';
 import { parseDeviceDetails } from './deviceParser.js';
-import { FD_INSTITUTIONS, matchFdRate, calculateFdReturns } from './fdRates.js';
+import { FD_INSTITUTIONS, matchFdRate, calculateFdReturns, RATE_NOTIFICATIONS } from './fdRates.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -2252,11 +2252,43 @@ app.get('/api/fd-rates', (req, res) => {
     res.json({
       success: true,
       lastUpdated: '2026-10-12',
-      institutions: FD_INSTITUTIONS
+      institutions: FD_INSTITUTIONS,
+      notifications: RATE_NOTIFICATIONS
     });
   } catch (err) {
     console.error('GET /api/fd-rates error:', err);
     res.status(500).json({ error: 'Failed to fetch FD rates directory' });
+  }
+});
+
+// GET /api/notifications
+app.get('/api/notifications', (req, res) => {
+  try {
+    res.json({
+      success: true,
+      notifications: RATE_NOTIFICATIONS,
+      unreadCount: RATE_NOTIFICATIONS.filter(n => n.isNew).length
+    });
+  } catch (err) {
+    console.error('GET /api/notifications error:', err);
+    res.status(500).json({ error: 'Failed to fetch notifications' });
+  }
+});
+
+// POST /api/notifications/read
+app.post('/api/notifications/read', (req, res) => {
+  try {
+    const { id } = req.body || {};
+    if (id) {
+      const target = RATE_NOTIFICATIONS.find(n => n.id === id);
+      if (target) target.isNew = false;
+    } else {
+      RATE_NOTIFICATIONS.forEach(n => { n.isNew = false; });
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('POST /api/notifications/read error:', err);
+    res.status(500).json({ error: 'Failed to mark notifications read' });
   }
 });
 
@@ -2281,6 +2313,7 @@ app.post('/api/fd-rates/quote', (req, res) => {
     res.status(500).json({ error: 'Failed to quote FD rates' });
   }
 });
+
 
 // ==========================================
 // INVESTMENT & PORTFOLIO ENDPOINTS

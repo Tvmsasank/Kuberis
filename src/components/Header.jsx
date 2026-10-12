@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Sliders,
   Sparkles,
@@ -18,8 +18,11 @@ import {
   Lock,
   ArrowUpRight,
   ArrowDownRight,
-  Compass
+  Compass,
+  Bell,
+  CheckCheck
 } from 'lucide-react';
+import { RATE_NOTIFICATIONS } from '../utils/fdRates';
 
 const INITIAL_TICKERS = [
   { name: 'NIFTY 50', numValue: 24078.30, change: '+124.50', pct: '+0.52%', isUp: true, prefix: '' },
@@ -54,6 +57,67 @@ export default function Header({
   const isDark = theme !== 'light';
   const [tickers, setTickers] = useState(INITIAL_TICKERS);
   const [flashedTicker, setFlashedTicker] = useState(null); // { index, dir }
+  const [notifications, setNotifications] = useState(RATE_NOTIFICATIONS);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [readNotifIds, setReadNotifIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('kuberis_read_notifs');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const notifRef = useRef(null);
+
+  // 🔔 Fetch Live Rate Notifications from Backend
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const res = await fetch('/api/notifications');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.notifications)) {
+            setNotifications(data.notifications);
+          }
+        }
+      } catch (err) {
+        // Retain default RATE_NOTIFICATIONS
+      }
+    };
+    fetchNotifications();
+  }, []);
+
+  // 🖱️ Dismiss Notification dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setIsNotificationsOpen(false);
+      }
+    };
+    if (isNotificationsOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isNotificationsOpen]);
+
+  const handleMarkAllRead = async () => {
+    const allIds = notifications.map(n => n.id);
+    setReadNotifIds(allIds);
+    try {
+      localStorage.setItem('kuberis_read_notifs', JSON.stringify(allIds));
+      await fetch('/api/notifications/read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: allIds })
+      });
+    } catch (err) {
+      // Offline fallback
+    }
+  };
+
+  const unreadCount = notifications.filter(n => !readNotifIds.includes(n.id)).length;
 
   // 🌐 Fetch Real-World Live Market Quotes from Backend API
   useEffect(() => {
@@ -310,6 +374,266 @@ export default function Header({
 
           {user ? (
             <>
+              {/* 🔔 Live Rate Alerts & Revisions Notification Bell */}
+              <div style={{ position: 'relative' }} ref={notifRef}>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setIsNotificationsOpen(prev => !prev)}
+                  style={{
+                    padding: '7px 11px',
+                    borderRadius: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: isNotificationsOpen ? 'rgba(16, 185, 129, 0.16)' : 'rgba(255, 255, 255, 0.05)',
+                    border: isNotificationsOpen ? '1px solid #10B981' : '1px solid var(--border-color)',
+                    color: isNotificationsOpen ? '#10B981' : 'var(--text-main)',
+                    position: 'relative',
+                    cursor: 'pointer'
+                  }}
+                  title="Live Rate Revisions & Market Alerts"
+                  aria-label="Rate Notifications"
+                >
+                  <Bell size={15} />
+                  {unreadCount > 0 && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        top: '-4px',
+                        right: '-4px',
+                        background: '#EF4444',
+                        color: '#FFFFFF',
+                        fontSize: '9.5px',
+                        fontWeight: '900',
+                        minWidth: '17px',
+                        height: '17px',
+                        padding: '0 4px',
+                        borderRadius: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 0 8px rgba(239, 68, 68, 0.65)',
+                        border: '2px solid var(--bg-card, #040D1A)'
+                      }}
+                    >
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* 📋 Notification Dropdown Popover */}
+                {isNotificationsOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 12px)',
+                      right: 0,
+                      width: '390px',
+                      maxWidth: '92vw',
+                      background: isDark ? '#0B192C' : '#FFFFFF',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '16px',
+                      boxShadow: isDark
+                        ? '0 24px 50px rgba(0, 0, 0, 0.8), 0 0 20px rgba(16, 185, 129, 0.15)'
+                        : '0 18px 40px rgba(0, 0, 0, 0.14)',
+                      zIndex: 9999,
+                      overflow: 'hidden',
+                      animation: 'fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                    }}
+                  >
+                    {/* Header */}
+                    <div
+                      style={{
+                        padding: '14px 16px',
+                        borderBottom: '1px solid var(--border-color)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: isDark ? 'rgba(255, 255, 255, 0.02)' : '#F8FAFC'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div
+                          style={{
+                            width: '26px',
+                            height: '26px',
+                            borderRadius: '8px',
+                            background: 'rgba(16, 185, 129, 0.15)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#10B981'
+                          }}
+                        >
+                          <Bell size={13} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            Rate Sync Alerts
+                            {unreadCount > 0 && (
+                              <span
+                                style={{
+                                  fontSize: '10px',
+                                  fontWeight: '800',
+                                  padding: '1px 6px',
+                                  borderRadius: '6px',
+                                  background: 'rgba(239, 68, 68, 0.18)',
+                                  color: '#EF4444',
+                                  border: '1px solid rgba(239, 68, 68, 0.3)'
+                                }}
+                              >
+                                {unreadCount} new
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
+                            Live updates from MoF, RBI & Bank catalogs
+                          </div>
+                        </div>
+                      </div>
+
+                      {unreadCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleMarkAllRead}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#10B981',
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '4px 8px',
+                            borderRadius: '6px'
+                          }}
+                          title="Mark all notifications as read"
+                        >
+                          <CheckCheck size={13} />
+                          <span>Mark all read</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Scrollable Notifications List */}
+                    <div style={{ maxHeight: '380px', overflowY: 'auto' }}>
+                      {notifications.length === 0 ? (
+                        <div style={{ padding: '30px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+                          No active rate alerts right now.
+                        </div>
+                      ) : (
+                        notifications.map((notif) => {
+                          const isUnread = !readNotifIds.includes(notif.id);
+                          const getCategoryColors = (cat) => {
+                            switch (cat) {
+                              case 'Govt Notification':
+                                return { color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.12)', border: 'rgba(245, 158, 11, 0.28)' };
+                              case 'Bank Scheme':
+                                return { color: '#10B981', bg: 'rgba(16, 185, 129, 0.12)', border: 'rgba(16, 185, 129, 0.28)' };
+                              case 'Market Benchmark':
+                                return { color: '#8B5CF6', bg: 'rgba(139, 92, 246, 0.12)', border: 'rgba(139, 92, 246, 0.28)' };
+                              case 'Monetary Policy':
+                                return { color: '#06B6D4', bg: 'rgba(6, 182, 212, 0.12)', border: 'rgba(6, 182, 212, 0.28)' };
+                              default:
+                                return { color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.12)', border: 'rgba(59, 130, 246, 0.28)' };
+                            }
+                          };
+                          const catColors = getCategoryColors(notif.category);
+
+                          return (
+                            <div
+                              key={notif.id}
+                              style={{
+                                padding: '14px 16px',
+                                borderBottom: '1px solid var(--border-color)',
+                                background: isUnread
+                                  ? (isDark ? 'rgba(16, 185, 129, 0.06)' : 'rgba(16, 185, 129, 0.04)')
+                                  : 'transparent',
+                                transition: 'background 0.2s ease',
+                                position: 'relative'
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                                <span
+                                  style={{
+                                    fontSize: '10px',
+                                    fontWeight: '800',
+                                    padding: '2px 7px',
+                                    borderRadius: '6px',
+                                    color: catColors.color,
+                                    background: catColors.bg,
+                                    border: `1px solid ${catColors.border}`,
+                                    letterSpacing: '0.2px'
+                                  }}
+                                >
+                                  {notif.category}
+                                </span>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', fontWeight: '600' }}>
+                                    {notif.date}
+                                  </span>
+                                  {isUnread && (
+                                    <span
+                                      style={{
+                                        width: '7px',
+                                        height: '7px',
+                                        borderRadius: '50%',
+                                        background: '#10B981',
+                                        boxShadow: '0 0 6px #10B981',
+                                        display: 'inline-block'
+                                      }}
+                                    />
+                                  )}
+                                </div>
+                              </div>
+
+                              <div style={{ fontSize: '12.5px', fontWeight: '800', color: 'var(--text-main)', marginTop: '7px', lineHeight: '1.35' }}>
+                                {notif.title}
+                              </div>
+
+                              <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: '1.45' }}>
+                                {notif.description}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* Footer live sync notice */}
+                    <div
+                      style={{
+                        padding: '10px 16px',
+                        background: isDark ? '#06101E' : '#F1F5F9',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '7px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        color: 'var(--text-muted)'
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          background: '#10B981',
+                          boxShadow: '0 0 6px #10B981',
+                          display: 'inline-block'
+                        }}
+                      />
+                      <span>Live Sync: Next review scheduled Q4 FY27</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Desktop Only Actions */}
               <button className="btn btn-ghost btn-sm desktop-only-action" onClick={onTriggerDriveSync} title="Sync Google Drive Inbox">
                 <FolderSync size={16} /> <span>Drive sync</span>
