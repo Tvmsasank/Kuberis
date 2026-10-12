@@ -335,12 +335,8 @@ export default function App() {
         if (errJson.code === 'ACCOUNT_SUSPENDED' || res.status === 403) {
           setSuspendedReasonMessage(errJson.error || 'Your account has been administratively suspended.');
           setAccountSuspendedModalOpen(true);
-        // Safe error handling - do not log out active user
-        } else if (errJson.code === 'SESSION_TERMINATED') {
-          setSessionTerminatedModalOpen(true);
-          handleLogout();
         }
-        // Do NOT log out active user on transient network errors or server reload
+        // Do NOT log out active user on background refresh
         return null;
       }
     } catch (e) {
@@ -384,13 +380,6 @@ export default function App() {
 
       // Silent Refresh & Retry on 401
       if (res.status === 401) {
-        const json = await res.clone().json().catch(() => ({}));
-        if (json.code === 'SESSION_TERMINATED') {
-          setSessionTerminatedModalOpen(true);
-          handleLogout();
-          return;
-        }
-
         const freshToken = await refreshAuthToken();
         if (freshToken) {
           res = await fetch('/api/state', {
@@ -461,13 +450,7 @@ export default function App() {
             return;
           }
         } else if (res.status === 401) {
-          const json = await res.json().catch(() => ({}));
-          if (json.code === 'SESSION_TERMINATED') {
-            setSessionTerminatedModalOpen(true);
-            handleLogout();
-          } else {
-            refreshAuthToken();
-          }
+          refreshAuthToken();
         } else if (res.ok) {
           const invData = await res.json();
           if (Array.isArray(invData)) {
@@ -500,8 +483,9 @@ export default function App() {
 
     // Reset idle timer on any user movement or interaction
     const registerActivity = () => {
-      if (!inactivityModalOpenRef.current) {
-        lastActivityRef.current = Date.now();
+      lastActivityRef.current = Date.now();
+      if (inactivityModalOpenRef.current) {
+        setInactivityModalOpen(false);
       }
     };
 
@@ -512,8 +496,8 @@ export default function App() {
     ];
 
     userEvents.forEach(evt => {
-      window.addEventListener(evt, registerActivity, { passive: true });
-      document.addEventListener(evt, registerActivity, { passive: true });
+      window.addEventListener(evt, registerActivity, { capture: true, passive: true });
+      document.addEventListener(evt, registerActivity, { capture: true, passive: true });
     });
 
     const timerInterval = setInterval(() => {
@@ -540,8 +524,8 @@ export default function App() {
     return () => {
       clearInterval(timerInterval);
       userEvents.forEach(evt => {
-        window.removeEventListener(evt, registerActivity);
-        document.removeEventListener(evt, registerActivity);
+        window.removeEventListener(evt, registerActivity, { capture: true });
+        document.removeEventListener(evt, registerActivity, { capture: true });
       });
     };
   }, [user]);
@@ -555,6 +539,7 @@ export default function App() {
 
   // Auth Handlers - Full state reset to guarantee complete isolation across sessions
   const handleLoginSuccess = (userData, userToken, rememberMe = true, metadata = {}) => {
+    lastActivityRef.current = Date.now();
     setTransactions([]);
     setInvestments([]);
     setTags([]);

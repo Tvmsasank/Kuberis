@@ -160,13 +160,6 @@ const authenticateToken = (req, res, next) => {
         error: 'Session token has expired. Auto-refreshing session.'
       });
     }
-
-    if (requestSessionId && requestSessionId !== activeSessionId) {
-      return res.status(401).json({
-        code: 'SESSION_TERMINATED',
-        error: 'Another login was detected on a different device or browser.'
-      });
-    }
   }
 
   req.userId = userId;
@@ -429,14 +422,8 @@ app.post('/api/auth/refresh', async (req, res) => {
       });
     }
 
-    // Check active session continuity
     const currentActiveSession = dbEngine.getUserActiveSession(user.id);
-    if (currentActiveSession && rotated.sessionId && rotated.sessionId !== currentActiveSession) {
-      return res.status(401).json({
-        code: 'SESSION_TERMINATED',
-        error: 'Another login was detected on a different device or browser.'
-      });
-    }
+
 
     const newAccessToken = jwt.sign(
       { userId: user.id, email: user.email, sessionId: rotated.sessionId || currentActiveSession },
