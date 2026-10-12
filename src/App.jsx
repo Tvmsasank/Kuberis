@@ -335,8 +335,11 @@ export default function App() {
         if (errJson.code === 'ACCOUNT_SUSPENDED' || res.status === 403) {
           setSuspendedReasonMessage(errJson.error || 'Your account has been administratively suspended.');
           setAccountSuspendedModalOpen(true);
+          handleLogout();
+        } else if (errJson.code === 'SESSION_TERMINATED') {
+          setSessionTerminatedModalOpen(true);
+          handleLogout();
         }
-        // Do NOT log out active user on background refresh
         return null;
       }
     } catch (e) {
@@ -380,6 +383,13 @@ export default function App() {
 
       // Silent Refresh & Retry on 401
       if (res.status === 401) {
+        const json = await res.clone().json().catch(() => ({}));
+        if (json.code === 'SESSION_TERMINATED') {
+          setSessionTerminatedModalOpen(true);
+          handleLogout();
+          return;
+        }
+
         const freshToken = await refreshAuthToken();
         if (freshToken) {
           res = await fetch('/api/state', {
@@ -450,7 +460,13 @@ export default function App() {
             return;
           }
         } else if (res.status === 401) {
-          refreshAuthToken();
+          const json = await res.json().catch(() => ({}));
+          if (json.code === 'SESSION_TERMINATED') {
+            setSessionTerminatedModalOpen(true);
+            handleLogout();
+          } else {
+            refreshAuthToken();
+          }
         } else if (res.ok) {
           const invData = await res.json();
           if (Array.isArray(invData)) {
@@ -483,7 +499,11 @@ export default function App() {
 
     // Reset idle timer on any user movement or interaction
     const registerActivity = () => {
-      lastActivityRef.current = Date.now();
+      const now = Date.now();
+      lastActivityRef.current = now;
+      try {
+        localStorage.setItem('kuberis_last_active', String(now));
+      } catch (e) {}
       if (inactivityModalOpenRef.current) {
         setInactivityModalOpen(false);
       }
@@ -503,7 +523,9 @@ export default function App() {
     const timerInterval = setInterval(() => {
       if (!user) return;
       const now = Date.now();
-      const idleTime = now - lastActivityRef.current;
+      const storedActive = parseInt(localStorage.getItem('kuberis_last_active') || '0', 10);
+      const latestActivity = Math.max(lastActivityRef.current, storedActive);
+      const idleTime = now - latestActivity;
 
       if (idleTime >= INACTIVITY_LIMIT_MS) {
         // Complete 15 minutes of zero activity reached -> perform auto logout
@@ -531,7 +553,11 @@ export default function App() {
   }, [user]);
 
   const handleStayLoggedIn = () => {
-    lastActivityRef.current = Date.now();
+    const now = Date.now();
+    lastActivityRef.current = now;
+    try {
+      localStorage.setItem('kuberis_last_active', String(now));
+    } catch (e) {}
     setInactivityModalOpen(false);
     refreshAuthToken();
   };
@@ -539,7 +565,11 @@ export default function App() {
 
   // Auth Handlers - Full state reset to guarantee complete isolation across sessions
   const handleLoginSuccess = (userData, userToken, rememberMe = true, metadata = {}) => {
-    lastActivityRef.current = Date.now();
+    const now = Date.now();
+    lastActivityRef.current = now;
+    try {
+      localStorage.setItem('kuberis_last_active', String(now));
+    } catch (e) {}
     setTransactions([]);
     setInvestments([]);
     setTags([]);
