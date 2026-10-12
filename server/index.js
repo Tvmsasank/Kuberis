@@ -21,6 +21,7 @@ import { parseUpiTransactionText } from './upiParser.js';
 import { SUPPORTED_BANKS, initiateAaConsent, verifyAaOtp, generateLiveBankFeed } from './accountAggregator.js';
 import { resolveIpLocation } from './geoIp.js';
 import { parseDeviceDetails } from './deviceParser.js';
+import { FD_INSTITUTIONS, matchFdRate, calculateFdReturns } from './fdRates.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -2238,6 +2239,46 @@ app.put('/api/preferences', authenticateToken, (req, res) => {
   } catch (err) {
     console.error('PUT /api/preferences error:', err);
     res.status(500).json({ error: 'Failed to update preferences' });
+  }
+});
+
+// ==========================================
+// FIXED DEPOSIT RATES DIRECTORY & CALCULATOR
+// ==========================================
+
+// GET /api/fd-rates
+app.get('/api/fd-rates', (req, res) => {
+  try {
+    res.json({
+      success: true,
+      lastUpdated: '2026-10-12',
+      institutions: FD_INSTITUTIONS
+    });
+  } catch (err) {
+    console.error('GET /api/fd-rates error:', err);
+    res.status(500).json({ error: 'Failed to fetch FD rates directory' });
+  }
+});
+
+// POST /api/fd-rates/quote
+app.post('/api/fd-rates/quote', (req, res) => {
+  try {
+    const { institutionId, totalDays, isSeniorCitizen, principal, compoundingFrequency } = req.body;
+    const quote = matchFdRate(institutionId, totalDays, Boolean(isSeniorCitizen));
+    const returns = calculateFdReturns(
+      principal || 100000,
+      quote.rate,
+      totalDays || 365,
+      compoundingFrequency || 'quarterly'
+    );
+    res.json({
+      success: true,
+      quote,
+      returns
+    });
+  } catch (err) {
+    console.error('POST /api/fd-rates/quote error:', err);
+    res.status(500).json({ error: 'Failed to quote FD rates' });
   }
 });
 

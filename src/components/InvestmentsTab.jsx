@@ -21,8 +21,14 @@ import {
   Sparkles,
   LineChart as LineChartIcon,
   Info,
-  Calendar
+  Calendar,
+  ShieldCheck,
+  AlertCircle,
+  User,
+  Clock,
+  X
 } from 'lucide-react';
+
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import StockDetailModal from './StockDetailModal';
 import AssetAllocationModal from './AssetAllocationModal';
@@ -84,12 +90,22 @@ export default function InvestmentsTab({
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [selectedStockForDetail, setSelectedStockForDetail] = useState(null);
+  const [selectedFdForDetail, setSelectedFdForDetail] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState('all'); // 'all' | 'stock' | 'us_stock' | 'mutual_fund' | 'gold' | 'fd'
   const [searchQuery, setSearchQuery] = useState('');
   const [isAllocationModalOpen, setIsAllocationModalOpen] = useState(false);
   const [allocationInitialSection, setAllocationInitialSection] = useState('allocation');
 
   const safeInvestments = Array.isArray(investments) ? investments : [];
+
+  // Near-maturity Fixed Deposits alert computation
+  const maturingFds = useMemo(() => {
+    return safeInvestments.filter(i => {
+      if (i.type !== 'fd') return false;
+      const d = Number(i.daysToMaturity);
+      return !isNaN(d) && d <= 30;
+    });
+  }, [safeInvestments]);
 
   const mask = (val) => (isPrivacyMode ? '₹••••••••' : val);
   const formatInr = (num) =>
@@ -213,13 +229,14 @@ export default function InvestmentsTab({
       pnlSub: `Across ${categoryHoldings.length} crypto holdings`
     },
     fd: {
-      investedTitle: 'TOTAL INVESTED (FIXED DEPOSITS)',
-      investedSub: 'FD & deposits capital deployed',
-      valueTitle: 'FIXED DEPOSITS VALUE',
-      dayTitle: "FIXED DEPOSITS DAY'S P&L",
-      pnlTitle: 'FIXED DEPOSITS TOTAL P&L',
+      investedTitle: 'TOTAL PRINCIPAL DEPOSITED',
+      investedSub: 'Capital locked in Fixed Deposits',
+      valueTitle: 'CURRENT ACCRUED VALUE',
+      dayTitle: "DAILY ACCRUED INTEREST",
+      pnlTitle: 'TOTAL INTEREST ACCRUED',
       pnlSub: `Across ${categoryHoldings.length} deposits`
     }
+
   };
 
   const currentMeta = categoryTitles[categoryFilter] || categoryTitles.all;
@@ -809,154 +826,345 @@ export default function InvestmentsTab({
             </div>
           </div>
 
-          {/* 📋 Exact Zerodha Holdings Table */}
+          {/* Proactive Near-Maturity Alert Banner */}
+          {maturingFds.length > 0 && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px 18px',
+              borderRadius: '16px',
+              background: 'linear-gradient(90deg, rgba(245, 158, 11, 0.12) 0%, rgba(239, 68, 68, 0.08) 100%)',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+              marginBottom: '20px'
+            }}>
+              <div style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '50%',
+                background: 'rgba(245, 158, 11, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#F59E0B',
+                fontSize: '18px',
+                flexShrink: 0
+              }}>
+                🔔
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '13.5px', fontWeight: '800', color: 'var(--text-main)' }}>
+                  Fixed Deposit Maturity Alert ({maturingFds.length} Deposit{maturingFds.length > 1 ? 's' : ''})
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                  {maturingFds.map(fd => {
+                    const isMatured = (fd.daysToMaturity ?? 0) <= 0;
+                    return `${fd.name || 'FD'} (${formatInr(fd.principal || fd.buyPrice)}) ${isMatured ? 'matured on ' + fd.maturityDate : 'matures in ' + fd.daysToMaturity + ' days (' + fd.maturityDate + ')'}`;
+                  }).join(' • ')}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Table Container */}
           <div className="card card-table" style={{ padding: '0', borderRadius: '20px', overflow: 'hidden', border: '1px solid var(--border-color)', marginBottom: '24px' }}>
             <div className="table-container">
-              <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: 'var(--bg-navy-card)' }}>
-                    <th style={{ padding: '14px 16px', borderTopLeftRadius: '20px' }}>Instrument</th>
-                    <th>Qty.</th>
-                    <th>Avg. Cost</th>
-                    <th>LTP</th>
-                    <th>Invested</th>
-                    <th>Cur. Val</th>
-                    <th style={{ textAlign: 'right' }}>P&L</th>
-                    <th style={{ textAlign: 'right' }}>Net Chg.</th>
-                    <th style={{ textAlign: 'right' }}>Day Chg.</th>
-                    <th style={{ textAlign: 'center', padding: '14px 16px', borderTopRightRadius: '20px' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredInvestments.length === 0 ? (
-                    <tr>
-                      <td colSpan="10" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                        No investment holdings found matching this filter.
-                      </td>
+              {categoryFilter === 'fd' ? (
+                /* 🏦 Dedicated Fixed Deposit Table */
+                <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--bg-navy-card)' }}>
+                      <th style={{ padding: '14px 16px', borderTopLeftRadius: '20px' }}>Deposit / Scheme</th>
+                      <th>Account Holder</th>
+                      <th>Tenure</th>
+                      <th>Interest Rate</th>
+                      <th>Maturity Date</th>
+                      <th>Principal</th>
+                      <th>Accrued Val</th>
+                      <th>Maturity Amt</th>
+                      <th style={{ textAlign: 'center' }}>Status</th>
+                      <th style={{ textAlign: 'center', padding: '14px 16px', borderTopRightRadius: '20px' }}>Actions</th>
                     </tr>
-                  ) : (
-                    filteredInvestments.map((item) => {
-                      const qty = Number(item.quantity || 1);
-                      const buyPrice = Number(item.buyPrice || 0);
-                      const ltp = Number(item.currentPrice || buyPrice);
-                      const invested = qty * buyPrice;
-                      const curVal = Number(item.currentValuation || qty * ltp);
-                      const pnl = Number(item.unrealizedPnL || curVal - invested);
-                      const netPct = Number(item.pnlPercentage || (invested > 0 ? (pnl / invested) * 100 : 0));
-                      const isPos = pnl >= 0;
+                  </thead>
+                  <tbody>
+                    {filteredInvestments.length === 0 ? (
+                      <tr>
+                        <td colSpan="10" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                          No Fixed Deposits found matching this filter. Click "+ Add Investment" above to book an FD!
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredInvestments.map((item) => {
+                        const principal = Number(item.principal || item.buyPrice || 0);
+                        const curVal = Number(item.currentValuation || principal);
+                        const accrued = Number(item.unrealizedPnL || (curVal - principal));
+                        const matAmt = Number(item.maturityAmount || curVal);
+                        const rate = Number(item.interestRate || item.rate || 7.0);
+                        const daysLeft = item.daysToMaturity !== undefined ? Number(item.daysToMaturity) : null;
+                        const isMatured = daysLeft !== null && daysLeft <= 0;
+                        const isNear = daysLeft !== null && daysLeft > 0 && daysLeft <= 30;
 
-                      const dayRupees = item.dayRupees !== undefined && !isNaN(Number(item.dayRupees))
-                        ? Number(item.dayRupees)
-                        : (item.previousClose ? ((ltp - Number(item.previousClose)) * qty) : 0);
-                      const dayPct = item.dayPercentage !== undefined && !isNaN(Number(item.dayPercentage))
-                        ? Number(item.dayPercentage)
-                        : (item.previousClose && Number(item.previousClose) > 0 ? (((ltp - Number(item.previousClose)) / Number(item.previousClose)) * 100) : (isPos ? 0.85 : -0.42));
-                      const isDayPos = dayRupees >= 0;
-
-                      return (
-                        <tr
-                          key={item.id}
-                          onClick={() => setSelectedStockForDetail(item)}
-                          style={{ cursor: 'pointer', transition: 'background 0.2s ease' }}
-                        >
-                          {/* Instrument & Badges */}
-                          <td style={{ padding: '14px 16px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <span style={{ fontWeight: '800', color: 'var(--text-main)', fontSize: '13.5px' }}>
-                                    {item.symbol || item.name}
-                                  </span>
-                                  {item.navDate && (
-                                    <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '6px', background: 'rgba(56, 189, 248, 0.15)', color: '#38BDF8', fontWeight: '700' }} title={`NAV Date: ${item.navDate}`}>
-                                      {item.navDate}
-                                    </span>
-                                  )}
-                                  {netPct > 10 && (
-                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10B981' }} title="Top Gainer" />
-                                  )}
-                                  {netPct < -5 && (
-                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#EF4444' }} title="Top Loser" />
-                                  )}
-                                </div>
-                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {item.name}
+                        return (
+                          <tr
+                            key={item.id}
+                            onClick={() => setSelectedFdForDetail(item)}
+                            style={{ cursor: 'pointer', transition: 'background 0.2s ease' }}
+                          >
+                            {/* Scheme & Institution */}
+                            <td style={{ padding: '14px 16px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <ShieldCheck size={18} style={{ color: '#10B981', flexShrink: 0 }} />
+                                <div>
+                                  <div style={{ fontWeight: '800', color: 'var(--text-main)', fontSize: '13.5px' }}>
+                                    {item.name || item.schemeName || 'Fixed Deposit'}
+                                  </div>
+                                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                    {item.institutionName || 'Scheduled Bank / Govt Scheme'}
+                                    {item.startDate && ` • Booked: ${item.startDate}`}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </td>
+                            </td>
 
-                          {/* Qty */}
-                          <td style={{ fontWeight: '700', fontSize: '13px' }}>
-                            {isPrivacyMode ? '••' : (Number.isInteger(qty) ? qty : Number(qty.toFixed(4)))}
-                          </td>
+                            {/* Account Holder */}
+                            <td style={{ fontSize: '12.5px', color: 'var(--text-main)', fontWeight: '600' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                <User size={13} style={{ color: 'var(--text-muted)' }} />
+                                {item.accountHolder || 'Primary Holder'}
+                              </div>
+                            </td>
 
-                          {/* Avg. Cost */}
-                          <td style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                            {formatAssetPrice(buyPrice, item.type)}
-                          </td>
+                            {/* Tenure */}
+                            <td style={{ fontSize: '12.5px', color: 'var(--text-main)', fontWeight: '700' }}>
+                              {item.tenureDays ? `${item.tenureDays} Days` : item.tenureYears ? `${item.tenureYears} Yrs` : '1 Year'}
+                            </td>
 
-                          {/* LTP */}
-                          <td style={{ fontWeight: '800', fontSize: '13.5px', color: 'var(--text-main)' }}>
-                            {formatAssetPrice(ltp, item.type)}
-                          </td>
+                            {/* Interest Rate */}
+                            <td style={{ fontSize: '12.5px', fontWeight: '800', color: '#10B981' }}>
+                              {rate.toFixed(2)}%
+                              <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: '500', textTransform: 'capitalize' }}>
+                                {item.compoundingFrequency || 'quarterly'}
+                              </div>
+                            </td>
 
-                          {/* Invested */}
-                          <td style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                            {formatInr(invested)}
-                          </td>
+                            {/* Maturity Date */}
+                            <td style={{ fontSize: '12.5px', color: 'var(--text-main)', fontWeight: '600' }}>
+                              {item.maturityDate || 'N/A'}
+                            </td>
 
-                          {/* Cur. Val */}
-                          <td style={{ fontWeight: '800', fontSize: '13.5px', color: '#38BDF8' }}>
-                            {formatInr(curVal)}
-                          </td>
+                            {/* Principal */}
+                            <td style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                              {formatInr(principal)}
+                            </td>
 
-                          {/* P&L */}
-                          <td style={{ textAlign: 'right', fontWeight: '800', fontSize: '13.5px', color: isPos ? '#10B981' : '#F87171' }}>
-                            {isPos ? '+' : ''}{formatInr(pnl)}
-                          </td>
+                            {/* Accrued Val */}
+                            <td style={{ fontWeight: '800', fontSize: '13.5px', color: '#38BDF8' }}>
+                              {formatInr(curVal)}
+                              <div style={{ fontSize: '10.5px', color: '#10B981', fontWeight: '700' }}>
+                                +{formatInr(accrued)}
+                              </div>
+                            </td>
 
-                          {/* Net Chg % */}
-                          <td style={{ textAlign: 'right', fontWeight: '800', fontSize: '12.5px', color: isPos ? '#10B981' : '#F87171' }}>
-                            {isPos ? '+' : ''}{netPct.toFixed(2)}%
-                          </td>
+                            {/* Maturity Amt */}
+                            <td style={{ fontWeight: '800', fontSize: '13.5px', color: '#10B981' }}>
+                              {formatInr(matAmt)}
+                            </td>
 
-                          {/* Day Chg */}
-                          <td style={{ textAlign: 'right', fontWeight: '700', fontSize: '12px', color: isDayPos ? '#10B981' : '#F87171' }}>
-                            {isDayPos ? '+' : ''}{isPrivacyMode ? '••' : (Math.abs(dayRupees) < 0.01 && dayRupees !== 0 ? dayRupees.toFixed(4) : formatInr(dayRupees))} ({isDayPos ? '+' : ''}{dayPct.toFixed(2)}%)
-                          </td>
+                            {/* Status */}
+                            <td style={{ textAlign: 'center' }}>
+                              {isMatured ? (
+                                <span style={{ padding: '3px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: '800', background: 'rgba(239, 68, 68, 0.15)', color: '#EF4444' }}>
+                                  Matured
+                                </span>
+                              ) : isNear ? (
+                                <span style={{ padding: '3px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: '800', background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B' }}>
+                                  {daysLeft}d Left
+                                </span>
+                              ) : (
+                                <span style={{ padding: '3px 8px', borderRadius: '8px', fontSize: '11px', fontWeight: '800', background: 'rgba(16, 185, 129, 0.15)', color: '#10B981' }}>
+                                  Active
+                                </span>
+                              )}
+                            </td>
 
-                          {/* Actions */}
-                          <td style={{ textAlign: 'center', padding: '14px 16px' }} onClick={(e) => e.stopPropagation()}>
-                            <div style={{ display: 'inline-flex', gap: '6px' }}>
-                              <button
-                                type="button"
-                                className="btn btn-ghost btn-sm"
-                                style={{ padding: '6px' }}
-                                onClick={() => onOpenEditInvestment(item)}
-                                title="Edit Holding"
-                              >
-                                <Edit3 size={14} />
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-ghost btn-sm"
-                                style={{ padding: '6px', color: '#F87171' }}
-                                onClick={() => setDeleteTarget(item)}
-                                title="Delete Holding"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+                            {/* Actions */}
+                            <td style={{ textAlign: 'center', padding: '14px 16px' }} onClick={(e) => e.stopPropagation()}>
+                              <div style={{ display: 'inline-flex', gap: '6px' }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost btn-sm"
+                                  style={{ padding: '6px' }}
+                                  onClick={() => onOpenEditInvestment(item)}
+                                  title="Edit Fixed Deposit"
+                                >
+                                  <Edit3 size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost btn-sm"
+                                  style={{ padding: '6px', color: '#F87171' }}
+                                  onClick={() => setDeleteTarget(item)}
+                                  title="Delete Fixed Deposit"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              ) : (
+                /* 📋 Standard Zerodha Holdings Table */
+                <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--bg-navy-card)' }}>
+                      <th style={{ padding: '14px 16px', borderTopLeftRadius: '20px' }}>Instrument</th>
+                      <th>Qty.</th>
+                      <th>Avg. Cost</th>
+                      <th>LTP</th>
+                      <th>Invested</th>
+                      <th>Cur. Val</th>
+                      <th style={{ textAlign: 'right' }}>P&L</th>
+                      <th style={{ textAlign: 'right' }}>Net Chg.</th>
+                      <th style={{ textAlign: 'right' }}>Day Chg.</th>
+                      <th style={{ textAlign: 'center', padding: '14px 16px', borderTopRightRadius: '20px' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredInvestments.length === 0 ? (
+                      <tr>
+                        <td colSpan="10" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                          No investment holdings found matching this filter.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredInvestments.map((item) => {
+                        const qty = Number(item.quantity || 1);
+                        const buyPrice = Number(item.buyPrice || 0);
+                        const ltp = Number(item.currentPrice || buyPrice);
+                        const invested = qty * buyPrice;
+                        const curVal = Number(item.currentValuation || qty * ltp);
+                        const pnl = Number(item.unrealizedPnL || curVal - invested);
+                        const netPct = Number(item.pnlPercentage || (invested > 0 ? (pnl / invested) * 100 : 0));
+                        const isPos = pnl >= 0;
+
+                        const dayRupees = item.dayRupees !== undefined && !isNaN(Number(item.dayRupees))
+                          ? Number(item.dayRupees)
+                          : (item.previousClose ? ((ltp - Number(item.previousClose)) * qty) : 0);
+                        const dayPct = item.dayPercentage !== undefined && !isNaN(Number(item.dayPercentage))
+                          ? Number(item.dayPercentage)
+                          : (item.previousClose && Number(item.previousClose) > 0 ? (((ltp - Number(item.previousClose)) / Number(item.previousClose)) * 100) : (isPos ? 0.85 : -0.42));
+                        const isDayPos = dayRupees >= 0;
+
+                        return (
+                          <tr
+                            key={item.id}
+                            onClick={() => item.type === 'fd' ? setSelectedFdForDetail(item) : setSelectedStockForDetail(item)}
+                            style={{ cursor: 'pointer', transition: 'background 0.2s ease' }}
+                          >
+                            {/* Instrument & Badges */}
+                            <td style={{ padding: '14px 16px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <span style={{ fontWeight: '800', color: 'var(--text-main)', fontSize: '13.5px' }}>
+                                      {item.symbol || item.name}
+                                    </span>
+                                    {item.navDate && (
+                                      <span style={{ fontSize: '10px', padding: '1px 6px', borderRadius: '6px', background: 'rgba(56, 189, 248, 0.15)', color: '#38BDF8', fontWeight: '700' }} title={`NAV Date: ${item.navDate}`}>
+                                        {item.navDate}
+                                      </span>
+                                    )}
+                                    {netPct > 10 && (
+                                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10B981' }} title="Top Gainer" />
+                                    )}
+                                    {netPct < -5 && (
+                                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#EF4444' }} title="Top Loser" />
+                                    )}
+                                  </div>
+                                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {item.name}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+
+                            {/* Qty */}
+                            <td style={{ fontWeight: '700', fontSize: '13px' }}>
+                              {isPrivacyMode ? '••' : (Number.isInteger(qty) ? qty : Number(qty.toFixed(4)))}
+                            </td>
+
+                            {/* Avg. Cost */}
+                            <td style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                              {formatAssetPrice(buyPrice, item.type)}
+                            </td>
+
+                            {/* LTP */}
+                            <td style={{ fontWeight: '800', fontSize: '13.5px', color: 'var(--text-main)' }}>
+                              {formatAssetPrice(ltp, item.type)}
+                            </td>
+
+                            {/* Invested */}
+                            <td style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                              {formatInr(invested)}
+                            </td>
+
+                            {/* Cur. Val */}
+                            <td style={{ fontWeight: '800', fontSize: '13.5px', color: '#38BDF8' }}>
+                              {formatInr(curVal)}
+                            </td>
+
+                            {/* P&L */}
+                            <td style={{ textAlign: 'right', fontWeight: '800', fontSize: '13.5px', color: isPos ? '#10B981' : '#F87171' }}>
+                              {isPos ? '+' : ''}{formatInr(pnl)}
+                            </td>
+
+                            {/* Net Chg % */}
+                            <td style={{ textAlign: 'right', fontWeight: '800', fontSize: '12.5px', color: isPos ? '#10B981' : '#F87171' }}>
+                              {isPos ? '+' : ''}{netPct.toFixed(2)}%
+                            </td>
+
+                            {/* Day Chg */}
+                            <td style={{ textAlign: 'right', fontWeight: '700', fontSize: '12px', color: isDayPos ? '#10B981' : '#F87171' }}>
+                              {isDayPos ? '+' : ''}{isPrivacyMode ? '••' : (Math.abs(dayRupees) < 0.01 && dayRupees !== 0 ? dayRupees.toFixed(4) : formatInr(dayRupees))} ({isDayPos ? '+' : ''}{dayPct.toFixed(2)}%)
+                            </td>
+
+                            {/* Actions */}
+                            <td style={{ textAlign: 'center', padding: '14px 16px' }} onClick={(e) => e.stopPropagation()}>
+                              <div style={{ display: 'inline-flex', gap: '6px' }}>
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost btn-sm"
+                                  style={{ padding: '6px' }}
+                                  onClick={() => onOpenEditInvestment(item)}
+                                  title="Edit Holding"
+                                >
+                                  <Edit3 size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost btn-sm"
+                                  style={{ padding: '6px', color: '#F87171' }}
+                                  onClick={() => setDeleteTarget(item)}
+                                  title="Delete Holding"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
+
 
         </>
       )}
@@ -1303,6 +1511,148 @@ export default function InvestmentsTab({
         )
       )}
 
+      {/* Fixed Deposit Certificate & Detail Modal */}
+      {selectedFdForDetail && (
+        <div className="modal-backdrop" onClick={() => setSelectedFdForDetail(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '540px', width: '100%', boxSizing: 'border-box' }}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ShieldCheck size={22} style={{ color: '#10B981' }} />
+                <div>
+                  <h2 style={{ margin: 0, fontSize: '17px' }}>Fixed Deposit Certificate</h2>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    {selectedFdForDetail.institutionName || 'Scheduled Bank / Govt Scheme'}
+                  </div>
+                </div>
+              </div>
+              <button className="modal-close" onClick={() => setSelectedFdForDetail(null)} aria-label="Close">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: '4px 0 16px 0' }}>
+              {/* Certificate Card Header */}
+              <div style={{
+                padding: '16px',
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(56, 189, 248, 0.08) 100%)',
+                border: '1px solid rgba(16, 185, 129, 0.25)',
+                marginBottom: '16px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ fontSize: '17px', fontWeight: '800', color: 'var(--text-main)' }}>
+                      {selectedFdForDetail.name || selectedFdForDetail.schemeName}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <User size={13} /> Account Holder: <strong style={{ color: 'var(--text-main)' }}>{selectedFdForDetail.accountHolder || 'Primary Account Holder'}</strong>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span className="pill" style={{
+                      background: (selectedFdForDetail.daysToMaturity ?? 1) <= 0 ? 'rgba(239, 68, 68, 0.2)' : (selectedFdForDetail.daysToMaturity ?? 99) <= 30 ? 'rgba(245, 158, 11, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                      color: (selectedFdForDetail.daysToMaturity ?? 1) <= 0 ? '#EF4444' : (selectedFdForDetail.daysToMaturity ?? 99) <= 30 ? '#F59E0B' : '#10B981',
+                      fontWeight: '800'
+                    }}>
+                      {(selectedFdForDetail.daysToMaturity ?? 1) <= 0 ? 'Matured' : (selectedFdForDetail.daysToMaturity ?? 99) <= 30 ? `${selectedFdForDetail.daysToMaturity}d Left` : 'Active'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Progress Bar of Tenure */}
+                {selectedFdForDetail.tenureDays > 0 && (
+                  <div style={{ marginTop: '14px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                      <span>Elapsed: {selectedFdForDetail.elapsedDays || 0} Days</span>
+                      <span>Total Tenure: {selectedFdForDetail.tenureDays} Days</span>
+                    </div>
+                    <div style={{ width: '100%', height: '8px', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${Math.min(100, Math.round(((selectedFdForDetail.elapsedDays || 0) / (selectedFdForDetail.tenureDays || 1)) * 100))}%`,
+                        background: 'linear-gradient(90deg, #10B981, #38BDF8)',
+                        borderRadius: '4px'
+                      }} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Detailed Metrics Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                <div style={{ padding: '12px 14px', borderRadius: '12px', background: 'var(--bg-app)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Principal Deposited</div>
+                  <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-main)', marginTop: '2px' }}>
+                    {formatInr(selectedFdForDetail.principal || selectedFdForDetail.buyPrice)}
+                  </div>
+                  <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    Booked: {selectedFdForDetail.startDate || 'N/A'}
+                  </div>
+                </div>
+
+                <div style={{ padding: '12px 14px', borderRadius: '12px', background: 'var(--bg-app)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Interest Rate (% p.a.)</div>
+                  <div style={{ fontSize: '16px', fontWeight: '800', color: '#10B981', marginTop: '2px' }}>
+                    {selectedFdForDetail.interestRate || 7.00}% p.a.
+                  </div>
+                  <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '2px', textTransform: 'capitalize' }}>
+                    {selectedFdForDetail.compoundingFrequency || 'Quarterly'} Compounding
+                  </div>
+                </div>
+
+                <div style={{ padding: '12px 14px', borderRadius: '12px', background: 'var(--bg-app)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Accrued Value (Today)</div>
+                  <div style={{ fontSize: '16px', fontWeight: '800', color: '#38BDF8', marginTop: '2px' }}>
+                    {formatInr(selectedFdForDetail.currentValuation || selectedFdForDetail.principal)}
+                  </div>
+                  <div style={{ fontSize: '10.5px', color: '#10B981', marginTop: '2px' }}>
+                    Accrued: +{formatInr(selectedFdForDetail.unrealizedPnL || 0)}
+                  </div>
+                </div>
+
+                <div style={{ padding: '12px 14px', borderRadius: '12px', background: 'var(--bg-app)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Projected Maturity Amount</div>
+                  <div style={{ fontSize: '16px', fontWeight: '800', color: '#10B981', marginTop: '2px' }}>
+                    {formatInr(selectedFdForDetail.maturityAmount || selectedFdForDetail.currentValuation)}
+                  </div>
+                  <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    Matures: {selectedFdForDetail.maturityDate || 'N/A'}
+                  </div>
+                </div>
+              </div>
+
+              {selectedFdForDetail.notes && (
+                <div style={{ padding: '10px 14px', borderRadius: '10px', background: 'var(--bg-app)', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                  <strong style={{ color: 'var(--text-main)' }}>Notes / Folio:</strong> {selectedFdForDetail.notes}
+                </div>
+              )}
+
+              {/* Footer Actions */}
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setSelectedFdForDetail(null)}
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    const item = selectedFdForDetail;
+                    setSelectedFdForDetail(null);
+                    onOpenEditInvestment(item);
+                  }}
+                >
+                  <Edit3 size={15} style={{ marginRight: '6px' }} /> Edit Deposit
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Stock Detailed Chart Modal */}
       <StockDetailModal
         isOpen={!!selectedStockForDetail}
@@ -1310,6 +1660,7 @@ export default function InvestmentsTab({
         investment={selectedStockForDetail}
         isPrivacyMode={isPrivacyMode}
       />
+
 
       {/* Asset Allocation Breakdown Modal */}
       <AssetAllocationModal

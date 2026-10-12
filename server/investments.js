@@ -1,8 +1,7 @@
-/**
- * Live Investment Price Fetcher for Indian Mutual Funds, Stocks & Cryptocurrencies
- */
+import { calculateFdAccrued } from './fdRates.js';
 
 // Memory cache for prices (expires every 1 minute for fast live updates)
+
 const priceCache = new Map();
 const CACHE_TTL_MS = 60 * 1000;
 
@@ -472,6 +471,56 @@ export async function refreshHoldingsPrices(holdings = []) {
   const updatedHoldings = [];
 
   for (const h of holdings) {
+    if (h.type === 'fd') {
+      const principal = Number(h.principal || h.buyPrice || 0);
+      const rate = Number(h.interestRate || h.rate || 7.0);
+      const tenureDays = Number(h.tenureDays || 365);
+      const startDate = h.startDate || h.depositDate || (h.createdAt ? h.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]);
+      const compoundingFrequency = h.compoundingFrequency || 'quarterly';
+
+      const accruedData = calculateFdAccrued({
+        principal,
+        annualRate: rate,
+        startDate,
+        maturityDate: h.maturityDate,
+        tenureDays,
+        frequency: compoundingFrequency
+      });
+
+      const dayRupees = Math.round(((principal * (rate / 100)) / 365) * 100) / 100;
+      const dayPct = Math.round(((rate / 365)) * 1000) / 1000;
+
+      updatedHoldings.push({
+        ...h,
+        type: 'fd',
+        principal,
+        interestRate: rate,
+        startDate: accruedData.startDate,
+        maturityDate: accruedData.maturityDate,
+        tenureDays: accruedData.tenureDays,
+        elapsedDays: accruedData.elapsedDays,
+        daysToMaturity: accruedData.daysToMaturity,
+        maturityStatus: accruedData.maturityStatus,
+        compoundingFrequency,
+        accountHolder: h.accountHolder || '',
+        institutionName: h.institutionName || h.bankName || '',
+        schemeName: h.schemeName || h.name || '',
+        currentValuation: accruedData.accruedValuation,
+        currentPrice: accruedData.accruedValuation,
+        buyPrice: principal,
+        quantity: 1,
+        unrealizedPnL: accruedData.accruedInterest,
+        pnlPercentage: principal > 0 ? Math.round(((accruedData.accruedInterest / principal) * 100) * 100) / 100 : 0,
+        maturityAmount: accruedData.maturityAmount,
+        totalInterest: accruedData.totalInterest,
+        dayRupees,
+        dayPercentage: dayPct,
+        priceStatus: 'ok',
+        lastPriceSyncAt: new Date().toISOString()
+      });
+      continue;
+    }
+
     let quote = null;
     let livePrice = null;
     let previousClose = null;
