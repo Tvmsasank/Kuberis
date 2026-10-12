@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Header from './components/Header';
 import Sidebar, { NAV_ITEMS } from './components/Sidebar';
 import MobileNav from './components/MobileNav';
@@ -41,6 +41,7 @@ import LandingPage from './components/LandingPage';
 import StandaloneAdminPortal from './components/StandaloneAdminPortal';
 import LiquidGlassController, { applyGlassConfig, DEFAULT_GLASS_CONFIG } from './components/LiquidGlassController';
 import KuberisPreloader from './components/KuberisPreloader';
+import InactivityTimeoutModal from './components/InactivityTimeoutModal';
 import { CheckCircle2, FolderSync, X, Shield, Lock, UserPlus, LogIn, Fingerprint, KeyRound, Zap, Landmark, ShieldAlert, AlertCircle } from 'lucide-react';
 import { getDeviceHeaders } from './utils/deviceInfo';
 
@@ -88,6 +89,12 @@ export default function App() {
   });
 
   const [token, setToken] = useState(() => localStorage.getItem('kuberis_token') || localStorage.getItem('wealthpulse_token') || localStorage.getItem('ledgerly_token') || '');
+
+  // ⏱️ Inactivity Auto-Logout Tracking (10 min timeout, 60s warning modal)
+  const [inactivityModalOpen, setInactivityModalOpen] = useState(false);
+  const [inactivityCountdown, setInactivityCountdown] = useState(60);
+  const lastActivityRef = useRef(Date.now());
+  const inactivityModalOpenRef = useRef(false);
 
   // Auth Modals State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);

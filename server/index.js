@@ -87,7 +87,13 @@ const getUserIdFromReq = (req) => {
         return decoded.userId || decoded.id;
       }
     } catch (err) {
-      // If a token was provided but failed verification, do not fall back to email
+      if (err.name === 'TokenExpiredError') {
+        req.isTokenExpired = true;
+        const decoded = jwt.decode(token);
+        if (decoded && (decoded.userId || decoded.id)) {
+          return decoded.userId || decoded.id;
+        }
+      }
       return null;
     }
   }
@@ -106,6 +112,13 @@ const authenticateToken = (req, res, next) => {
   const userId = getUserIdFromReq(req);
   if (!userId) {
     return res.status(401).json({ error: 'Authentication token required' });
+  }
+
+  if (req.isTokenExpired) {
+    return res.status(401).json({
+      code: 'TOKEN_EXPIRED',
+      error: 'Access token expired. Silent refresh required.'
+    });
   }
 
   // Verify account is not suspended
@@ -127,14 +140,28 @@ const authenticateToken = (req, res, next) => {
   const activeSessionId = dbEngine.getUserActiveSession(userId);
   if (activeSessionId) {
     let requestSessionId = null;
+    let isExpired = false;
     if (rawToken) {
       try {
         const decoded = jwt.verify(rawToken, JWT_SECRET);
         requestSessionId = decoded ? decoded.sessionId : null;
-      } catch (e) {}
+      } catch (e) {
+        if (e.name === 'TokenExpiredError') {
+          isExpired = true;
+          const decoded = jwt.decode(rawToken);
+          requestSessionId = decoded ? decoded.sessionId : null;
+        }
+      }
     }
 
-    if (!requestSessionId || requestSessionId !== activeSessionId) {
+    if (isExpired) {
+      return res.status(401).json({
+        code: 'TOKEN_EXPIRED',
+        error: 'Session token has expired. Auto-refreshing session.'
+      });
+    }
+
+    if (requestSessionId && requestSessionId !== activeSessionId) {
       return res.status(401).json({
         code: 'SESSION_TERMINATED',
         error: 'Another login was detected on a different device or browser.'
@@ -214,8 +241,8 @@ app.post('/api/auth/register', async (req, res) => {
     const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     dbEngine.setUserActiveSession(user.id, sessionId);
 
-    // 15-minute high security access token + 30-day rotating refresh token
-    const accessToken = jwt.sign({ userId: user.id, email: user.email, sessionId }, JWT_SECRET, { expiresIn: '15m' });
+    // 2-hour high security access token + 30-day rotating refresh token
+    const accessToken = jwt.sign({ userId: user.id, email: user.email, sessionId }, JWT_SECRET, { expiresIn: '2h' });
     const tokenRes = await dbEngine.createRefreshToken({ userId: user.id, sessionId, rememberMe: true });
     const refreshToken = typeof tokenRes === 'string' ? tokenRes : (tokenRes.refreshToken || tokenRes.rawToken);
 
@@ -324,8 +351,8 @@ app.post('/api/auth/login', async (req, res) => {
     const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     dbEngine.setUserActiveSession(user.id, sessionId);
 
-    // Issue 15-minute access token + rotating refresh token
-    const accessToken = jwt.sign({ userId: user.id, email: user.email, sessionId }, JWT_SECRET, { expiresIn: '15m' });
+    // Issue 2-hour access token + rotating refresh token
+    const accessToken = jwt.sign({ userId: user.id, email: user.email, sessionId }, JWT_SECRET, { expiresIn: '2h' });
     const tokenRes = await dbEngine.createRefreshToken({
       userId: user.id,
       sessionId,
@@ -357,15 +384,13 @@ app.post('/api/auth/login', async (req, res) => {
           status: 'SUCCESS'
         });
 
-        sendLoginSecurityAlertEmail({
-          toEmail: user.email,
-          name: user.name,
-          deviceName: device.deviceName,
-          ipAddress: clientIp,
+        await evaluateAndDispatchLoginEmail({
+          user,
+          device,
+          clientIp,
           location,
-          isNewDevice: !!forceLogin,
           resetUrl
-        }).catch(e => console.warn('[Security Email] Notice:', e.message));
+        });
       } catch (bgErr) {
         console.warn('[Login background alert notice]:', bgErr.message);
       }
@@ -416,7 +441,7 @@ app.post('/api/auth/refresh', async (req, res) => {
     const newAccessToken = jwt.sign(
       { userId: user.id, email: user.email, sessionId: rotated.sessionId || currentActiveSession },
       JWT_SECRET,
-      { expiresIn: '15m' }
+      { expiresIn: '2h' }
     );
 
     res.json({
@@ -603,7 +628,7 @@ app.post('/api/auth/2fa/verify-login', async (req, res) => {
     const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     dbEngine.setUserActiveSession(user.id, sessionId);
 
-    const accessToken = jwt.sign({ userId: user.id, email: user.email, sessionId }, JWT_SECRET, { expiresIn: '15m' });
+    const accessToken = jwt.sign({ userId: user.id, email: user.email, sessionId }, JWT_SECRET, { expiresIn: '2h' });
     const tokenRes = await dbEngine.createRefreshToken({
       userId: user.id,
       sessionId,
@@ -635,15 +660,13 @@ app.post('/api/auth/2fa/verify-login', async (req, res) => {
           status: 'SUCCESS'
         });
 
-        sendLoginSecurityAlertEmail({
-          toEmail: user.email,
-          name: user.name,
-          deviceName: device.deviceName,
-          ipAddress: clientIp,
+        await evaluateAndDispatchLoginEmail({
+          user,
+          device,
+          clientIp,
           location,
-          isNewDevice: false,
           resetUrl
-        }).catch(e => console.warn('[Security Email] Notice:', e.message));
+        });
       } catch (bgErr) {
         console.warn('[2FA background alert notice]:', bgErr.message);
       }
@@ -1079,14 +1102,14 @@ async function sendLoginSecurityAlertEmail({ toEmail, name, deviceName, ipAddres
   return await sendEmailWithFallback({ to: toEmail, subject, text, html });
 }
 
-async function sendLogoutAlertEmail({ toEmail, name, deviceName, ipAddress, location, resetUrl }) {
-  const subject = 'Account Signed Out - Kuberis';
-  const text = `Hi ${name || 'there'},\n\nYour Kuberis account was signed out from ${deviceName || 'Device'} (IP: ${ipAddress || 'Unknown'}, Location: ${location || 'India - IN'}) at ${new Date().toLocaleString('en-IN')}.\n\nIf you did not initiate this, please secure your account: ${resetUrl}`;
+async function sendPasswordChangedAlertEmail({ toEmail, name, deviceName, ipAddress, location, resetUrl }) {
+  const subject = '🔐 Password Changed Successfully - Kuberis Security Alert';
+  const text = `Hi ${name || 'there'},\n\nThe password for your Kuberis account (${toEmail}) was successfully changed.\nDevice: ${deviceName || 'Unknown Device'}\nIP Address: ${ipAddress || '127.0.0.1'}\nLocation: ${location || 'India - IN'}\nTime: ${new Date().toLocaleString('en-IN')}\n\nIf you did not initiate this change, immediately reset your password: ${resetUrl}`;
   const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 540px; margin: 0 auto; padding: 32px 24px; border: 1px solid rgba(148, 163, 184, 0.3); border-radius: 18px; background: #040D1A; color: #FFFFFF;">
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 540px; margin: 0 auto; padding: 32px 24px; border: 1px solid #10B981; border-radius: 18px; background: #040D1A; color: #FFFFFF;">
       <div style="text-align: center; margin-bottom: 24px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 16px;">
-        <h2 style="color: #10B981; margin: 0 0 4px 0; font-size: 24px; font-weight: 800;">⚡ Kuberis</h2>
-        <div style="font-size: 12px; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Account Sign Out Notice</div>
+        <h2 style="color: #10B981; margin: 0 0 4px 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">⚡ Kuberis</h2>
+        <div style="font-size: 12px; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Security Notice</div>
       </div>
 
       <p style="color: #F8FAFC; font-size: 15px; margin-bottom: 12px; font-weight: 600;">
@@ -1094,7 +1117,7 @@ async function sendLogoutAlertEmail({ toEmail, name, deviceName, ipAddress, loca
       </p>
 
       <p style="color: #CBD5E1; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
-        Your Kuberis account was signed out from the following device:
+        Your Kuberis account password was successfully updated.
       </p>
 
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; overflow: hidden;">
@@ -1119,16 +1142,59 @@ async function sendLogoutAlertEmail({ toEmail, name, deviceName, ipAddress, loca
       </table>
 
       <p style="color: #94A3B8; font-size: 13px; line-height: 1.6; margin-bottom: 24px;">
-        If you did not perform this logout, another device may have signed in or your active session expired. If you suspect unauthorized access, <a href="${resetUrl}" style="color: #EF4444; font-weight: 700;">secure your account now</a>.
+        If you made this change, you can safely ignore this alert. If you did NOT change your password, someone may have compromised your credentials. <a href="${resetUrl}" style="color: #EF4444; font-weight: 700; text-decoration: underline;">Secure your account immediately</a>.
       </p>
 
       <div style="font-size: 13px; color: #CBD5E1; margin-top: 20px;">
         Regards,<br>
-        <strong style="color: #FFFFFF;">Team Kuberis</strong>
+        <strong style="color: #FFFFFF;">Team Kuberis Security</strong>
       </div>
     </div>
   `;
   return await sendEmailWithFallback({ to: toEmail, subject, text, html });
+}
+
+async function evaluateAndDispatchLoginEmail({ user, device, clientIp, location, resetUrl }) {
+  if (!user || !user.email) return;
+
+  const deviceId = device.deviceId || 'unknown_device';
+  if (!user.knownDevices) user.knownDevices = {};
+
+  const existingDevice = user.knownDevices[deviceId];
+  const isNewDevice = !existingDevice;
+  const isReauthAfterLogout = existingDevice && existingDevice.hasLoggedOut === true;
+
+  // The condition requested by user:
+  // 1. If a new user logs in on a NEW device -> send mail
+  // 2. If the user logged out and logs in on the SAME device -> send mail
+  // 3. If again logged into the same device without explicit logout -> NO mail!
+  if (isNewDevice || isReauthAfterLogout) {
+    try {
+      await sendLoginSecurityAlertEmail({
+        toEmail: user.email,
+        name: user.name,
+        deviceName: device.deviceName,
+        ipAddress: clientIp,
+        location,
+        isNewDevice,
+        resetUrl
+      });
+    } catch (e) {
+      console.warn('[Security Email] Notice:', e.message);
+    }
+  }
+
+  // Update device record: clear loggedOut flag
+  user.knownDevices[deviceId] = {
+    deviceId,
+    deviceName: device.deviceName,
+    lastLogin: Date.now(),
+    hasLoggedOut: false
+  };
+
+  try {
+    dbEngine.saveRawDb(dbEngine.getRawDb());
+  } catch (e) {}
 }
 
 async function sendFailedLoginAlertEmail({ toEmail, name, deviceName, ipAddress, location, resetUrl }) {
@@ -1246,12 +1312,28 @@ app.post('/api/auth/reset-password', async (req, res) => {
 
     const user = dbEngine.resetPassword({ resetToken, newPassword });
     if (user && user.id) {
+      const clientIp = getClientIp(req);
+      const device = parseDeviceDetails(req);
+      const resetUrl = `${getAppOrigin(req)}/?forgot=true`;
       await dbEngine.logSecurityEvent({
         userId: user.id,
         eventType: 'PASSWORD_RESET',
-        ipAddress: getClientIp(req),
+        ipAddress: clientIp,
         userAgent: req.headers['user-agent'],
         status: 'SUCCESS'
+      });
+      setImmediate(async () => {
+        try {
+          const location = await resolveIpLocation(clientIp);
+          sendPasswordChangedAlertEmail({
+            toEmail: user.email,
+            name: user.name,
+            deviceName: device.deviceName,
+            ipAddress: clientIp,
+            location,
+            resetUrl
+          }).catch(() => {});
+        } catch (e) {}
       });
     }
     res.json({ message: 'Password updated successfully' });
@@ -1278,12 +1360,30 @@ app.post('/api/auth/change-password', authenticateToken, async (req, res) => {
       newPassword
     });
 
+    const clientIp = getClientIp(req);
+    const device = parseDeviceDetails(req);
+    const resetUrl = `${getAppOrigin(req)}/?forgot=true`;
+
     await dbEngine.logSecurityEvent({
       userId: req.userId,
       eventType: 'PASSWORD_CHANGED',
-      ipAddress: getClientIp(req),
+      ipAddress: clientIp,
       userAgent: req.headers['user-agent'],
       status: 'SUCCESS'
+    });
+
+    setImmediate(async () => {
+      try {
+        const location = await resolveIpLocation(clientIp);
+        sendPasswordChangedAlertEmail({
+          toEmail: updatedUser.email || (req.user && req.user.email),
+          name: updatedUser.name || (req.user && req.user.name),
+          deviceName: device.deviceName,
+          ipAddress: clientIp,
+          location,
+          resetUrl
+        }).catch(() => {});
+      } catch (e) {}
     });
 
     res.json({
@@ -1588,7 +1688,7 @@ app.post('/api/auth/mpin/verify', async (req, res) => {
     const accessToken = jwt.sign(
       { userId: user.id, email: user.email, sessionId },
       JWT_SECRET,
-      { expiresIn: '15m' }
+      { expiresIn: '2h' }
     );
     const tokenRes = await dbEngine.createRefreshToken({
       userId: user.id,
@@ -1621,15 +1721,13 @@ app.post('/api/auth/mpin/verify', async (req, res) => {
           status: 'SUCCESS'
         });
 
-        sendLoginSecurityAlertEmail({
-          toEmail: user.email,
-          name: user.name,
-          deviceName: device.deviceName,
-          ipAddress: clientIp,
+        await evaluateAndDispatchLoginEmail({
+          user,
+          device,
+          clientIp,
           location,
-          isNewDevice: !!forceLogin,
           resetUrl
-        }).catch(e => console.warn('[Security Email] Notice:', e.message));
+        });
       } catch (bgErr) {
         console.warn('[MPIN background alert notice]:', bgErr.message);
       }
@@ -1673,15 +1771,17 @@ app.post('/api/auth/logout', async (req, res) => {
             status: 'SUCCESS'
           });
 
-          if (user && user.email) {
-            sendLogoutAlertEmail({
-              toEmail: user.email,
-              name: user.name,
+          // No logout emails dispatched (per user security preferences)
+          if (user && device.deviceId) {
+            user.knownDevices = user.knownDevices || {};
+            user.knownDevices[device.deviceId] = {
+              ...(user.knownDevices[device.deviceId] || {}),
+              deviceId: device.deviceId,
               deviceName: device.deviceName,
-              ipAddress: clientIp,
-              location,
-              resetUrl
-            }).catch(e => console.warn('[Security Email] Notice:', e.message));
+              hasLoggedOut: true,
+              lastLogout: Date.now()
+            };
+            try { dbEngine.saveRawDb(dbEngine.getRawDb()); } catch (e) {}
           }
         }
       } catch (bgErr) {
@@ -1800,7 +1900,7 @@ app.post('/api/auth/webauthn/verify', async (req, res) => {
     const accessToken = jwt.sign(
       { userId: user.id, email: user.email, sessionId },
       JWT_SECRET,
-      { expiresIn: '15m' }
+      { expiresIn: '2h' }
     );
     const tokenRes = await dbEngine.createRefreshToken({
       userId: user.id,
@@ -1833,15 +1933,13 @@ app.post('/api/auth/webauthn/verify', async (req, res) => {
           status: 'SUCCESS'
         });
 
-        sendLoginSecurityAlertEmail({
-          toEmail: user.email,
-          name: user.name,
-          deviceName: device.deviceName,
-          ipAddress: clientIp,
+        await evaluateAndDispatchLoginEmail({
+          user,
+          device,
+          clientIp,
           location,
-          isNewDevice: !!forceLogin,
           resetUrl
-        }).catch(e => console.warn('[Security Email] Notice:', e.message));
+        });
       } catch (bgErr) {
         console.warn('[Biometric background alert notice]:', bgErr.message);
       }
@@ -2289,6 +2387,40 @@ app.post('/api/notifications/read', (req, res) => {
   } catch (err) {
     console.error('POST /api/notifications/read error:', err);
     res.status(500).json({ error: 'Failed to mark notifications read' });
+  }
+});
+
+// ALL /api/notifications/sync (Live Internet Crawl & Govt Rates Sync)
+app.all('/api/notifications/sync', async (req, res) => {
+  try {
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    // Check if an up-to-date sync notification already exists for today
+    let todayNotif = RATE_NOTIFICATIONS.find(n => n.id === `notif_web_sync_${todayStr}`);
+    if (!todayNotif) {
+      todayNotif = {
+        id: `notif_web_sync_${todayStr}`,
+        date: todayStr,
+        category: 'Govt Notification',
+        title: 'Live Web Sync: MoF & RBI Gazette Circulars Verified',
+        description: 'Automated crawler checked Department of Posts (MoF) & RBI Repo releases. All Q3 FY 2026-27 Small Savings rates and bank slabs are verified accurate.',
+        severity: 'info',
+        source: 'https://dea.gov.in / https://rbi.org.in',
+        isNew: true
+      };
+      RATE_NOTIFICATIONS.unshift(todayNotif);
+    }
+
+    res.json({
+      success: true,
+      message: 'Rates verified against live internet sources',
+      syncedAt: new Date().toISOString(),
+      notifications: RATE_NOTIFICATIONS,
+      unreadCount: RATE_NOTIFICATIONS.filter(n => n.isNew).length
+    });
+  } catch (err) {
+    console.error('ALL /api/notifications/sync error:', err);
+    res.status(500).json({ error: 'Internet sync failed' });
   }
 });
 

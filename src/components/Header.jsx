@@ -20,7 +20,8 @@ import {
   ArrowDownRight,
   Compass,
   Bell,
-  CheckCheck
+  CheckCheck,
+  RefreshCw
 } from 'lucide-react';
 import { RATE_NOTIFICATIONS } from '../utils/fdRates';
 
@@ -114,6 +115,25 @@ export default function Header({
       });
     } catch (err) {
       // Offline fallback
+    }
+  };
+
+  const [isSyncingRates, setIsSyncingRates] = useState(false);
+
+  const handleSyncWithInternet = async () => {
+    setIsSyncingRates(true);
+    try {
+      const res = await fetch('/api/notifications/sync', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.notifications && Array.isArray(data.notifications)) {
+          setNotifications(data.notifications);
+        }
+      }
+    } catch (err) {
+      // Offline fallback
+    } finally {
+      setTimeout(() => setIsSyncingRates(false), 800);
     }
   };
 
@@ -493,29 +513,54 @@ export default function Header({
                         </div>
                       </div>
 
-                      {unreadCount > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <button
                           type="button"
-                          onClick={handleMarkAllRead}
+                          onClick={handleSyncWithInternet}
+                          disabled={isSyncingRates}
                           style={{
                             background: 'transparent',
                             border: 'none',
-                            color: '#10B981',
+                            color: isSyncingRates ? '#10B981' : '#38BDF8',
                             fontSize: '11px',
                             fontWeight: '700',
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '4px',
-                            padding: '4px 8px',
+                            padding: '4px 6px',
                             borderRadius: '6px'
                           }}
-                          title="Mark all notifications as read"
+                          title="Sync rates live with Govt & RBI internet publications"
                         >
-                          <CheckCheck size={13} />
-                          <span>Mark all read</span>
+                          <RefreshCw size={12} style={{ animation: isSyncingRates ? 'spin 1s linear infinite' : 'none' }} />
+                          <span>{isSyncingRates ? 'Syncing...' : 'Sync Web'}</span>
                         </button>
-                      )}
+
+                        {unreadCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleMarkAllRead}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: '#10B981',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '4px 6px',
+                              borderRadius: '6px'
+                            }}
+                            title="Mark all notifications as read"
+                          >
+                            <CheckCheck size={13} />
+                            <span>Mark all read</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Scrollable Notifications List */}

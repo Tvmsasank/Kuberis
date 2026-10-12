@@ -512,28 +512,28 @@ export default function AddInvestmentModal({
                     </div>
                   </div>
 
-                  {/* Deposit / Booking Date & Compounding */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label className="form-label" style={{ marginBottom: '4px' }}>Booking Date</label>
-                      <input
-                        type="date"
-                        className="form-control"
-                        value={startDate}
-                        onChange={e => setStartDate(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label className="form-label" style={{ marginBottom: '4px' }}>Compounding</label>
-                      <CustomSelect
-                        value={compoundingFrequency}
-                        onChange={e => setCompoundingFrequency(e.target.value)}
-                        options={COMPOUNDING_OPTIONS}
-                        size="md"
-                        searchable={false}
-                      />
-                    </div>
+                  {/* Booking Date */}
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" style={{ marginBottom: '4px' }}>Booking / Deposit Date</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={startDate}
+                      onChange={e => setStartDate(e.target.value)}
+                      required
+                    />
+                  </div>
+
+                  {/* Compounding Frequency */}
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" style={{ marginBottom: '4px' }}>Compounding Frequency</label>
+                    <CustomSelect
+                      value={compoundingFrequency}
+                      onChange={e => setCompoundingFrequency(e.target.value)}
+                      options={COMPOUNDING_OPTIONS}
+                      size="md"
+                      searchable={false}
+                    />
                   </div>
 
                   {/* Portfolio Notes */}
@@ -695,48 +695,69 @@ export default function AddInvestmentModal({
                     )}
                   </div>
 
-                  {/* Senior Citizen Toggle & Rate Override */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '10px', alignItems: 'center' }}>
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: '10px 12px',
-                        borderRadius: '12px',
-                        background: isSeniorCitizen ? 'rgba(56, 189, 248, 0.15)' : 'var(--bg-app)',
-                        border: isSeniorCitizen ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid var(--border-color)',
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => setIsSeniorCitizen(!isSeniorCitizen)}
-                    >
+                  {/* Senior Citizen Toggle */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 14px',
+                      borderRadius: '12px',
+                      background: isSeniorCitizen ? 'rgba(56, 189, 248, 0.14)' : 'var(--bg-app)',
+                      border: isSeniorCitizen ? '1px solid rgba(56, 189, 248, 0.4)' : '1px solid var(--border-color)',
+                      cursor: bankRules.isSeniorRatesSame ? 'default' : 'pointer'
+                    }}
+                    onClick={() => {
+                      if (!bankRules.isSeniorRatesSame) setIsSeniorCitizen(!isSeniorCitizen);
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <input
                         type="checkbox"
                         id="seniorCitizenToggle"
                         checked={isSeniorCitizen}
+                        disabled={bankRules.isSeniorRatesSame}
                         onChange={e => setIsSeniorCitizen(e.target.checked)}
-                        style={{ accentColor: '#38BDF8', width: '15px', height: '15px', cursor: 'pointer' }}
+                        style={{ accentColor: '#38BDF8', width: '15px', height: '15px', cursor: bankRules.isSeniorRatesSame ? 'default' : 'pointer' }}
                       />
-                      <label htmlFor="seniorCitizenToggle" style={{ fontSize: '11.5px', color: 'var(--text-main)', cursor: 'pointer', margin: 0, fontWeight: '700' }}>
-                        Senior Citizen (+0.5% Yield)
+                      <label htmlFor="seniorCitizenToggle" style={{ fontSize: '11.5px', color: 'var(--text-main)', cursor: bankRules.isSeniorRatesSame ? 'default' : 'pointer', margin: 0, fontWeight: '700' }}>
+                        {bankRules.isSeniorRatesSame
+                          ? 'Senior Citizen (General & Senior Rates Identical on TD; Opt SCSS for 8.20%)'
+                          : `Senior Citizen (+${(bankRules.seniorAdditionalRate || 0.5).toFixed(2)}% Extra Yield)`}
                       </label>
                     </div>
+                    {!bankRules.isSeniorRatesSame && (
+                      <span style={{ fontSize: '11px', color: '#38BDF8', fontWeight: '800' }}>
+                        +{bankRules.seniorAdditionalRate || 0.5}%
+                      </span>
+                    )}
+                  </div>
 
+                  {/* Annual Interest Rate with Prominent Label */}
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <label className="form-label" style={{ margin: 0, fontSize: '12px', fontWeight: '700' }}>
+                        Annual Interest Rate (% p.a.)
+                      </label>
+                      <span style={{ fontSize: '10.5px', color: isRateManuallyEdited ? '#F59E0B' : '#10B981', fontWeight: '700' }}>
+                        {isRateManuallyEdited ? '● Custom Override' : '● Official Bank Rate'}
+                      </span>
+                    </div>
                     <div style={{ position: 'relative' }}>
                       <input
                         type="number"
                         step="0.01"
-                        placeholder="Rate %"
+                        placeholder="e.g. 7.10"
                         className="form-control"
                         value={interestRate}
                         onChange={e => {
                           setInterestRate(e.target.value);
                           setIsRateManuallyEdited(true);
                         }}
-                        style={{ paddingRight: '28px', fontSize: '13px', fontWeight: '700' }}
+                        style={{ paddingRight: '32px', fontSize: '13.5px', fontWeight: '800' }}
                         required
                       />
-                      <Percent size={13} style={{ position: 'absolute', right: '10px', top: '12px', color: 'var(--text-muted)' }} />
+                      <Percent size={14} style={{ position: 'absolute', right: '12px', top: '12px', color: 'var(--text-muted)' }} />
                     </div>
                   </div>
 

@@ -68,9 +68,10 @@ export const FD_INSTITUTIONS = [
       { label: '2 Years (7.00%)', years: 2, months: 0, days: 0, totalDays: 730, regularRate: 7.00, seniorRate: 7.00, schemeName: 'Post Office 2-Year Time Deposit (POTD)', badge: 'Govt Guaranteed' },
       { label: '3 Years (7.10%)', years: 3, months: 0, days: 0, totalDays: 1095, regularRate: 7.10, seniorRate: 7.10, schemeName: 'Post Office 3-Year Time Deposit (POTD)', badge: 'Govt Guaranteed' },
       { label: '5 Years (80C Tax Saver @ 7.50%)', years: 5, months: 0, days: 0, totalDays: 1825, regularRate: 7.50, seniorRate: 7.50, schemeName: 'Post Office 5-Year Time Deposit (80C)', isSpecial: true, badge: '80C Tax Saver' },
-      { label: 'Senior Citizen SCSS 5Y (8.20%)', years: 5, months: 0, days: 0, totalDays: 1825, regularRate: 8.20, seniorRate: 8.20, schemeName: 'Senior Citizen Savings Scheme (SCSS)', isSpecial: true, isSeniorOnly: true, badge: 'Highest Senior (8.20%)' },
-      { label: 'Mahila Samman 2Y (7.50%)', years: 2, months: 0, days: 0, totalDays: 730, regularRate: 7.50, seniorRate: 7.50, schemeName: 'Mahila Samman Savings Certificate', isSpecial: true, badge: 'Women Special (7.50%)' },
-      { label: 'NSC Certificate 5Y (7.70%)', years: 5, months: 0, days: 0, totalDays: 1825, regularRate: 7.70, seniorRate: 7.70, schemeName: 'National Savings Certificate (NSC)', isSpecial: true, badge: 'Govt 7.70%' }
+      { label: 'Senior Citizen SCSS 5Y (8.20%)', years: 5, months: 0, days: 0, totalDays: 1825, regularRate: 8.20, seniorRate: 8.20, schemeName: 'Senior Citizen Savings Scheme (SCSS)', isSpecial: true, isSeniorOnly: true, badge: 'SCSS (8.20%)' },
+      { label: 'Mahila Samman 2Y (7.50%)', years: 2, months: 0, days: 0, totalDays: 730, regularRate: 7.50, seniorRate: 7.50, schemeName: 'Mahila Samman Savings Certificate', isSpecial: true, badge: 'Women Special' },
+      { label: 'NSC Certificate 5Y (7.70%)', years: 5, months: 0, days: 0, totalDays: 1825, regularRate: 7.70, seniorRate: 7.70, schemeName: 'National Savings Certificate (NSC)', isSpecial: true, badge: 'Govt 7.70%' },
+      { label: 'Kisan Vikas Patra KVP (7.50%)', years: 9, months: 7, days: 0, totalDays: 3500, regularRate: 7.50, seniorRate: 7.50, schemeName: 'Kisan Vikas Patra (KVP - Doubles Amount)', isSpecial: true, badge: 'Doubles Money' }
     ],
     slabs: [
       { minDays: 365, maxDays: 365, regularRate: 6.90, seniorRate: 6.90, label: 'Post Office 1-Year TD', schemeName: '1-Year Time Deposit' },

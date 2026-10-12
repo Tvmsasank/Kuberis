@@ -1404,8 +1404,16 @@ export const dbEngine = {
       return { success: false, error: 'Invalid refresh token' };
     }
 
-    // Replay Attack Detection: If token was already revoked, revoke ALL user tokens (family revocation)
+    // Replay Attack Detection with 60s Grace Window for concurrent client retries
     if (tokenRecord.revoked) {
+      if (tokenRecord.revokedAt && (Date.now() - tokenRecord.revokedAt < 60000) && tokenRecord.replacedBy) {
+        return {
+          success: true,
+          user: this.getUserById(tokenRecord.userId),
+          sessionId: tokenRecord.sessionId,
+          newRefreshToken: tokenRecord.replacedBy
+        };
+      }
       this.revokeAllUserTokens(tokenRecord.userId);
       this.logSecurityEvent({
         userId: tokenRecord.userId,
@@ -1419,6 +1427,7 @@ export const dbEngine = {
     // Check expiration
     if (new Date(tokenRecord.expiresAt).getTime() < Date.now()) {
       tokenRecord.revoked = true;
+      tokenRecord.revokedAt = Date.now();
       saveDb();
       return { success: false, error: 'Refresh token expired. Please sign in again.' };
     }
@@ -1428,8 +1437,17 @@ export const dbEngine = {
       return { success: false, error: 'User account not found' };
     }
 
-    // Invalidate old token (one-time use rotation)
+    // Generate brand new rotating refresh token
+    const tokenResult = this.createRefreshToken({
+      userId: user.id,
+      sessionId: tokenRecord.sessionId
+    });
+    const newRefreshToken = typeof tokenResult === 'string' ? tokenResult : (tokenResult.refreshToken || tokenResult.rawToken);
+
+    // Invalidate old token (one-time use rotation with replacement link)
     tokenRecord.revoked = true;
+    tokenRecord.revokedAt = Date.now();
+    tokenRecord.replacedBy = newRefreshToken;
     saveDb();
 
     if (pgPool) {
@@ -1438,13 +1456,6 @@ export const dbEngine = {
         [tokenHash]
       ).catch(e => console.warn('[Supabase PostgreSQL] Revoke token notice:', e.message));
     }
-
-    // Generate brand new rotating refresh token
-    const tokenResult = this.createRefreshToken({
-      userId: user.id,
-      sessionId: tokenRecord.sessionId
-    });
-    const newRefreshToken = typeof tokenResult === 'string' ? tokenResult : (tokenResult.refreshToken || tokenResult.rawToken);
 
     return {
       success: true,
