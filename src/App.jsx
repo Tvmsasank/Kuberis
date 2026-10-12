@@ -335,10 +335,12 @@ export default function App() {
         if (errJson.code === 'ACCOUNT_SUSPENDED' || res.status === 403) {
           setSuspendedReasonMessage(errJson.error || 'Your account has been administratively suspended.');
           setAccountSuspendedModalOpen(true);
+        // Safe error handling - do not log out active user
         } else if (errJson.code === 'SESSION_TERMINATED') {
           setSessionTerminatedModalOpen(true);
+          handleLogout();
         }
-        handleLogout();
+        // Do NOT log out active user on transient network errors or server reload
         return null;
       }
     } catch (e) {
@@ -421,7 +423,7 @@ export default function App() {
           });
         }
       } else if (res.status === 401) {
-        handleLogout();
+        console.warn('Unauthorized status on fetchState; silent retry queued');
       }
     } catch (err) {
       console.error('Failed to fetch state:', err);
@@ -479,6 +481,77 @@ export default function App() {
 
     return () => clearInterval(interval);
   }, [user, token]);
+
+  // ⏱️ 15-Minute Financial Security Inactivity Auto-Logout System
+  // User stays logged in as long as cursor moves, keys are pressed, or scrolling occurs.
+  // At the 14th minute (last 60 seconds remaining), warning modal displays with "Stay" & "Log Out".
+  useEffect(() => {
+    inactivityModalOpenRef.current = inactivityModalOpen;
+  }, [inactivityModalOpen]);
+
+  useEffect(() => {
+    if (!user) {
+      setInactivityModalOpen(false);
+      return;
+    }
+
+    const INACTIVITY_LIMIT_MS = 15 * 60 * 1000; // 15 Minutes total idle time
+    const WARNING_TIME_MS = 60 * 1000;          // Modal triggers at 14 minutes (60 seconds left)
+
+    // Reset idle timer on any user movement or interaction
+    const registerActivity = () => {
+      if (!inactivityModalOpenRef.current) {
+        lastActivityRef.current = Date.now();
+      }
+    };
+
+    const userEvents = [
+      'mousemove', 'pointermove', 'mousedown', 'mouseup', 'click', 'pointerdown',
+      'keydown', 'keyup', 'keypress', 'input', 'change',
+      'scroll', 'wheel', 'touchstart', 'touchmove', 'touchend', 'focus'
+    ];
+
+    userEvents.forEach(evt => {
+      window.addEventListener(evt, registerActivity, { passive: true });
+      document.addEventListener(evt, registerActivity, { passive: true });
+    });
+
+    const timerInterval = setInterval(() => {
+      if (!user) return;
+      const now = Date.now();
+      const idleTime = now - lastActivityRef.current;
+
+      if (idleTime >= INACTIVITY_LIMIT_MS) {
+        // Complete 15 minutes of zero activity reached -> perform auto logout
+        setInactivityModalOpen(false);
+        handleLogout();
+      } else if (idleTime >= (INACTIVITY_LIMIT_MS - WARNING_TIME_MS)) {
+        // Between 14th and 15th minute -> display warning modal with live seconds countdown
+        const remaining = Math.max(1, Math.ceil((INACTIVITY_LIMIT_MS - idleTime) / 1000));
+        setInactivityCountdown(remaining);
+        setInactivityModalOpen(true);
+      } else {
+        if (inactivityModalOpenRef.current) {
+          setInactivityModalOpen(false);
+        }
+      }
+    }, 1000);
+
+    return () => {
+      clearInterval(timerInterval);
+      userEvents.forEach(evt => {
+        window.removeEventListener(evt, registerActivity);
+        document.removeEventListener(evt, registerActivity);
+      });
+    };
+  }, [user]);
+
+  const handleStayLoggedIn = () => {
+    lastActivityRef.current = Date.now();
+    setInactivityModalOpen(false);
+    refreshAuthToken();
+  };
+
 
   // Auth Handlers - Full state reset to guarantee complete isolation across sessions
   const handleLoginSuccess = (userData, userToken, rememberMe = true, metadata = {}) => {
@@ -1595,6 +1668,14 @@ export default function App() {
       <LiquidGlassController
         isOpen={isGlassControllerOpen}
         onClose={() => setIsGlassControllerOpen(false)}
+      />
+
+      {/* ⏱️ 15-Minute Session Inactivity Warning Modal with Live Countdown */}
+      <InactivityTimeoutModal
+        isOpen={inactivityModalOpen}
+        countdownSeconds={inactivityCountdown}
+        onStayLoggedIn={handleStayLoggedIn}
+        onLogoutNow={handleLogout}
       />
 
       {/* Animated Logout Feedback Capsule */}

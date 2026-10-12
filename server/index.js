@@ -242,7 +242,7 @@ app.post('/api/auth/register', async (req, res) => {
     dbEngine.setUserActiveSession(user.id, sessionId);
 
     // 2-hour high security access token + 30-day rotating refresh token
-    const accessToken = jwt.sign({ userId: user.id, email: user.email, sessionId }, JWT_SECRET, { expiresIn: '2h' });
+    const accessToken = jwt.sign({ userId: user.id, email: user.email, sessionId }, JWT_SECRET, { expiresIn: '7d' });
     const tokenRes = await dbEngine.createRefreshToken({ userId: user.id, sessionId, rememberMe: true });
     const refreshToken = typeof tokenRes === 'string' ? tokenRes : (tokenRes.refreshToken || tokenRes.rawToken);
 
@@ -352,7 +352,7 @@ app.post('/api/auth/login', async (req, res) => {
     dbEngine.setUserActiveSession(user.id, sessionId);
 
     // Issue 2-hour access token + rotating refresh token
-    const accessToken = jwt.sign({ userId: user.id, email: user.email, sessionId }, JWT_SECRET, { expiresIn: '2h' });
+    const accessToken = jwt.sign({ userId: user.id, email: user.email, sessionId }, JWT_SECRET, { expiresIn: '7d' });
     const tokenRes = await dbEngine.createRefreshToken({
       userId: user.id,
       sessionId,
@@ -441,7 +441,7 @@ app.post('/api/auth/refresh', async (req, res) => {
     const newAccessToken = jwt.sign(
       { userId: user.id, email: user.email, sessionId: rotated.sessionId || currentActiveSession },
       JWT_SECRET,
-      { expiresIn: '2h' }
+      { expiresIn: '7d' }
     );
 
     res.json({
@@ -628,7 +628,7 @@ app.post('/api/auth/2fa/verify-login', async (req, res) => {
     const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     dbEngine.setUserActiveSession(user.id, sessionId);
 
-    const accessToken = jwt.sign({ userId: user.id, email: user.email, sessionId }, JWT_SECRET, { expiresIn: '2h' });
+    const accessToken = jwt.sign({ userId: user.id, email: user.email, sessionId }, JWT_SECRET, { expiresIn: '7d' });
     const tokenRes = await dbEngine.createRefreshToken({
       userId: user.id,
       sessionId,
@@ -1688,7 +1688,7 @@ app.post('/api/auth/mpin/verify', async (req, res) => {
     const accessToken = jwt.sign(
       { userId: user.id, email: user.email, sessionId },
       JWT_SECRET,
-      { expiresIn: '2h' }
+      { expiresIn: '7d' }
     );
     const tokenRes = await dbEngine.createRefreshToken({
       userId: user.id,
@@ -1900,7 +1900,7 @@ app.post('/api/auth/webauthn/verify', async (req, res) => {
     const accessToken = jwt.sign(
       { userId: user.id, email: user.email, sessionId },
       JWT_SECRET,
-      { expiresIn: '2h' }
+      { expiresIn: '7d' }
     );
     const tokenRes = await dbEngine.createRefreshToken({
       userId: user.id,

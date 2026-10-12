@@ -20,12 +20,12 @@ export default function InactivityTimeoutModal({
     <div
       className="modal-backdrop"
       style={{
-        zIndex: 99999,
+        zIndex: 999999,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backdropFilter: 'blur(10px)',
-        background: 'rgba(0, 0, 0, 0.75)',
+        backdropFilter: 'blur(12px)',
+        background: 'rgba(0, 0, 0, 0.8)',
         animation: 'fadeIn 0.2s ease-out'
       }}
     >
@@ -40,14 +40,14 @@ export default function InactivityTimeoutModal({
           borderRadius: '20px',
           padding: '28px 24px',
           boxShadow: isUrgent
-            ? '0 25px 60px rgba(239, 68, 68, 0.35), 0 0 30px rgba(239, 68, 68, 0.2)'
-            : '0 25px 60px rgba(245, 158, 11, 0.3), 0 0 30px rgba(245, 158, 11, 0.15)',
+            ? '0 25px 60px rgba(239, 68, 68, 0.4), 0 0 30px rgba(239, 68, 68, 0.25)'
+            : '0 25px 60px rgba(245, 158, 11, 0.35), 0 0 30px rgba(245, 158, 11, 0.2)',
           textAlign: 'center',
           animation: 'scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
           boxSizing: 'border-box'
         }}
       >
-        {/* Glowing Security Badge */}
+        {/* Glowing Security Shield */}
         <div
           style={{
             width: '64px',
@@ -71,15 +71,15 @@ export default function InactivityTimeoutModal({
         </h3>
 
         {/* Context description */}
-        <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: 'var(--text-muted, #94A3B8)', lineHeight: '1.5' }}>
-          You have been idle for 9 minutes. To safeguard your financial data, your session will automatically log out in:
+        <p style={{ margin: '0 0 20px 0', fontSize: '13.5px', color: 'var(--text-muted, #94A3B8)', lineHeight: '1.5' }}>
+          You have been idle for 14 minutes. For your data security, your session will automatically log out in:
         </p>
 
         {/* Live Countdown Display */}
         <div
           style={{
-            background: isUrgent ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-            border: isUrgent ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
+            background: isUrgent ? 'rgba(239, 68, 68, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+            border: isUrgent ? '1px solid rgba(239, 68, 68, 0.35)' : '1px solid rgba(245, 158, 11, 0.35)',
             borderRadius: '16px',
             padding: '16px 20px',
             marginBottom: '24px',
@@ -109,7 +109,7 @@ export default function InactivityTimeoutModal({
           </div>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons: Stay vs Log Out */}
         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
           <button
             type="button"
@@ -118,7 +118,7 @@ export default function InactivityTimeoutModal({
             style={{
               flex: 1.2,
               padding: '12px 18px',
-              fontSize: '13.5px',
+              fontSize: '14px',
               fontWeight: '800',
               borderRadius: '12px',
               display: 'flex',
@@ -129,7 +129,7 @@ export default function InactivityTimeoutModal({
             }}
           >
             <CheckCircle size={16} />
-            <span>Stay Logged In</span>
+            <span>Stay</span>
           </button>
 
           <button
@@ -139,7 +139,7 @@ export default function InactivityTimeoutModal({
             style={{
               flex: 1,
               padding: '12px 16px',
-              fontSize: '13px',
+              fontSize: '13.5px',
               fontWeight: '700',
               borderRadius: '12px',
               color: '#EF4444',
@@ -152,7 +152,7 @@ export default function InactivityTimeoutModal({
             }}
           >
             <LogOut size={15} />
-            <span>Logout Now</span>
+            <span>Log Out</span>
           </button>
         </div>
       </div>
