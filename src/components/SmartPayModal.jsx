@@ -141,30 +141,19 @@ export default function SmartPayModal({
 
   // Automated Polling & Settlement Detection during 'waiting' step
   useEffect(() => {
-    let interval = null;
+    let timerInterval = null;
     let pollInterval = null;
 
     if (step === 'waiting') {
       setWaitingElapsedSeconds(0);
       setIsVerifyingAnimation(false);
 
-      interval = setInterval(() => {
-        setWaitingElapsedSeconds(prev => {
-          const nextSec = prev + 1;
-          // Auto-confirm and trigger bank verification animation after 6s
-          if (nextSec >= 6 && !isConfirming && !autoConfirmed) {
-            setAutoConfirmed(true);
-            setIsVerifyingAnimation(true);
-            setTimeout(() => {
-              const autoUtr = `4287${Math.floor(10000000 + Math.random() * 90000000)}`;
-              completeAndShowReceipt(autoUtr);
-            }, 1200);
-          }
-          return nextSec;
-        });
+      // Simple elapsed seconds counter (DO NOT fake auto-confirm on a timer!)
+      timerInterval = setInterval(() => {
+        setWaitingElapsedSeconds(prev => prev + 1);
       }, 1000);
 
-      // Automated Polling: Continuously checks backend listener
+      // Automated Polling: Checks backend webhook / collect status every 2 seconds
       pollInterval = setInterval(async () => {
         try {
           const pollUrl = currentTxnId 
@@ -174,35 +163,22 @@ export default function SmartPayModal({
             headers: { 'Authorization': token ? `Bearer ${token}` : '' }
           });
           const data = await res.json();
-          if (data && data.status === 'SUCCESS' && !autoConfirmed) {
+          // ONLY trigger when the webhook or backend listener has genuinely verified SUCCESS
+          if (data && data.status === 'SUCCESS' && !autoConfirmed && !isConfirming) {
             setAutoConfirmed(true);
             setIsVerifyingAnimation(true);
             setTimeout(() => {
               completeAndShowReceipt(data.refNumber || `4287${Math.floor(10000000 + Math.random() * 90000000)}`);
-            }, 1000);
+            }, 1800);
           }
         } catch (e) {
-          // Ignore network glitch during poll
+          // Ignore network glitch during polling
         }
       }, 2000);
 
-      // Detect user returning from UPI mobile app
-      const handleVisibilityChange = () => {
-        if (document.visibilityState === 'visible' && !autoConfirmed && !isConfirming) {
-          setAutoConfirmed(true);
-          setIsVerifyingAnimation(true);
-          setTimeout(() => {
-            const autoUtr = `4287${Math.floor(10000000 + Math.random() * 90000000)}`;
-            completeAndShowReceipt(autoUtr);
-          }, 1200);
-        }
-      };
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-
       return () => {
-        if (interval) clearInterval(interval);
+        if (timerInterval) clearInterval(timerInterval);
         if (pollInterval) clearInterval(pollInterval);
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
       };
     }
   }, [step, currentTxnId, numericAmount, isConfirming, autoConfirmed]);
@@ -493,6 +469,7 @@ export default function SmartPayModal({
 
     const newTx = {
       type: 'expense',
+      merchant: payeeName || vpa || 'UPI Payment',
       category: selectedCategory || 'Shopping',
       amount: numericAmount,
       date: paymentTimestamp.split('T')[0],
@@ -558,7 +535,10 @@ export default function SmartPayModal({
   };
 
   const handleManualConfirm = () => {
-    completeAndShowReceipt(refNumber);
+    setIsVerifyingAnimation(true);
+    setTimeout(() => {
+      completeAndShowReceipt(refNumber);
+    }, 1200);
   };
 
   const formatInr = (n) =>

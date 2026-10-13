@@ -2446,22 +2446,8 @@ app.get('/api/payments/poll-status', authenticateToken, async (req, res) => {
       }
     }
 
-    // Auto-resolve pending UPI intent after 5 seconds of app launch or user return
+    // Return current session status (PENDING until webhook or verified match)
     if (session) {
-      const elapsed = Date.now() - (session.createdAt || Date.now());
-      if (elapsed >= 5000) {
-        const randomUtrSuffix = Math.floor(10000000 + Math.random() * 90000000);
-        session.status = 'SUCCESS';
-        session.refNumber = session.refNumber || `4287${randomUtrSuffix}`;
-        return res.json({
-          txnId: session.txnId,
-          status: 'SUCCESS',
-          refNumber: session.refNumber,
-          amount: session.amount,
-          autoConfirmed: true
-        });
-      }
-
       return res.json({
         txnId,
         status: session.status || 'PENDING',
@@ -2493,6 +2479,7 @@ app.post('/api/payments/confirm-automated', authenticateToken, async (req, res) 
 
     const newTx = {
       type: 'expense',
+      merchant: payeeName || receiverVpa || 'UPI Merchant',
       category: category,
       amount: amount,
       date: new Date().toISOString().split('T')[0],
