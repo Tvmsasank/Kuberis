@@ -1467,7 +1467,7 @@ export default function App() {
       <SmartPayModal
         isOpen={isSmartPayOpen}
         onClose={() => setIsSmartPayOpen(false)}
-        budgets={budgets}
+        budgets={settings.budgets || []}
         categories={settings.categories || []}
         transactions={transactions}
         microWealthPot={settings?.microWealthPot || {}}
