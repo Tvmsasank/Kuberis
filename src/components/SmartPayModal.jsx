@@ -35,7 +35,8 @@ export default function SmartPayModal({
   onSaveTransaction,
   isPrivacyMode = false,
   token,
-  user
+  user,
+  onNavigateToTransactions
 }) {
   if (!isOpen) return null;
 
@@ -519,6 +520,7 @@ export default function SmartPayModal({
 
   const resetAll = () => {
     stopCamera();
+    const shouldGoToTransactions = step === 'success';
     setStep('input');
     setRawAmount('');
     setVpa('');
@@ -530,6 +532,9 @@ export default function SmartPayModal({
     setCompletedPayment(null);
     setEmailStatus('');
     onClose();
+    if (shouldGoToTransactions && onNavigateToTransactions) {
+      onNavigateToTransactions('transactions');
+    }
   };
 
   return (
@@ -1108,107 +1113,165 @@ export default function SmartPayModal({
             {/* TAB 2: Manual VPA & Payment Confirmation */}
             {activeTab === 'manual' && (
               <div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '14px' }}>
-                  {/* Sender VPA (From User Profile or editable) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '16px' }}>
+                  
+                  {/* Card 1: Sender & Receiver Routing Box */}
                   <div
                     style={{
                       background: 'rgba(255, 255, 255, 0.03)',
                       border: '1px solid var(--border-glass)',
-                      borderRadius: '12px',
-                      padding: '10px 12px'
+                      borderRadius: '16px',
+                      padding: '14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px'
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                      <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>
-                        Sender VPA (Your Account)
-                      </label>
-                      <span style={{ fontSize: '10px', color: '#10B981', fontWeight: '700' }}>
-                        {user?.defaultVpa ? 'Linked Profile VPA' : 'Default'}
-                      </span>
-                    </div>
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="e.g. mobile@ybl, yourname@okhdfcbank"
-                      value={senderVpa}
-                      onChange={e => setSenderVpa(e.target.value.trim())}
-                      style={{ width: '100%', borderRadius: '8px', fontSize: '12.5px', padding: '7px 10px', fontFamily: 'monospace' }}
-                    />
-                  </div>
-
-                  {/* Receiver UPI ID / VPA */}
-                  <div>
-                    <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '5px', display: 'block' }}>
-                      Receiver UPI ID / VPA *
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="e.g. merchant@upi, payee@okhdfcbank"
-                      value={vpa}
-                      onChange={e => setVpa(e.target.value.trim())}
-                      style={{ width: '100%', borderRadius: '12px', fontSize: '13.5px', padding: '11px 12px' }}
-                    />
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    {/* Receiver VPA */}
                     <div>
-                      <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '5px', display: 'block' }}>
-                        Amount (₹) *
-                      </label>
-                      <div style={{ position: 'relative' }}>
-                        <span style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)', fontWeight: '800', color: 'var(--text-main)', fontSize: '15px' }}>
-                          ₹
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <label style={{ fontSize: '11.5px', fontWeight: '800', color: 'var(--text-main)', letterSpacing: '0.2px' }}>
+                          Receiver UPI ID / VPA *
+                        </label>
+                        <span style={{ fontSize: '10px', color: '#10B981', fontWeight: '700' }}>
+                          Active UPI
                         </span>
-                        <input
-                          type="number"
-                          step="any"
+                      </div>
+                      <input
+                        type="text"
+                        className="input"
+                        placeholder="e.g. friend@oksbi, shop@ybl, business@icici"
+                        value={vpa}
+                        onChange={e => setVpa(e.target.value.trim())}
+                        style={{
+                          width: '100%',
+                          borderRadius: '12px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          padding: '11px 14px',
+                          border: vpa ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid var(--border-glass)'
+                        }}
+                      />
+                    </div>
+
+                    {/* Sender VPA Capsule */}
+                    <div
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: '12px',
+                        background: 'rgba(56, 189, 248, 0.05)',
+                        border: '1px solid rgba(56, 189, 248, 0.18)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '10.5px', fontWeight: '700', color: '#38BDF8' }}>
+                          From (Your Linked Profile UPI ID)
+                        </span>
+                        <span style={{ fontSize: '9.5px', color: 'var(--text-muted)' }}>
+                          Auto-selected
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        className="input"
+                        placeholder="Enter your VPA (e.g. mobile@ybl, name@okhdfcbank)"
+                        value={senderVpa}
+                        onChange={e => setSenderVpa(e.target.value.trim())}
+                        style={{
+                          width: '100%',
+                          borderRadius: '8px',
+                          fontSize: '12px',
+                          padding: '6px 10px',
+                          fontFamily: 'monospace',
+                          background: 'transparent',
+                          border: '1px solid rgba(255, 255, 255, 0.08)'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Card 2: Amount & Category Selection */}
+                  <div
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid var(--border-glass)',
+                      borderRadius: '16px',
+                      padding: '14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '12px'
+                    }}
+                  >
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
+                      <div>
+                        <label style={{ fontSize: '11.5px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '6px', display: 'block' }}>
+                          Amount (₹) *
+                        </label>
+                        <div style={{ position: 'relative' }}>
+                          <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: '900', color: '#10B981', fontSize: '18px' }}>
+                            ₹
+                          </span>
+                          <input
+                            type="number"
+                            step="any"
+                            className="input"
+                            placeholder="0.00"
+                            value={rawAmount}
+                            onChange={e => setRawAmount(e.target.value)}
+                            style={{
+                              width: '100%',
+                              paddingLeft: '30px',
+                              fontSize: '18px',
+                              fontWeight: '900',
+                              borderRadius: '12px',
+                              paddingTop: '10px',
+                              paddingBottom: '10px',
+                              letterSpacing: '-0.3px',
+                              color: 'var(--text-main)'
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '11.5px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '6px', display: 'block' }}>
+                          Category
+                        </label>
+                        <select
                           className="input"
-                          placeholder="0.00"
-                          value={rawAmount}
-                          onChange={e => setRawAmount(e.target.value)}
-                          style={{ width: '100%', paddingLeft: '26px', fontSize: '15px', fontWeight: '800', borderRadius: '12px', padding: '11px 12px 11px 26px' }}
-                        />
+                          value={selectedCategory}
+                          onChange={e => setSelectedCategory(e.target.value)}
+                          style={{ width: '100%', borderRadius: '12px', fontSize: '13px', fontWeight: '600', padding: '11px 10px' }}
+                        >
+                          {categories.map(c => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
 
+                    {/* Merchant / Purpose Optional Input */}
                     <div>
-                      <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '5px', display: 'block' }}>
-                        Category
+                      <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '5px', display: 'block' }}>
+                        Merchant / Note (Optional)
                       </label>
-                      <select
+                      <input
+                        type="text"
                         className="input"
-                        value={selectedCategory}
-                        onChange={e => setSelectedCategory(e.target.value)}
-                        style={{ width: '100%', borderRadius: '12px', fontSize: '13px', padding: '11px 10px' }}
-                      >
-                        {categories.map(c => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
+                        placeholder="e.g. Dinner, Rent, Swiggy, Zerodha"
+                        value={payeeName}
+                        onChange={e => setPayeeName(e.target.value)}
+                        style={{ width: '100%', borderRadius: '10px', fontSize: '12.5px', padding: '8px 12px' }}
+                      />
                     </div>
-                  </div>
-
-                  <div>
-                    <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '5px', display: 'block' }}>
-                      Receiver Name / Merchant (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="e.g. Swiggy, Friend, Zerodha Broking"
-                      value={payeeName}
-                      onChange={e => setPayeeName(e.target.value)}
-                      style={{ width: '100%', borderRadius: '12px', fontSize: '13px', padding: '10px 12px' }}
-                    />
                   </div>
                 </div>
 
                 {/* 🛡️ PRE-PAYMENT BUDGET SHIELD BANNER */}
                 <div
                   style={{
-                    padding: '11px 13px',
-                    borderRadius: '13px',
+                    padding: '12px 14px',
+                    borderRadius: '14px',
                     marginBottom: '16px',
                     border: shieldStatus === 'safe'
                       ? '1px solid rgba(16, 185, 129, 0.4)'

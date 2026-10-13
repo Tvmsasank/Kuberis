@@ -580,7 +580,9 @@ export const dbEngine = {
       hasMpin: !!user.mpinHash,
       hasBiometrics: !!user.webauthnCredentialId,
       twoFactorEnabled: !!user.twoFactorEnabled,
-      activeSessionId: user.activeSessionId || null,
+      activeSessionId: user.activeSessionId || (user.activeSessionIds && user.activeSessionIds[0]) || null,
+      activeSessionIds: Array.isArray(user.activeSessionIds) ? user.activeSessionIds : (user.activeSessionId ? [user.activeSessionId] : []),
+      maxActiveSessions: user.maxActiveSessions || 2,
       defaultVpa: user.defaultVpa || null
     };
   },
@@ -602,10 +604,34 @@ export const dbEngine = {
     return true;
   },
 
+  setUserMaxActiveSessions(userId, maxSessions) {
+    const db = loadDb();
+    const user = db.users.find(u => u.id === userId);
+    if (!user) return false;
+    user.maxActiveSessions = maxSessions === 1 ? 1 : 2;
+    if (Array.isArray(user.activeSessionIds) && user.activeSessionIds.length > user.maxActiveSessions) {
+      user.activeSessionIds = user.activeSessionIds.slice(-user.maxActiveSessions);
+      user.activeSessionId = user.activeSessionIds[user.activeSessionIds.length - 1] || null;
+    }
+    saveDb();
+    return true;
+  },
+
   setUserActiveSession(userId, sessionId) {
     const db = loadDb();
     const user = db.users.find(u => u.id === userId);
     if (!user) return false;
+    const maxSessions = user.maxActiveSessions || 2;
+    if (!Array.isArray(user.activeSessionIds)) {
+      user.activeSessionIds = user.activeSessionId ? [user.activeSessionId] : [];
+    }
+    // Filter out if already in array
+    user.activeSessionIds = user.activeSessionIds.filter(id => id && id !== sessionId);
+    user.activeSessionIds.push(sessionId);
+    // Keep within allowed limit
+    if (user.activeSessionIds.length > maxSessions) {
+      user.activeSessionIds = user.activeSessionIds.slice(-maxSessions);
+    }
     user.activeSessionId = sessionId;
     saveDb();
     return true;
@@ -614,14 +640,43 @@ export const dbEngine = {
   getUserActiveSession(userId) {
     const db = loadDb();
     const user = db.users.find(u => u.id === userId);
-    return user ? user.activeSessionId || null : null;
+    if (!user) return null;
+    return user.activeSessionId || (user.activeSessionIds && user.activeSessionIds[0]) || null;
   },
 
-  clearUserActiveSession(userId) {
+  getUserActiveSessions(userId) {
+    const db = loadDb();
+    const user = db.users.find(u => u.id === userId);
+    if (!user) return [];
+    if (Array.isArray(user.activeSessionIds) && user.activeSessionIds.length > 0) {
+      return user.activeSessionIds;
+    }
+    return user.activeSessionId ? [user.activeSessionId] : [];
+  },
+
+  isUserSessionValid(userId, sessionId) {
+    if (!sessionId) return false;
+    const db = loadDb();
+    const user = db.users.find(u => u.id === userId);
+    if (!user) return false;
+    const sessions = Array.isArray(user.activeSessionIds) && user.activeSessionIds.length > 0
+      ? user.activeSessionIds
+      : (user.activeSessionId ? [user.activeSessionId] : []);
+    if (sessions.length === 0) return true; // No active session restriction
+    return sessions.includes(sessionId);
+  },
+
+  clearUserActiveSession(userId, sessionIdToClear = null) {
     const db = loadDb();
     const user = db.users.find(u => u.id === userId);
     if (user) {
-      user.activeSessionId = null;
+      if (sessionIdToClear && Array.isArray(user.activeSessionIds)) {
+        user.activeSessionIds = user.activeSessionIds.filter(s => s !== sessionIdToClear);
+        user.activeSessionId = user.activeSessionIds[user.activeSessionIds.length - 1] || null;
+      } else {
+        user.activeSessionId = null;
+        user.activeSessionIds = [];
+      }
       saveDb();
     }
     return true;

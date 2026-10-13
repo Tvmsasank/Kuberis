@@ -1475,6 +1475,7 @@ export default function App() {
         isPrivacyMode={isPrivacyMode}
         token={token}
         user={user}
+        onNavigateToTransactions={(tab) => setActiveTab(tab || 'transactions')}
       />
 
       <AccountAggregatorModal

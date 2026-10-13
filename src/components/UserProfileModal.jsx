@@ -85,6 +85,44 @@ export default function UserProfileModal({
     return `${visiblePrefix}****${visibleSuffix}@${handle}`;
   };
 
+  // Concurrent Sessions State (1 vs 2)
+  const [maxSessions, setMaxSessions] = useState(user?.maxActiveSessions || 2);
+  const [sessionSaving, setSessionSaving] = useState(false);
+  const [sessionSuccess, setSessionSuccess] = useState('');
+
+  useEffect(() => {
+    if (user?.maxActiveSessions) {
+      setMaxSessions(user.maxActiveSessions);
+    }
+  }, [user?.maxActiveSessions]);
+
+  const handleToggleMaxSessions = async (newLimit) => {
+    setSessionSaving(true);
+    setSessionSuccess('');
+    try {
+      const res = await fetch('/api/user/session-settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ maxActiveSessions: newLimit })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update session settings');
+      setMaxSessions(newLimit);
+      setSessionSuccess(newLimit === 2 ? 'Allowed 2 active sessions (PC + Mobile)!' : 'Enforced strict 1 session only.');
+      if (onUpdateUser && data.user) {
+        onUpdateUser(data.user);
+      }
+      setTimeout(() => setSessionSuccess(''), 3500);
+    } catch (err) {
+      alert(err.message || 'Error updating session settings');
+    } finally {
+      setSessionSaving(false);
+    }
+  };
+
   const handleSaveVpa = async () => {
     setVpaSaving(true);
     setVpaSuccess('');
@@ -107,6 +145,7 @@ export default function UserProfileModal({
       if (onUpdateUser && data.user) {
         onUpdateUser(data.user);
       }
+      setTimeout(() => setVpaSuccess(''), 4000);
     } catch (err) {
       setVpaError(err.message || 'Error saving UPI ID');
     } finally {
@@ -719,6 +758,113 @@ export default function UserProfileModal({
                         <div style={{ fontSize: '11.5px', color: '#10B981' }}>✓ {vpaSuccess}</div>
                       )}
                     </div>
+                  </div>
+
+                  {/* Multi-Device Active Sessions Control (1 vs 2 Sessions) */}
+                  <div
+                    style={{
+                      padding: '14px 16px',
+                      borderRadius: '16px',
+                      background: cardItemBg,
+                      border: cardItemBorder,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div
+                          style={{
+                            padding: '10px',
+                            borderRadius: '12px',
+                            background: maxSessions === 2 ? 'rgba(56, 189, 248, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                            color: maxSessions === 2 ? '#38BDF8' : '#F59E0B'
+                          }}
+                        >
+                          <Smartphone size={20} />
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <div style={{ fontWeight: '800', fontSize: '13.5px', color: textHeading }}>
+                              Concurrent Active Sessions
+                            </div>
+                            <span
+                              style={{
+                                fontSize: '10px',
+                                fontWeight: '800',
+                                padding: '2px 8px',
+                                borderRadius: '12px',
+                                background: maxSessions === 2 ? 'rgba(56, 189, 248, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                color: maxSessions === 2 ? '#38BDF8' : '#F59E0B'
+                              }}
+                            >
+                              {maxSessions === 2 ? '2 Sessions (PC + Mobile)' : '1 Single Session'}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '11.5px', color: textSub, marginTop: '2px' }}>
+                            {maxSessions === 2 
+                              ? 'Stay logged in on PC browser and mobile phone simultaneously without kicking each other out.'
+                              : 'Strict banking mode: logging in on another device terminates previous sessions.'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 1 vs 2 Toggle Segmented Button */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          background: isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.06)',
+                          padding: '3px',
+                          borderRadius: '12px',
+                          gap: '2px',
+                          flexShrink: 0
+                        }}
+                      >
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          disabled={sessionSaving}
+                          onClick={() => handleToggleMaxSessions(1)}
+                          style={{
+                            padding: '5px 10px',
+                            fontSize: '11px',
+                            fontWeight: '800',
+                            borderRadius: '9px',
+                            background: maxSessions === 1 ? (isLight ? '#FFFFFF' : '#0F172A') : 'transparent',
+                            color: maxSessions === 1 ? 'var(--primary)' : textSub,
+                            border: maxSessions === 1 ? '1px solid var(--border-color)' : 'none',
+                            boxShadow: maxSessions === 1 ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                          }}
+                        >
+                          1 Session
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          disabled={sessionSaving}
+                          onClick={() => handleToggleMaxSessions(2)}
+                          style={{
+                            padding: '5px 10px',
+                            fontSize: '11px',
+                            fontWeight: '800',
+                            borderRadius: '9px',
+                            background: maxSessions === 2 ? (isLight ? '#FFFFFF' : '#0F172A') : 'transparent',
+                            color: maxSessions === 2 ? '#38BDF8' : textSub,
+                            border: maxSessions === 2 ? '1px solid var(--border-color)' : 'none',
+                            boxShadow: maxSessions === 2 ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                          }}
+                        >
+                          2 Sessions
+                        </button>
+                      </div>
+                    </div>
+
+                    {sessionSuccess && (
+                      <div style={{ fontSize: '11px', color: '#10B981', fontWeight: '700' }}>
+                        ✓ {sessionSuccess}
+                      </div>
+                    )}
                   </div>
                 </div>
 

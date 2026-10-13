@@ -868,7 +868,7 @@ export default function InvestmentsTab({
 
           {/* Table Container */}
           <div className="card card-table" style={{ padding: '0', borderRadius: '20px', overflow: 'hidden', border: '1px solid var(--border-color)', marginBottom: '24px' }}>
-            <div className="table-container">
+            <div className="table-container desktop-table-view">
               {categoryFilter === 'fd' ? (
                 /* 🏦 Dedicated Fixed Deposit Table */
                 <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -1161,6 +1161,146 @@ export default function InvestmentsTab({
                     )}
                   </tbody>
                 </table>
+              )}
+            </div>
+
+            {/* Mobile Cards View (Optimized for small screens) */}
+            <div className="mobile-cards-view" style={{ padding: '12px' }}>
+              {filteredInvestments.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)', fontSize: '13px' }}>
+                  No investments found matching this filter.
+                </div>
+              ) : (
+                filteredInvestments.map((item) => {
+                  const isFd = categoryFilter === 'fd' || item.type === 'fd';
+                  const principal = Number(item.principal || item.buyPrice || 0);
+                  const curVal = Number(item.currentValuation || principal);
+                  const accrued = Number(item.unrealizedPnL || (curVal - principal));
+                  const matAmt = Number(item.maturityAmount || curVal);
+                  const rate = Number(item.interestRate || item.rate || 7.0);
+                  const daysLeft = item.daysToMaturity !== undefined ? Number(item.daysToMaturity) : null;
+                  const isMatured = daysLeft !== null && daysLeft <= 0;
+                  const isNear = daysLeft !== null && daysLeft > 0 && daysLeft <= 30;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="card"
+                      onClick={() => isFd ? setSelectedFdForDetail(item) : setSelectedStockForDetail(item)}
+                      style={{
+                        padding: '14px',
+                        marginBottom: '10px',
+                        cursor: 'pointer',
+                        borderRadius: '16px'
+                      }}
+                    >
+                      {/* Top Row: Title, Institution & Actions */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                        <div style={{ minWidth: 0, flex: 1, paddingRight: '8px' }}>
+                          <div style={{ fontWeight: '800', fontSize: '14px', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {isFd && <ShieldCheck size={16} style={{ color: '#10B981', flexShrink: 0 }} />}
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {item.name || item.schemeName || item.symbol || 'Fixed Deposit'}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            {item.institutionName || item.accountHolder || (item.symbol ? item.name : 'Scheduled Bank')}
+                            {item.maturityDate && ` • Mat: ${item.maturityDate}`}
+                          </div>
+                        </div>
+
+                        {/* Status Badge */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                          {isFd && (
+                            isMatured ? (
+                              <span style={{ padding: '2px 7px', borderRadius: '6px', fontSize: '10px', fontWeight: '800', background: 'rgba(239, 68, 68, 0.15)', color: '#EF4444' }}>
+                                Matured
+                              </span>
+                            ) : isNear ? (
+                              <span style={{ padding: '2px 7px', borderRadius: '6px', fontSize: '10px', fontWeight: '800', background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B' }}>
+                                {daysLeft}d Left
+                              </span>
+                            ) : (
+                              <span style={{ padding: '2px 7px', borderRadius: '6px', fontSize: '10px', fontWeight: '800', background: 'rgba(16, 185, 129, 0.15)', color: '#10B981' }}>
+                                Active
+                              </span>
+                            )
+                          )}
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            style={{ padding: '4px' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenEditInvestment(item);
+                            }}
+                          >
+                            <Edit3 size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            style={{ padding: '4px', color: '#F87171' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteTarget(item);
+                            }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Financial Key Figures Row */}
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: '1fr 1fr',
+                          gap: '8px',
+                          background: 'rgba(255, 255, 255, 0.03)',
+                          padding: '10px 12px',
+                          borderRadius: '12px',
+                          border: '1px solid var(--border-glass)'
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
+                            {isFd ? 'Principal Amount' : 'Invested Value'}
+                          </div>
+                          <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', marginTop: '2px' }}>
+                            {formatInr(principal)}
+                          </div>
+                        </div>
+
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
+                            {isFd ? 'Maturity Amount' : 'Current Value'}
+                          </div>
+                          <div style={{ fontSize: '14px', fontWeight: '900', color: '#10B981', marginTop: '2px' }}>
+                            {formatInr(isFd ? matAmt : curVal)}
+                          </div>
+                        </div>
+
+                        {isFd ? (
+                          <>
+                            <div style={{ marginTop: '2px' }}>
+                              <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Interest Rate</div>
+                              <div style={{ fontSize: '12px', fontWeight: '800', color: '#38BDF8' }}>
+                                {rate.toFixed(2)}% ({item.compoundingFrequency || 'Quarterly'})
+                              </div>
+                            </div>
+                            <div style={{ textAlign: 'right', marginTop: '2px' }}>
+                              <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Accrued Return</div>
+                              <div style={{ fontSize: '12px', fontWeight: '800', color: '#10B981' }}>
+                                +{formatInr(accrued)}
+                              </div>
+                            </div>
+                          </>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>

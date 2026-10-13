@@ -137,8 +137,8 @@ const authenticateToken = (req, res, next) => {
     rawToken = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : authHeader;
   }
 
-  const activeSessionId = dbEngine.getUserActiveSession(userId);
-  if (activeSessionId) {
+  const activeSessions = dbEngine.getUserActiveSessions(userId);
+  if (activeSessions.length > 0) {
     let requestSessionId = null;
     let isExpired = false;
     if (rawToken) {
@@ -161,7 +161,7 @@ const authenticateToken = (req, res, next) => {
       });
     }
 
-    if (requestSessionId && requestSessionId !== activeSessionId) {
+    if (requestSessionId && !dbEngine.isUserSessionValid(userId, requestSessionId)) {
       return res.status(401).json({
         code: 'SESSION_TERMINATED',
         error: 'Another login was detected on a different device or browser.'
@@ -323,12 +323,13 @@ app.post('/api/auth/login', async (req, res) => {
       });
     }
 
-    // Check Active Session for Multi-Device Session Detection (HDFC Pattern)
-    const existingSessionId = dbEngine.getUserActiveSession(user.id);
-    if (existingSessionId && !forceLogin) {
+    // Check Active Session for Multi-Device Session Detection
+    const existingSessions = dbEngine.getUserActiveSessions(user.id);
+    const maxSessions = user.maxActiveSessions || 2;
+    if (existingSessions.length >= maxSessions && !forceLogin) {
       return res.json({
         activeSessionExists: true,
-        message: "Looks like you're already logged in with another device. Please close the other session to continue here."
+        message: `You have reached the maximum allowed concurrent sessions (${maxSessions}). Click Continue to close the oldest session and sign in here.`
       });
     }
 
@@ -429,9 +430,9 @@ app.post('/api/auth/refresh', async (req, res) => {
       });
     }
 
-    // Check active session continuity for strict single-device policy
-    const currentActiveSession = dbEngine.getUserActiveSession(user.id);
-    if (currentActiveSession && rotated.sessionId && rotated.sessionId !== currentActiveSession) {
+    // Check active session continuity for allowed sessions
+    const activeSessions = dbEngine.getUserActiveSessions(user.id);
+    if (activeSessions.length > 0 && rotated.sessionId && !dbEngine.isUserSessionValid(user.id, rotated.sessionId)) {
       return res.status(401).json({
         code: 'SESSION_TERMINATED',
         error: 'Another login was detected on a different device or browser.'
@@ -439,7 +440,7 @@ app.post('/api/auth/refresh', async (req, res) => {
     }
 
     const newAccessToken = jwt.sign(
-      { userId: user.id, email: user.email, sessionId: rotated.sessionId || currentActiveSession },
+      { userId: user.id, email: user.email, sessionId: rotated.sessionId || (activeSessions[0] || null) },
       JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -742,10 +743,12 @@ app.post('/api/user/vpa', authenticateToken, (req, res) => {
   try {
     const userId = req.userId;
     const { vpa } = req.body;
-    if (vpa && typeof vpa === 'string') {
-      const trimmed = vpa.trim().toLowerCase();
-      if (!trimmed.includes('@')) {
-        return res.status(400).json({ error: 'Invalid UPI VPA format. Must contain @' });
+    if (vpa !== undefined && vpa !== null && String(vpa).trim() !== '') {
+      const trimmed = String(vpa).trim().toLowerCase();
+      // Standard NPCI UPI VPA format: alphanumeric, periods, dashes, underscores followed by @ and bank handle
+      const vpaRegex = /^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z0-9.\-_]{2,64}$/;
+      if (!trimmed.includes('@') || !vpaRegex.test(trimmed)) {
+        return res.status(400).json({ error: 'Please enter a valid UPI VPA format (e.g. name@bank, username-1@okhdfcbank).' });
       }
       dbEngine.setDefaultVpa(userId, trimmed);
     } else {
@@ -755,7 +758,22 @@ app.post('/api/user/vpa', authenticateToken, (req, res) => {
     res.json({ success: true, user: updatedUser });
   } catch (err) {
     console.error('POST /api/user/vpa error:', err);
-    res.status(500).json({ error: 'Failed to update UPI VPA' });
+    res.status(500).json({ error: 'Failed to update UPI VPA: ' + (err.message || 'Internal error') });
+  }
+});
+
+// POST /api/user/session-settings - Toggle allowed active sessions (1 vs 2)
+app.post('/api/user/session-settings', authenticateToken, (req, res) => {
+  try {
+    const userId = req.userId;
+    const { maxActiveSessions } = req.body;
+    const sessionsLimit = maxActiveSessions === 1 ? 1 : 2;
+    dbEngine.setUserMaxActiveSessions(userId, sessionsLimit);
+    const updatedUser = dbEngine.getUserById(userId);
+    res.json({ success: true, user: updatedUser, maxActiveSessions: sessionsLimit });
+  } catch (err) {
+    console.error('POST /api/user/session-settings error:', err);
+    res.status(500).json({ error: 'Failed to update session settings' });
   }
 });
 
@@ -1752,12 +1770,13 @@ app.post('/api/auth/mpin/verify', async (req, res) => {
     // Reset failed attempts on success
     dbUser.failedMpinAttempts = 0;
 
-    // Check Active Session for Multi-Device Session Detection (HDFC Pattern)
-    const existingSessionId = dbEngine.getUserActiveSession(user.id);
-    if (existingSessionId && !forceLogin) {
+    // Check Active Session for Multi-Device Session Detection
+    const existingSessions = dbEngine.getUserActiveSessions(user.id);
+    const maxSessions = user.maxActiveSessions || 2;
+    if (existingSessions.length >= maxSessions && !forceLogin) {
       return res.json({
         activeSessionExists: true,
-        message: "Looks like you're already logged in with another device. Please close the other session to continue here."
+        message: `You have reached the maximum allowed concurrent sessions (${maxSessions}). Click Continue to close the oldest session and sign in here.`
       });
     }
 
@@ -1964,12 +1983,13 @@ app.post('/api/auth/webauthn/verify', async (req, res) => {
       return res.status(401).json({ error: 'Biometric verification failed' });
     }
 
-    // Check Active Session for Multi-Device Session Detection (HDFC Pattern)
-    const existingSessionId = dbEngine.getUserActiveSession(user.id);
-    if (existingSessionId && !forceLogin) {
+    // Check Active Session for Multi-Device Session Detection
+    const existingSessions = dbEngine.getUserActiveSessions(user.id);
+    const maxSessions = user.maxActiveSessions || 2;
+    if (existingSessions.length >= maxSessions && !forceLogin) {
       return res.json({
         activeSessionExists: true,
-        message: "Looks like you're already logged in with another device. Please close the other session to continue here."
+        message: `You have reached the maximum allowed concurrent sessions (${maxSessions}). Click Continue to close the oldest session and sign in here.`
       });
     }
 
