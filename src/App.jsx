@@ -1472,6 +1472,8 @@ export default function App() {
         transactions={transactions}
         onSaveTransaction={handleSaveEntry}
         isPrivacyMode={isPrivacyMode}
+        token={token}
+        user={user}
       />
 
       <AccountAggregatorModal

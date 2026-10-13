@@ -13,7 +13,12 @@ import {
   Lock,
   ArrowRight,
   RefreshCw,
-  Info
+  Info,
+  Mail,
+  Loader2,
+  ChevronRight,
+  Sparkles,
+  Smartphone
 } from 'lucide-react';
 import jsQR from 'jsqr';
 
@@ -24,12 +29,17 @@ export default function SmartPayModal({
   categories = [],
   transactions = [],
   onSaveTransaction,
-  isPrivacyMode = false
+  isPrivacyMode = false,
+  token,
+  user
 }) {
   if (!isOpen) return null;
 
-  // Tabs: 'scan' | 'manual'
-  const [activeTab, setActiveTab] = useState('scan');
+  // Active Flow Step: 'input' | 'waiting' | 'success'
+  const [step, setStep] = useState('input');
+
+  // Input Tabs: 'manual' | 'scan'
+  const [activeTab, setActiveTab] = useState('manual');
 
   // Payment Form State
   const [vpa, setVpa] = useState('');
@@ -38,6 +48,13 @@ export default function SmartPayModal({
   const [selectedCategory, setSelectedCategory] = useState('');
   const [notes, setNotes] = useState('');
 
+  // Waiting / In-Progress State
+  const [activeAppName, setActiveAppName] = useState('');
+  const [refNumber, setRefNumber] = useState('');
+  const [waitingElapsedSeconds, setWaitingElapsedSeconds] = useState(0);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [emailStatus, setEmailStatus] = useState(''); // 'sending' | 'sent' | 'failed' | ''
+
   // Scanner States
   const [isScanningCamera, setIsScanningCamera] = useState(false);
   const [cameraError, setCameraError] = useState('');
@@ -45,9 +62,10 @@ export default function SmartPayModal({
   const canvasRef = useRef(null);
   const animFrameRef = useRef(null);
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
 
-  // Payment Success View State
-  const [paymentSuccessData, setPaymentSuccessData] = useState(null);
+  // Success Summary State
+  const [completedPayment, setCompletedPayment] = useState(null);
 
   // Initialize Category
   useEffect(() => {
@@ -57,12 +75,26 @@ export default function SmartPayModal({
     }
   }, [categories, selectedCategory]);
 
-  // Clean camera stream when tab changes or modal closes
+  // Clean camera stream on unmount
   useEffect(() => {
     return () => {
       stopCamera();
     };
   }, []);
+
+  // Timer during 'waiting' step
+  useEffect(() => {
+    let interval = null;
+    if (step === 'waiting') {
+      setWaitingElapsedSeconds(0);
+      interval = setInterval(() => {
+        setWaitingElapsedSeconds(prev => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [step]);
 
   const stopCamera = () => {
     if (videoRef.current && videoRef.current.srcObject) {
@@ -83,25 +115,33 @@ export default function SmartPayModal({
     setIsScanningCamera(true);
 
     if (!navigator?.mediaDevices?.getUserMedia) {
-      setCameraError('Camera API is not supported in this browser or requires HTTPS. Use the Upload QR button or enter UPI ID manually.');
+      setCameraError('Direct live stream is not supported in this browser environment. Use the "Take Photo with Camera" or "Upload QR" button below.');
       setIsScanningCamera(false);
       return;
     }
 
     try {
-      // First attempt environment (rear) camera
       let stream;
+      // 1. Try rear environment camera first
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' } },
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } },
           audio: false
         });
-      } catch (errEnvironment) {
-        // Fallback to any available video camera
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: false
-        });
+      } catch (errEnv) {
+        // 2. Fallback to basic environment camera
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' },
+            audio: false
+          });
+        } catch (errBasicEnv) {
+          // 3. Fallback to any camera
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false
+          });
+        }
       }
 
       if (videoRef.current) {
@@ -111,14 +151,14 @@ export default function SmartPayModal({
         scanVideoFrame();
       }
     } catch (err) {
-      console.error('Camera access error:', err);
-      let errMsg = 'Unable to access camera.';
+      console.error('Camera stream error:', err);
+      let errMsg = 'Unable to launch camera stream directly.';
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        errMsg = 'Camera permission was denied. Tap browser settings (lock icon / address bar) → Site permissions → Allow Camera, or upload a QR screenshot.';
+        errMsg = 'Camera permission was denied. Tap browser address bar / settings → Allow Camera, or use the "Take Photo with Camera" button below.';
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
         errMsg = 'No camera found on this device. Please upload a QR screenshot.';
       } else {
-        errMsg = 'Camera is in use by another app or permissions are blocked. Please upload a QR screenshot or type VPA.';
+        errMsg = 'Camera could not be accessed directly. Tap "Take Photo with Camera" button below for 100% reliable native capture.';
       }
       setCameraError(errMsg);
       setIsScanningCamera(false);
@@ -152,8 +192,7 @@ export default function SmartPayModal({
     animFrameRef.current = requestAnimationFrame(scanVideoFrame);
   };
 
-  const handleImageUpload = (e) => {
-    const file = e.target.files?.[0];
+  const handleImageFileScan = (file) => {
     if (!file) return;
 
     const reader = new FileReader();
@@ -171,7 +210,7 @@ export default function SmartPayModal({
         if (code && code.data) {
           parseUpiPayload(code.data);
         } else {
-          setCameraError('No valid UPI QR code detected in the selected image. Please try another screenshot.');
+          setCameraError('No valid UPI QR code detected in this photo. Please make sure the QR code is clearly visible and well-lit.');
         }
       };
       img.src = uploadEvent.target.result;
@@ -189,7 +228,7 @@ export default function SmartPayModal({
           setActiveTab('manual');
           return;
         }
-        setCameraError('Scanned QR is not an official UPI payment QR code.');
+        setCameraError('Scanned image is not an official UPI QR code.');
         return;
       }
 
@@ -235,10 +274,10 @@ export default function SmartPayModal({
     }
   };
 
-  // Real-Time Calculations
+  // Calculations
   const numericAmount = Math.max(0, parseFloat(rawAmount) || 0);
 
-  // Pre-Payment Budget Shield Evaluation
+  // Budget Shield
   const currentCategoryBudget = budgets.find(
     b => b.category?.toLowerCase() === selectedCategory?.toLowerCase()
   );
@@ -260,7 +299,6 @@ export default function SmartPayModal({
   const projectedSpent = spentThisMonth + numericAmount;
   const isBudgetConfigured = budgetLimit > 0;
   const remainingAfter = budgetLimit - projectedSpent;
-  const spentPctBefore = isBudgetConfigured ? (spentThisMonth / budgetLimit) * 100 : 0;
   const spentPctAfter = isBudgetConfigured ? (projectedSpent / budgetLimit) * 100 : 0;
 
   let shieldStatus = 'safe';
@@ -280,7 +318,7 @@ export default function SmartPayModal({
     shieldMessage = `Safe to spend. Uses ${spentPctAfter.toFixed(0)}% of your monthly ${selectedCategory} budget.`;
   }
 
-  // Generate Official UPI Intent URLs
+  // Generate UPI Intent URLs
   const encodedPn = encodeURIComponent(payeeName || 'Merchant');
   const encodedTn = encodeURIComponent(notes || 'Payment via Kuberis');
   const baseUpiParams = `pa=${encodeURIComponent(vpa)}&pn=${encodedPn}&am=${numericAmount.toFixed(2)}&cu=INR&tn=${encodedTn}`;
@@ -290,46 +328,94 @@ export default function SmartPayModal({
   const phonepeUrl = `phonepe://pay?${baseUpiParams}`;
   const paytmUrl = `paytmmp://pay?${baseUpiParams}`;
 
-  // Handle Launching Payment & Ledger Recording
-  const handleLaunchPayment = async (intentUrl, appName) => {
+  // STEP 1: Launch Native UPI Intent & switch to Waiting Screen
+  const handleLaunchPayment = (intentUrl, appName) => {
     if (!vpa || numericAmount <= 0) {
-      alert('Please enter a valid UPI ID and Amount.');
+      alert('Please enter a valid receiver UPI ID and Amount.');
       return;
     }
 
-    // Launch native UPI app via Android/iOS Intent
+    setActiveAppName(appName);
+
+    // Launch native UPI app on Android / iOS
     if (intentUrl.startsWith('upi://') || intentUrl.startsWith('tez://') || intentUrl.startsWith('phonepe://') || intentUrl.startsWith('paytmmp://')) {
       window.location.href = intentUrl;
     }
 
-    // Auto-record in personal ledger
+    // Switch view to in-progress waiting screen
+    setStep('waiting');
+  };
+
+  // STEP 2: Confirm Payment & Record in Ledger & Trigger Email Receipt
+  const handleConfirmPaymentCompletion = async () => {
+    setIsConfirming(true);
+    setEmailStatus('sending');
+
     const paymentTimestamp = new Date().toISOString();
     const newTx = {
       type: 'expense',
       category: selectedCategory || 'Shopping',
       amount: numericAmount,
       date: paymentTimestamp.split('T')[0],
-      description: `UPI to ${payeeName || vpa} (${appName || 'UPI'})`,
+      description: `UPI to ${payeeName || vpa} (${activeAppName || 'UPI'})`,
       paymentMethod: 'UPI',
-      notes: notes || `Smart-Pay to ${vpa}`,
+      notes: [
+        notes || `Smart-Pay to ${vpa}`,
+        refNumber ? `UTR/Ref: ${refNumber}` : null
+      ].filter(Boolean).join(' • '),
       tags: ['SmartPay', 'UPI']
     };
 
+    // 1. Record into personal ledger
     if (onSaveTransaction) {
       try {
         await onSaveTransaction(newTx);
       } catch (err) {
-        console.error('Error recording ledger entry:', err);
+        console.error('Error saving transaction:', err);
       }
     }
 
-    setPaymentSuccessData({
+    // 2. Dispatch Email Receipt to user
+    try {
+      const emailPayload = {
+        payeeName: payeeName || vpa,
+        vpa,
+        amount: numericAmount,
+        category: selectedCategory,
+        refNumber: refNumber || '',
+        date: paymentTimestamp,
+        appName: activeAppName || 'UPI'
+      };
+
+      const res = await fetch('/api/payments/send-receipt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : ''
+        },
+        body: JSON.stringify(emailPayload)
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setEmailStatus('sent');
+      } else {
+        setEmailStatus('failed');
+      }
+    } catch (err) {
+      console.warn('Could not send email receipt:', err);
+      setEmailStatus('failed');
+    }
+
+    setIsConfirming(false);
+    setCompletedPayment({
       vpa,
       payeeName: payeeName || vpa,
       amount: numericAmount,
-      appName: appName || 'UPI App',
-      category: selectedCategory
+      category: selectedCategory,
+      refNumber,
+      appName: activeAppName || 'UPI App'
     });
+    setStep('success');
   };
 
   const formatInr = (n) =>
@@ -341,36 +427,49 @@ export default function SmartPayModal({
           maximumFractionDigits: 2
         });
 
+  const resetAll = () => {
+    stopCamera();
+    setStep('input');
+    setRawAmount('');
+    setVpa('');
+    setPayeeName('');
+    setNotes('');
+    setRefNumber('');
+    setCompletedPayment(null);
+    setEmailStatus('');
+    onClose();
+  };
+
   return (
     <div className="modal-backdrop" style={{ zIndex: 10050, padding: '12px' }}>
       <div
         className="modal-content"
         style={{
-          maxWidth: '480px',
+          maxWidth: '460px',
           width: '100%',
           maxHeight: '92vh',
           overflowY: 'auto',
           padding: '20px 18px',
-          borderRadius: '20px',
+          borderRadius: '24px',
           background: 'var(--bg-card, #0B132B)',
-          border: '1px solid var(--border-glass)',
-          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.75), 0 0 25px rgba(16, 185, 129, 0.12)'
+          border: '1px solid var(--border-glass, rgba(255, 255, 255, 0.1))',
+          boxShadow: '0 25px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(16, 185, 129, 0.12)'
         }}
       >
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        {/* ===================== HEADER ===================== */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div
               style={{
                 width: '38px',
                 height: '38px',
-                borderRadius: '11px',
+                borderRadius: '12px',
                 background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
                 color: '#000',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 0 12px rgba(16, 185, 129, 0.45)',
+                boxShadow: '0 0 14px rgba(16, 185, 129, 0.45)',
                 flexShrink: 0
               }}
             >
@@ -392,11 +491,11 @@ export default function SmartPayModal({
                     border: '1px solid rgba(16, 185, 129, 0.3)'
                   }}
                 >
-                  SECURE UPI INTENT
+                  DIRECT UPI
                 </span>
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                Pre-Payment Budget Shield • Zero Bank Data Stored
+                Budget Shield • Zero Storage of Bank PIN or Passwords
               </div>
             </div>
           </div>
@@ -404,20 +503,17 @@ export default function SmartPayModal({
           <button
             type="button"
             className="btn btn-ghost"
-            onClick={() => {
-              stopCamera();
-              onClose();
-            }}
+            onClick={resetAll}
             style={{ padding: '6px', borderRadius: '50%', color: 'var(--text-muted)' }}
           >
             <X size={20} />
           </button>
         </div>
 
-        {/* Security & Regulatory Safety Assurance Pill */}
+        {/* Security Assurance Banner */}
         <div
           style={{
-            padding: '8px 12px',
+            padding: '7px 11px',
             borderRadius: '10px',
             background: 'rgba(16, 185, 129, 0.08)',
             border: '1px solid rgba(16, 185, 129, 0.25)',
@@ -431,43 +527,210 @@ export default function SmartPayModal({
         >
           <Lock size={13} style={{ color: '#10B981', flexShrink: 0 }} />
           <span>
-            <strong>100% Authorized & Secure:</strong> Handled entirely by your device’s UPI apps (CRED, GPay, PhonePe). Kuberis never touches your bank balance or MPIN.
+            <strong>100% Authorized & Safe:</strong> Payment executes directly in your installed bank app (CRED, GPay, PhonePe).
           </span>
         </div>
 
-        {/* Payment Confirmation Receipt */}
-        {paymentSuccessData ? (
-          <div style={{ textAlign: 'center', padding: '16px 4px', animation: 'fadeIn 0.3s ease' }}>
+        {/* ===================== VIEW 1: WAITING FOR COMPLETION ===================== */}
+        {step === 'waiting' && (
+          <div style={{ textAlign: 'center', padding: '10px 4px', animation: 'fadeIn 0.3s ease' }}>
+            {/* Radar / Shield Glowing Animation */}
+            <div style={{ position: 'relative', width: '110px', height: '110px', margin: '14px auto 20px auto' }}>
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  borderRadius: '50%',
+                  background: 'radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0) 70%)',
+                  animation: 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite'
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: '8px',
+                  borderRadius: '50%',
+                  border: '2px dashed rgba(16, 185, 129, 0.6)',
+                  animation: 'spin 12s linear infinite'
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: '16px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(6, 78, 59, 0.4) 100%)',
+                  border: '2px solid #10B981',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#10B981',
+                  boxShadow: '0 0 25px rgba(16, 185, 129, 0.5)'
+                }}
+              >
+                <Smartphone size={38} style={{ animation: 'bounce 2s infinite' }} />
+              </div>
+            </div>
+
+            <h3 style={{ fontSize: '19px', fontWeight: '900', color: 'var(--text-main)', margin: '0 0 6px 0' }}>
+              Payment in Progress in {activeAppName || 'UPI App'}
+            </h3>
+            <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', margin: '0 0 16px 0', lineHeight: '1.4' }}>
+              Complete the payment of <strong style={{ color: '#10B981' }}>{formatInr(numericAmount)}</strong> to{' '}
+              <strong style={{ color: 'var(--text-main)' }}>{payeeName || vpa}</strong> in your UPI app.
+            </p>
+
+            {/* Live Timer Pill */}
             <div
               style={{
-                width: '60px',
-                height: '60px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 12px',
+                borderRadius: '20px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid var(--border-glass)',
+                fontSize: '11.5px',
+                color: 'var(--text-muted)',
+                marginBottom: '18px'
+              }}
+            >
+              <RefreshCw size={12} style={{ animation: 'spin 4s linear infinite', color: '#10B981' }} />
+              <span>Waiting for confirmation: {waitingElapsedSeconds}s</span>
+            </div>
+
+            {/* Optional UTR / Reference Input */}
+            <div
+              style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                borderRadius: '14px',
+                border: '1px solid var(--border-glass)',
+                padding: '14px',
+                textAlign: 'left',
+                marginBottom: '16px'
+              }}
+            >
+              <label style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                UPI Reference No / UTR (Optional, 12 Digits)
+              </label>
+              <input
+                type="text"
+                className="input"
+                placeholder="e.g. 4287XXXXXXXX"
+                value={refNumber}
+                onChange={e => setRefNumber(e.target.value.replace(/[^0-9]/g, '').slice(0, 16))}
+                style={{ width: '100%', fontSize: '13px', padding: '9px 12px', borderRadius: '10px' }}
+              />
+              <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '5px' }}>
+                Found in your UPI app receipt or SMS after successful debit.
+              </div>
+            </div>
+
+            {/* Confirmation Actions */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleConfirmPaymentCompletion}
+                disabled={isConfirming}
+                style={{
+                  width: '100%',
+                  padding: '13px',
+                  borderRadius: '13px',
+                  fontWeight: '800',
+                  fontSize: '14px',
+                  gap: '8px',
+                  justifyContent: 'center',
+                  boxShadow: '0 4px 18px rgba(16, 185, 129, 0.4)'
+                }}
+              >
+                {isConfirming ? (
+                  <>
+                    <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
+                    Verifying & Syncing Ledger...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={18} />
+                    I've Completed the Payment
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setStep('input')}
+                disabled={isConfirming}
+                style={{ width: '100%', padding: '9px', fontSize: '12px', color: 'var(--text-muted)' }}
+              >
+                Back / Cancel Payment
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ===================== VIEW 2: FINAL CONFIRMATION & RECEIPT ===================== */}
+        {step === 'success' && completedPayment && (
+          <div style={{ textAlign: 'center', padding: '12px 4px', animation: 'fadeIn 0.3s ease' }}>
+            <div
+              style={{
+                width: '64px',
+                height: '64px',
                 borderRadius: '50%',
                 background: 'rgba(16, 185, 129, 0.15)',
                 color: '#10B981',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                margin: '0 auto 14px auto',
+                margin: '0 auto 12px auto',
                 border: '2px solid #10B981',
-                boxShadow: '0 0 20px rgba(16, 185, 129, 0.35)'
+                boxShadow: '0 0 25px rgba(16, 185, 129, 0.4)'
               }}
             >
-              <CheckCircle2 size={34} />
+              <CheckCircle2 size={36} />
             </div>
 
-            <h3 style={{ fontSize: '20px', fontWeight: '900', color: 'var(--text-main)', marginBottom: '4px' }}>
-              Handed off to {paymentSuccessData.appName}!
+            <h3 style={{ fontSize: '20px', fontWeight: '900', color: 'var(--text-main)', margin: '0 0 4px 0' }}>
+              Payment Recorded & Verified!
             </h3>
-            <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-              Transaction logged in your personal ledger automatically.
+            <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', margin: '0 0 16px 0' }}>
+              Deducted from budget and saved in your personal ledger.
             </p>
 
+            {/* Email Status Indicator */}
+            {user?.email && (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '5px 12px',
+                  borderRadius: '20px',
+                  background: emailStatus === 'sent' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.05)',
+                  border: emailStatus === 'sent' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid var(--border-glass)',
+                  fontSize: '11px',
+                  color: emailStatus === 'sent' ? '#10B981' : 'var(--text-muted)',
+                  marginBottom: '16px'
+                }}
+              >
+                <Mail size={12} />
+                <span>
+                  {emailStatus === 'sent'
+                    ? `Receipt emailed to ${user.email}`
+                    : emailStatus === 'sending'
+                    ? `Sending receipt to ${user.email}...`
+                    : `Receipt scheduled for ${user.email}`}
+                </span>
+              </div>
+            )}
+
+            {/* Summary Details Card */}
             <div
               style={{
                 background: 'rgba(255, 255, 255, 0.03)',
-                borderRadius: '14px',
-                border: '1px solid var(--border-color)',
+                borderRadius: '16px',
+                border: '1px solid var(--border-glass)',
                 padding: '16px',
                 textAlign: 'left',
                 marginBottom: '18px'
@@ -476,20 +739,34 @@ export default function SmartPayModal({
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Payee:</span>
                 <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-main)' }}>
-                  {paymentSuccessData.payeeName} ({paymentSuccessData.vpa})
+                  {completedPayment.payeeName}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>UPI ID:</span>
+                <span style={{ fontSize: '12.5px', fontFamily: 'monospace', color: '#38BDF8', fontWeight: '700' }}>
+                  {completedPayment.vpa}
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Category:</span>
                 <span style={{ fontSize: '12.5px', fontWeight: '700', color: 'var(--text-main)' }}>
-                  {paymentSuccessData.category}
+                  {completedPayment.category}
                 </span>
               </div>
-              <div style={{ height: '1px', background: 'var(--border-color)', margin: '8px 0' }} />
+              {completedPayment.refNumber && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>UTR / Ref:</span>
+                  <span style={{ fontSize: '12px', fontFamily: 'monospace', color: '#F59E0B', fontWeight: '700' }}>
+                    {completedPayment.refNumber}
+                  </span>
+                </div>
+              )}
+              <div style={{ height: '1px', background: 'var(--border-glass)', margin: '10px 0' }} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '12.5px', fontWeight: '700', color: 'var(--text-main)' }}>Amount Paid:</span>
-                <span style={{ fontSize: '18px', fontWeight: '900', color: 'var(--primary)' }}>
-                  {formatInr(paymentSuccessData.amount)}
+                <span style={{ fontSize: '12.5px', fontWeight: '700', color: 'var(--text-main)' }}>Amount Deducted:</span>
+                <span style={{ fontSize: '20px', fontWeight: '900', color: '#10B981' }}>
+                  {formatInr(completedPayment.amount)}
                 </span>
               </div>
             </div>
@@ -497,22 +774,18 @@ export default function SmartPayModal({
             <button
               type="button"
               className="btn btn-primary"
-              style={{ width: '100%', padding: '12px', borderRadius: '12px', fontWeight: '800', fontSize: '13.5px' }}
-              onClick={() => {
-                setPaymentSuccessData(null);
-                setRawAmount('');
-                setVpa('');
-                setPayeeName('');
-                setNotes('');
-                onClose();
-              }}
+              style={{ width: '100%', padding: '13px', borderRadius: '13px', fontWeight: '800', fontSize: '14px' }}
+              onClick={resetAll}
             >
-              Done & Return
+              Done & Return to Ledger
             </button>
           </div>
-        ) : (
+        )}
+
+        {/* ===================== VIEW 3: PAYMENT INPUT FORM ===================== */}
+        {step === 'input' && (
           <>
-            {/* 2 Clean Tabs (Scan QR & Pay VPA) */}
+            {/* 2 Clean Tabs (Enter UPI ID & Scan QR) */}
             <div
               style={{
                 display: 'grid',
@@ -520,21 +793,10 @@ export default function SmartPayModal({
                 gap: '6px',
                 background: 'rgba(255, 255, 255, 0.05)',
                 padding: '4px',
-                borderRadius: '12px',
+                borderRadius: '14px',
                 marginBottom: '16px'
               }}
             >
-              <button
-                type="button"
-                className={`btn btn-sm ${activeTab === 'scan' ? 'btn-primary' : 'btn-ghost'}`}
-                onClick={() => {
-                  setActiveTab('scan');
-                  startCamera();
-                }}
-                style={{ borderRadius: '9px', fontSize: '12px', fontWeight: '700', gap: '6px', padding: '8px' }}
-              >
-                <QrCode size={15} /> Scan QR Code
-              </button>
               <button
                 type="button"
                 className={`btn btn-sm ${activeTab === 'manual' ? 'btn-primary' : 'btn-ghost'}`}
@@ -542,9 +804,20 @@ export default function SmartPayModal({
                   stopCamera();
                   setActiveTab('manual');
                 }}
-                style={{ borderRadius: '9px', fontSize: '12px', fontWeight: '700', gap: '6px', padding: '8px' }}
+                style={{ borderRadius: '10px', fontSize: '12.5px', fontWeight: '700', gap: '6px', padding: '8px' }}
               >
                 <Zap size={15} /> Enter UPI ID
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${activeTab === 'scan' ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={() => {
+                  setActiveTab('scan');
+                  startCamera();
+                }}
+                style={{ borderRadius: '10px', fontSize: '12.5px', fontWeight: '700', gap: '6px', padding: '8px' }}
+              >
+                <QrCode size={15} /> Scan / Photo QR
               </button>
             </div>
 
@@ -555,7 +828,7 @@ export default function SmartPayModal({
                   style={{
                     position: 'relative',
                     width: '100%',
-                    height: '240px',
+                    height: '220px',
                     borderRadius: '16px',
                     overflow: 'hidden',
                     background: '#040914',
@@ -564,7 +837,7 @@ export default function SmartPayModal({
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    marginBottom: '14px'
+                    marginBottom: '12px'
                   }}
                 >
                   <video
@@ -582,8 +855,8 @@ export default function SmartPayModal({
                     <div
                       style={{
                         position: 'absolute',
-                        width: '170px',
-                        height: '170px',
+                        width: '160px',
+                        height: '160px',
                         border: '2px solid #10B981',
                         borderRadius: '14px',
                         boxShadow: '0 0 20px rgba(16, 185, 129, 0.4)',
@@ -597,20 +870,20 @@ export default function SmartPayModal({
 
                   {!isScanningCamera && (
                     <div style={{ textAlign: 'center', padding: '16px' }}>
-                      <Camera size={40} style={{ color: 'var(--text-muted)', marginBottom: '10px', opacity: 0.6 }} />
-                      <div style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-main)' }}>
-                        Point Camera at Any Merchant UPI QR
+                      <Camera size={36} style={{ color: 'var(--text-muted)', marginBottom: '8px', opacity: 0.6 }} />
+                      <div style={{ fontSize: '13.5px', fontWeight: '800', color: 'var(--text-main)' }}>
+                        Scan Any UPI Merchant QR
                       </div>
-                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                        Scan PhonePe, GPay, Paytm, BharatPe
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px' }}>
+                        PhonePe, Google Pay, Paytm, BharatPe
                       </div>
                       <button
                         type="button"
                         className="btn btn-primary btn-sm"
                         onClick={startCamera}
-                        style={{ marginTop: '14px', borderRadius: '10px', padding: '8px 16px', fontSize: '12.5px', fontWeight: '800' }}
+                        style={{ marginTop: '12px', borderRadius: '10px', padding: '8px 16px', fontSize: '12px', fontWeight: '800' }}
                       >
-                        <Camera size={14} /> Start Camera Scanner
+                        <Camera size={14} /> Start Live Camera
                       </button>
                     </div>
                   )}
@@ -619,45 +892,65 @@ export default function SmartPayModal({
                 {cameraError && (
                   <div
                     style={{
-                      padding: '12px 14px',
+                      padding: '10px 12px',
                       borderRadius: '12px',
                       background: 'rgba(239, 68, 68, 0.1)',
                       border: '1px solid rgba(239, 68, 68, 0.3)',
                       color: '#FCA5A5',
-                      fontSize: '12px',
-                      marginBottom: '14px',
+                      fontSize: '11.5px',
+                      marginBottom: '12px',
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '8px'
+                      gap: '4px'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#EF4444', fontWeight: '700' }}>
-                      <AlertTriangle size={16} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#EF4444', fontWeight: '800' }}>
+                      <AlertTriangle size={15} />
                       <span>Camera Access Tip</span>
                     </div>
-                    <div style={{ lineHeight: '1.45', color: 'var(--text-main)', fontSize: '11.5px' }}>
+                    <div style={{ lineHeight: '1.4', color: 'var(--text-main)', fontSize: '11px' }}>
                       {cameraError}
                     </div>
                   </div>
                 )}
 
-                {/* Upload Image Alternative */}
+                {/* 100% Mobile Compatible Native Capture Options */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {/* Native Mobile Shutter: Launches native phone camera app directly */}
+                  <input
+                    type="file"
+                    ref={cameraInputRef}
+                    accept="image/*"
+                    capture="environment"
+                    style={{ display: 'none' }}
+                    onChange={e => handleImageFileScan(e.target.files?.[0])}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => cameraInputRef.current?.click()}
+                    style={{ width: '100%', padding: '11px', fontSize: '13px', borderRadius: '12px', gap: '8px', justifyContent: 'center', fontWeight: '800' }}
+                  >
+                    <Camera size={16} /> Take Photo of QR (Phone Camera)
+                  </button>
+
+                  {/* Gallery Upload */}
                   <input
                     type="file"
                     ref={fileInputRef}
                     accept="image/*"
                     style={{ display: 'none' }}
-                    onChange={handleImageUpload}
+                    onChange={e => handleImageFileScan(e.target.files?.[0])}
                   />
                   <button
                     type="button"
                     className="btn btn-secondary"
                     onClick={() => fileInputRef.current?.click()}
-                    style={{ width: '100%', padding: '10px', fontSize: '12.5px', borderRadius: '11px', gap: '6px', justifyContent: 'center' }}
+                    style={{ width: '100%', padding: '10px', fontSize: '12px', borderRadius: '12px', gap: '8px', justifyContent: 'center' }}
                   >
-                    <Upload size={15} /> Upload QR Screenshot from Gallery
+                    <Upload size={14} /> Upload QR Screenshot from Gallery
                   </button>
+
                   <button
                     type="button"
                     className="btn btn-ghost"
@@ -665,7 +958,7 @@ export default function SmartPayModal({
                       stopCamera();
                       setActiveTab('manual');
                     }}
-                    style={{ width: '100%', fontSize: '12px', borderRadius: '11px', padding: '8px' }}
+                    style={{ width: '100%', fontSize: '12px', borderRadius: '10px', padding: '6px', color: 'var(--text-muted)' }}
                   >
                     Or Enter UPI ID Manually <ArrowRight size={13} />
                   </button>
@@ -676,29 +969,29 @@ export default function SmartPayModal({
             {/* TAB 2: Manual VPA & Payment Confirmation */}
             {activeTab === 'manual' && (
               <div>
-                {/* Responsive Inputs: Stack vertically on mobile */}
+                {/* Responsive Inputs */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '14px' }}>
                   <div>
-                    <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
-                      Recipient UPI ID / VPA *
+                    <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '5px', display: 'block' }}>
+                      Receiver UPI ID / VPA *
                     </label>
                     <input
                       type="text"
                       className="input"
-                      placeholder="merchant@upi or mobile@okhdfcbank"
+                      placeholder="e.g. mobile@upi, merchant@okhdfcbank"
                       value={vpa}
-                      onChange={e => setVpa(e.target.value)}
-                      style={{ width: '100%', borderRadius: '10px', fontSize: '13px', padding: '10px 12px' }}
+                      onChange={e => setVpa(e.target.value.trim())}
+                      style={{ width: '100%', borderRadius: '12px', fontSize: '13.5px', padding: '11px 12px' }}
                     />
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                     <div>
-                      <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
+                      <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '5px', display: 'block' }}>
                         Amount (₹) *
                       </label>
                       <div style={{ position: 'relative' }}>
-                        <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', fontWeight: '800', color: 'var(--text-main)', fontSize: '14px' }}>
+                        <span style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)', fontWeight: '800', color: 'var(--text-main)', fontSize: '15px' }}>
                           ₹
                         </span>
                         <input
@@ -708,20 +1001,20 @@ export default function SmartPayModal({
                           placeholder="0.00"
                           value={rawAmount}
                           onChange={e => setRawAmount(e.target.value)}
-                          style={{ width: '100%', paddingLeft: '24px', fontSize: '15px', fontWeight: '800', borderRadius: '10px' }}
+                          style={{ width: '100%', paddingLeft: '26px', fontSize: '15px', fontWeight: '800', borderRadius: '12px', padding: '11px 12px 11px 26px' }}
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
+                      <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '5px', display: 'block' }}>
                         Category
                       </label>
                       <select
                         className="input"
                         value={selectedCategory}
                         onChange={e => setSelectedCategory(e.target.value)}
-                        style={{ width: '100%', borderRadius: '10px', fontSize: '12.5px', padding: '9px 10px' }}
+                        style={{ width: '100%', borderRadius: '12px', fontSize: '13px', padding: '11px 10px' }}
                       >
                         {categories.map(c => (
                           <option key={c} value={c}>{c}</option>
@@ -731,16 +1024,16 @@ export default function SmartPayModal({
                   </div>
 
                   <div>
-                    <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
-                      Payee / Merchant Name (Optional)
+                    <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '5px', display: 'block' }}>
+                      Receiver Name / Merchant (Optional)
                     </label>
                     <input
                       type="text"
                       className="input"
-                      placeholder="e.g. Swiggy, Groceries, Friend"
+                      placeholder="e.g. Swiggy, Friend, Chai Point"
                       value={payeeName}
                       onChange={e => setPayeeName(e.target.value)}
-                      style={{ width: '100%', borderRadius: '10px', fontSize: '12.5px', padding: '9px 12px' }}
+                      style={{ width: '100%', borderRadius: '12px', fontSize: '13px', padding: '10px 12px' }}
                     />
                   </div>
                 </div>
@@ -748,8 +1041,8 @@ export default function SmartPayModal({
                 {/* 🛡️ PRE-PAYMENT BUDGET SHIELD BANNER */}
                 <div
                   style={{
-                    padding: '12px 14px',
-                    borderRadius: '12px',
+                    padding: '11px 13px',
+                    borderRadius: '13px',
                     marginBottom: '16px',
                     border: shieldStatus === 'safe'
                       ? '1px solid rgba(16, 185, 129, 0.4)'
@@ -773,11 +1066,11 @@ export default function SmartPayModal({
                     }}
                   >
                     {shieldStatus === 'safe' ? (
-                      <ShieldCheck size={20} />
+                      <ShieldCheck size={18} />
                     ) : shieldStatus === 'warning' ? (
-                      <AlertTriangle size={20} />
+                      <AlertTriangle size={18} />
                     ) : (
-                      <ShieldAlert size={20} />
+                      <ShieldAlert size={18} />
                     )}
                   </div>
                   <div style={{ flex: 1 }}>
@@ -794,18 +1087,18 @@ export default function SmartPayModal({
                         Budget Shield: {shieldStatus.toUpperCase()}
                       </span>
                       {isBudgetConfigured && (
-                        <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>
+                        <span style={{ fontSize: '10.5px', fontWeight: '700', color: 'var(--text-muted)' }}>
                           Budget: {formatInr(budgetLimit)}/mo
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-main)', marginTop: '2px' }}>
+                    <div style={{ fontSize: '11.5px', fontWeight: '600', color: 'var(--text-main)', marginTop: '2px' }}>
                       {shieldMessage}
                     </div>
 
                     {isBudgetConfigured && (
                       <div style={{ marginTop: '6px' }}>
-                        <div style={{ width: '100%', height: '5px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                        <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
                           <div
                             style={{
                               width: `${Math.min(100, spentPctAfter)}%`,
@@ -822,7 +1115,7 @@ export default function SmartPayModal({
 
                 {/* 🚀 1-TAP UNIVERSAL UPI APP LAUNCHERS */}
                 <div>
-                  <div style={{ fontSize: '11.5px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
                     Pay via Installed UPI App
                   </div>
 
@@ -832,7 +1125,7 @@ export default function SmartPayModal({
                       className="btn btn-secondary"
                       onClick={() => handleLaunchPayment(phonepeUrl, 'PhonePe')}
                       disabled={!vpa || numericAmount <= 0}
-                      style={{ padding: '10px 8px', fontSize: '12px', borderRadius: '11px', gap: '6px', fontWeight: '800', justifyContent: 'center' }}
+                      style={{ padding: '11px 8px', fontSize: '12px', borderRadius: '12px', gap: '6px', fontWeight: '800', justifyContent: 'center' }}
                     >
                       <Zap size={14} style={{ color: '#5F259F' }} /> PhonePe
                     </button>
@@ -842,7 +1135,7 @@ export default function SmartPayModal({
                       className="btn btn-secondary"
                       onClick={() => handleLaunchPayment(gpayUrl, 'Google Pay')}
                       disabled={!vpa || numericAmount <= 0}
-                      style={{ padding: '10px 8px', fontSize: '12px', borderRadius: '11px', gap: '6px', fontWeight: '800', justifyContent: 'center' }}
+                      style={{ padding: '11px 8px', fontSize: '12px', borderRadius: '12px', gap: '6px', fontWeight: '800', justifyContent: 'center' }}
                     >
                       <Zap size={14} style={{ color: '#4285F4' }} /> Google Pay
                     </button>
@@ -852,7 +1145,7 @@ export default function SmartPayModal({
                       className="btn btn-secondary"
                       onClick={() => handleLaunchPayment(paytmUrl, 'Paytm')}
                       disabled={!vpa || numericAmount <= 0}
-                      style={{ padding: '10px 8px', fontSize: '12px', borderRadius: '11px', gap: '6px', fontWeight: '800', justifyContent: 'center' }}
+                      style={{ padding: '11px 8px', fontSize: '12px', borderRadius: '12px', gap: '6px', fontWeight: '800', justifyContent: 'center' }}
                     >
                       <Zap size={14} style={{ color: '#00BAF2' }} /> Paytm
                     </button>
@@ -860,9 +1153,9 @@ export default function SmartPayModal({
                     <button
                       type="button"
                       className="btn btn-primary"
-                      onClick={() => handleLaunchPayment(standardUpiUrl, 'CRED / UPI')}
+                      onClick={() => handleLaunchPayment(standardUpiUrl, 'CRED / Any UPI App')}
                       disabled={!vpa || numericAmount <= 0}
-                      style={{ padding: '10px 8px', fontSize: '12px', borderRadius: '11px', gap: '6px', fontWeight: '800', justifyContent: 'center' }}
+                      style={{ padding: '11px 8px', fontSize: '12px', borderRadius: '12px', gap: '6px', fontWeight: '800', justifyContent: 'center' }}
                     >
                       <ExternalLink size={14} /> CRED / Any App
                     </button>
@@ -871,11 +1164,11 @@ export default function SmartPayModal({
                   <button
                     type="button"
                     className="btn btn-ghost"
-                    onClick={() => handleLaunchPayment('#manual', 'Manual UPI')}
+                    onClick={() => handleLaunchPayment('#manual', 'Direct UPI')}
                     disabled={!vpa || numericAmount <= 0}
-                    style={{ width: '100%', fontSize: '11px', color: 'var(--text-muted)', padding: '6px' }}
+                    style={{ width: '100%', fontSize: '11px', color: 'var(--text-muted)', padding: '7px' }}
                   >
-                    Already paid? Click to record in ledger only
+                    Paid via web/desktop? Click to verify & log in ledger
                   </button>
                 </div>
               </div>

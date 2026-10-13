@@ -1102,6 +1102,80 @@ async function sendLoginSecurityAlertEmail({ toEmail, name, deviceName, ipAddres
   return await sendEmailWithFallback({ to: toEmail, subject, text, html });
 }
 
+async function sendPaymentReceiptEmail({ toEmail, name, payeeName, vpa, amount, category, refNumber, date, appName }) {
+  const formattedAmount = '₹' + Number(amount || 0).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+  const paymentDate = date ? new Date(date).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+  const subject = `Payment Confirmed: ${formattedAmount} to ${payeeName || vpa} - Kuberis Smart-Pay`;
+  const text = `Hi ${name || 'Investor'},\n\nYour UPI payment of ${formattedAmount} to ${payeeName || vpa} (${vpa}) via ${appName || 'UPI'} has been completed and logged in your Kuberis Ledger.\n\nDetails:\n- Amount: ${formattedAmount}\n- Payee: ${payeeName || vpa}\n- VPA: ${vpa}\n- Category: ${category || 'General'}\n- Reference/UTR: ${refNumber || 'N/A'}\n- Time: ${paymentDate}\n\nThis entry has been securely synced with your personal ledger and Budget Shield.\n\nRegards,\nTeam Kuberis`;
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 540px; margin: 0 auto; padding: 28px 22px; border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 18px; background: #040D1A; color: #FFFFFF;">
+      <div style="text-align: center; margin-bottom: 22px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 16px;">
+        <h2 style="color: #10B981; margin: 0 0 4px 0; font-size: 24px; font-weight: 900; letter-spacing: -0.5px;">⚡ Kuberis Smart-Pay</h2>
+        <div style="font-size: 12px; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Official Payment Confirmation</div>
+      </div>
+
+      <div style="text-align: center; margin: 20px 0;">
+        <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(16, 185, 129, 0.15); border: 2px solid #10B981; color: #10B981; display: inline-flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 12px; line-height: 1;">
+          ✓
+        </div>
+        <div style="font-size: 13px; color: #94A3B8; font-weight: 500;">Payment Successful</div>
+        <div style="font-size: 30px; font-weight: 900; color: #10B981; margin-top: 4px; letter-spacing: -0.5px;">
+          ${formattedAmount}
+        </div>
+        <div style="font-size: 13.5px; color: #CBD5E1; margin-top: 4px;">
+          Paid to <strong style="color: #FFFFFF;">${payeeName || vpa}</strong>
+        </div>
+      </div>
+
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 22px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; overflow: hidden;">
+        <tbody>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <td style="padding: 10px 14px; font-size: 12.5px; color: #94A3B8; font-weight: 600; width: 38%;">Receiver UPI ID</td>
+            <td style="padding: 10px 14px; font-size: 13px; color: #38BDF8; font-family: monospace; font-weight: 700;">${vpa}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <td style="padding: 10px 14px; font-size: 12.5px; color: #94A3B8; font-weight: 600;">Category</td>
+            <td style="padding: 10px 14px; font-size: 13px; color: #FFFFFF; font-weight: 700;">${category || 'Expense'}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <td style="padding: 10px 14px; font-size: 12.5px; color: #94A3B8; font-weight: 600;">Payment Mode</td>
+            <td style="padding: 10px 14px; font-size: 13px; color: #FFFFFF;">${appName || 'UPI Intent'}</td>
+          </tr>
+          ${refNumber ? `
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <td style="padding: 10px 14px; font-size: 12.5px; color: #94A3B8; font-weight: 600;">UPI Ref / UTR</td>
+            <td style="padding: 10px 14px; font-size: 13px; color: #F59E0B; font-family: monospace; font-weight: 700;">${refNumber}</td>
+          </tr>` : ''}
+          <tr>
+            <td style="padding: 10px 14px; font-size: 12.5px; color: #94A3B8; font-weight: 600;">Timestamp</td>
+            <td style="padding: 10px 14px; font-size: 12.5px; color: #CBD5E1;">${paymentDate}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 12px 14px; margin-bottom: 20px; font-size: 12px; color: #94A3B8; line-height: 1.5;">
+        🛡️ <strong>Kuberis Safe-Pay Guard:</strong> This entry has been synced to your ledger and deducted against your monthly budget. Zero bank credentials or PINs are stored.
+      </div>
+
+      <div style="text-align: center; margin: 24px 0 10px 0;">
+        <a href="https://kuberis.onrender.com/dashboard" style="background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: #000000; padding: 12px 26px; text-decoration: none; border-radius: 10px; font-weight: 800; font-size: 14px; display: inline-block;">
+          View in Kuberis Ledger →
+        </a>
+      </div>
+
+      <div style="font-size: 11px; color: #64748B; text-align: center; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 14px; margin-top: 18px; line-height: 1.4;">
+        © 2026 Kuberis OS. Non-custodial financial operating system.
+      </div>
+    </div>
+  `;
+
+  return await sendEmailWithFallback({ to: toEmail, subject, text, html });
+}
+
 async function sendPasswordChangedAlertEmail({ toEmail, name, deviceName, ipAddress, location, resetUrl }) {
   const subject = '🔐 Password Changed Successfully - Kuberis Security Alert';
   const text = `Hi ${name || 'there'},\n\nThe password for your Kuberis account (${toEmail}) was successfully changed.\nDevice: ${deviceName || 'Unknown Device'}\nIP Address: ${ipAddress || '127.0.0.1'}\nLocation: ${location || 'India - IN'}\nTime: ${new Date().toLocaleString('en-IN')}\n\nIf you did not initiate this change, immediately reset your password: ${resetUrl}`;
@@ -2165,6 +2239,40 @@ app.all('/api/transactions/upi-webhook', (req, res) => {
   } catch (err) {
     console.error('ALL /api/transactions/upi-webhook error:', err);
     res.status(500).json({ error: err.message || 'Webhook processing failed' });
+  }
+});
+
+// POST /api/payments/send-receipt - Send confirmation receipt email upon verified payment
+app.post('/api/payments/send-receipt', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { payeeName, vpa, amount, category, refNumber, date, appName } = req.body;
+    
+    // Fetch user details for recipient email
+    const state = dbEngine.getState(userId);
+    const user = state.user || {};
+    const toEmail = user.email || req.userEmail;
+
+    if (!toEmail) {
+      return res.status(400).json({ error: 'No user email found to send receipt' });
+    }
+
+    const sent = await sendPaymentReceiptEmail({
+      toEmail,
+      name: user.name || user.username || 'Investor',
+      payeeName,
+      vpa,
+      amount,
+      category,
+      refNumber,
+      date,
+      appName
+    });
+
+    res.json({ success: sent, message: sent ? 'Receipt sent successfully' : 'Receipt queued or email skipped' });
+  } catch (err) {
+    console.error('POST /api/payments/send-receipt error:', err);
+    res.status(500).json({ error: 'Failed to send payment receipt' });
   }
 });
 
