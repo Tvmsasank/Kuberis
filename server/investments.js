@@ -472,8 +472,8 @@ export async function refreshHoldingsPrices(holdings = []) {
 
   for (const h of holdings) {
     if (h.type === 'fd') {
-      const principal = Number(h.principal || h.buyPrice || 0);
-      const rate = Number(h.interestRate || h.rate || 7.0);
+      const principal = Number(h.principal !== undefined ? h.principal : (h.buyPrice || 0));
+      const rate = Number(h.interestRate !== undefined ? h.interestRate : (h.rate !== undefined ? h.rate : 6.90));
       const tenureDays = Number(h.tenureDays || 365);
       const startDate = h.startDate || h.depositDate || (h.createdAt ? h.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]);
       const compoundingFrequency = h.compoundingFrequency || 'quarterly';
@@ -502,9 +502,13 @@ export async function refreshHoldingsPrices(holdings = []) {
         daysToMaturity: accruedData.daysToMaturity,
         maturityStatus: accruedData.maturityStatus,
         compoundingFrequency,
-        accountHolder: h.accountHolder || '',
+        accountHolder: h.accountHolder || h.holderName || '',
+        institutionId: h.institutionId || '',
         institutionName: h.institutionName || h.bankName || '',
         schemeName: h.schemeName || h.name || '',
+        tenureYears: h.tenureYears !== undefined ? h.tenureYears : Math.floor(tenureDays / 365),
+        tenureMonths: h.tenureMonths !== undefined ? h.tenureMonths : 0,
+        isSeniorCitizen: Boolean(h.isSeniorCitizen),
         currentValuation: accruedData.accruedValuation,
         currentPrice: accruedData.accruedValuation,
         buyPrice: principal,

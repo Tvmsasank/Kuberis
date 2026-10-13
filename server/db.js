@@ -162,6 +162,24 @@ if (process.env.DATABASE_URL) {
       ALTER TABLE public.wealthpulse_audit_logs ADD COLUMN IF NOT EXISTS device_name VARCHAR(255);
       ALTER TABLE public.wealthpulse_audit_logs ADD COLUMN IF NOT EXISTS location VARCHAR(255);
 
+      -- Auto-upgrade columns for Fixed Deposits and Structured Assets
+      ALTER TABLE public.wealthpulse_investments ADD COLUMN IF NOT EXISTS account_holder VARCHAR(255);
+      ALTER TABLE public.wealthpulse_investments ADD COLUMN IF NOT EXISTS institution_id VARCHAR(100);
+      ALTER TABLE public.wealthpulse_investments ADD COLUMN IF NOT EXISTS institution_name VARCHAR(255);
+      ALTER TABLE public.wealthpulse_investments ADD COLUMN IF NOT EXISTS scheme_name VARCHAR(255);
+      ALTER TABLE public.wealthpulse_investments ADD COLUMN IF NOT EXISTS principal NUMERIC(15, 2);
+      ALTER TABLE public.wealthpulse_investments ADD COLUMN IF NOT EXISTS interest_rate NUMERIC(6, 2);
+      ALTER TABLE public.wealthpulse_investments ADD COLUMN IF NOT EXISTS tenure_years INT;
+      ALTER TABLE public.wealthpulse_investments ADD COLUMN IF NOT EXISTS tenure_months INT;
+      ALTER TABLE public.wealthpulse_investments ADD COLUMN IF NOT EXISTS tenure_days INT;
+      ALTER TABLE public.wealthpulse_investments ADD COLUMN IF NOT EXISTS compounding_frequency VARCHAR(50);
+      ALTER TABLE public.wealthpulse_investments ADD COLUMN IF NOT EXISTS start_date DATE;
+      ALTER TABLE public.wealthpulse_investments ADD COLUMN IF NOT EXISTS maturity_date DATE;
+      ALTER TABLE public.wealthpulse_investments ADD COLUMN IF NOT EXISTS maturity_amount NUMERIC(15, 2);
+      ALTER TABLE public.wealthpulse_investments ADD COLUMN IF NOT EXISTS total_interest NUMERIC(15, 2);
+      ALTER TABLE public.wealthpulse_investments ADD COLUMN IF NOT EXISTS is_senior_citizen BOOLEAN DEFAULT FALSE;
+      ALTER TABLE public.wealthpulse_investments ADD COLUMN IF NOT EXISTS notes TEXT;
+
       CREATE OR REPLACE FUNCTION public.sp_upsert_wealthpulse_user(
         p_id VARCHAR,
         p_name VARCHAR,
@@ -1132,20 +1150,36 @@ export const dbEngine = {
   addInvestment(userId, item) {
     const db = loadDb();
     const newInv = {
-      id: `inv_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      ...item,
+      id: item.id || `inv_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
       userId,
-      name: item.name || 'New Holding',
+      name: item.name || item.schemeName || 'New Holding',
       symbol: item.symbol || '',
       type: item.type || 'stock',
       quantity: Number(item.quantity) || 1,
-      buyPrice: Number(item.buyPrice) || 0,
-      currentPrice: Number(item.currentPrice || item.buyPrice) || 0,
-      currentValuation: Number(item.currentValuation) || 0,
+      buyPrice: Number(item.buyPrice !== undefined ? item.buyPrice : (item.principal || 0)) || 0,
+      currentPrice: Number(item.currentPrice !== undefined ? item.currentPrice : (item.currentValuation || item.buyPrice || item.principal || 0)) || 0,
+      currentValuation: Number(item.currentValuation !== undefined ? item.currentValuation : (item.principal || 0)) || 0,
       unrealizedPnL: Number(item.unrealizedPnL) || 0,
       pnlPercentage: Number(item.pnlPercentage) || 0,
       notes: item.notes || '',
       priceStatus: item.priceStatus || 'ok',
-      createdAt: new Date().toISOString()
+      accountHolder: item.accountHolder || item.holderName || '',
+      institutionId: item.institutionId || '',
+      institutionName: item.institutionName || '',
+      schemeName: item.schemeName || item.name || '',
+      principal: Number(item.principal !== undefined ? item.principal : (item.buyPrice || 0)) || 0,
+      interestRate: item.interestRate !== undefined ? Number(item.interestRate) : (item.rate !== undefined ? Number(item.rate) : 6.90),
+      tenureYears: item.tenureYears !== undefined ? Number(item.tenureYears) : 1,
+      tenureMonths: item.tenureMonths !== undefined ? Number(item.tenureMonths) : 0,
+      tenureDays: item.tenureDays !== undefined ? Number(item.tenureDays) : 365,
+      isSeniorCitizen: Boolean(item.isSeniorCitizen),
+      compoundingFrequency: item.compoundingFrequency || 'quarterly',
+      startDate: item.startDate || new Date().toISOString().split('T')[0],
+      maturityDate: item.maturityDate || null,
+      maturityAmount: Number(item.maturityAmount) || 0,
+      totalInterest: Number(item.totalInterest) || 0,
+      createdAt: item.createdAt || new Date().toISOString()
     };
     if (!db.investments) db.investments = [];
     db.investments.unshift(newInv);
@@ -1153,11 +1187,19 @@ export const dbEngine = {
 
     if (pgPool) {
       pgPool.query(
-        `INSERT INTO public.wealthpulse_investments (id, user_id, name, symbol, type, quantity, buy_price, current_price, current_valuation, unrealized_pnl, pnl_percentage, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-         ON CONFLICT (id) DO UPDATE SET quantity = $6, buy_price = $7, current_price = $8, current_valuation = $9, unrealized_pnl = $10, pnl_percentage = $11`,
-        [newInv.id, newInv.userId, newInv.name, newInv.symbol, newInv.type, newInv.quantity, newInv.buyPrice, newInv.currentPrice, newInv.currentValuation, newInv.unrealizedPnL, newInv.pnlPercentage, newInv.createdAt]
-      ).catch(e => console.error('[Supabase PostgreSQL] Relational Inv sync error:', e.message));
+        `INSERT INTO public.wealthpulse_investments (id, user_id, name, symbol, type, quantity, buy_price, current_price, current_valuation, unrealized_pnl, pnl_percentage, account_holder, institution_id, institution_name, scheme_name, principal, interest_rate, tenure_years, tenure_months, tenure_days, compounding_frequency, start_date, maturity_date, maturity_amount, total_interest, is_senior_citizen, notes, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
+         ON CONFLICT (id) DO UPDATE SET quantity = $6, buy_price = $7, current_price = $8, current_valuation = $9, unrealized_pnl = $10, pnl_percentage = $11, account_holder = $12, interest_rate = $17, maturity_date = $23, maturity_amount = $24`,
+        [newInv.id, newInv.userId, newInv.name, newInv.symbol, newInv.type, newInv.quantity, newInv.buyPrice, newInv.currentPrice, newInv.currentValuation, newInv.unrealizedPnL, newInv.pnlPercentage, newInv.accountHolder, newInv.institutionId, newInv.institutionName, newInv.schemeName, newInv.principal, newInv.interestRate, newInv.tenureYears, newInv.tenureMonths, newInv.tenureDays, newInv.compoundingFrequency, newInv.startDate, newInv.maturityDate, newInv.maturityAmount, newInv.totalInterest, newInv.isSeniorCitizen, newInv.notes, newInv.createdAt]
+      ).catch(() => {
+        // Fallback for base schema
+        pgPool.query(
+          `INSERT INTO public.wealthpulse_investments (id, user_id, name, symbol, type, quantity, buy_price, current_price, current_valuation, unrealized_pnl, pnl_percentage, created_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+           ON CONFLICT (id) DO UPDATE SET quantity = $6, buy_price = $7, current_price = $8, current_valuation = $9`,
+          [newInv.id, newInv.userId, newInv.name, newInv.symbol, newInv.type, newInv.quantity, newInv.buyPrice, newInv.currentPrice, newInv.currentValuation, newInv.unrealizedPnL, newInv.pnlPercentage, newInv.createdAt]
+        ).catch(e => console.error('[Supabase PostgreSQL] Relational Inv sync error:', e.message));
+      });
     }
 
     return newInv;
@@ -1179,6 +1221,21 @@ export const dbEngine = {
       ...existing,
       ...updates,
       userId,
+      accountHolder: updates.accountHolder !== undefined ? updates.accountHolder : (existing.accountHolder || ''),
+      institutionId: updates.institutionId !== undefined ? updates.institutionId : (existing.institutionId || ''),
+      institutionName: updates.institutionName !== undefined ? updates.institutionName : (existing.institutionName || ''),
+      schemeName: updates.schemeName !== undefined ? updates.schemeName : (existing.schemeName || ''),
+      principal: updates.principal !== undefined ? Number(updates.principal) : (existing.principal !== undefined ? Number(existing.principal) : existing.buyPrice),
+      interestRate: updates.interestRate !== undefined ? Number(updates.interestRate) : (existing.interestRate !== undefined ? Number(existing.interestRate) : 6.90),
+      tenureYears: updates.tenureYears !== undefined ? Number(updates.tenureYears) : existing.tenureYears,
+      tenureMonths: updates.tenureMonths !== undefined ? Number(updates.tenureMonths) : existing.tenureMonths,
+      tenureDays: updates.tenureDays !== undefined ? Number(updates.tenureDays) : existing.tenureDays,
+      compoundingFrequency: updates.compoundingFrequency || existing.compoundingFrequency || 'quarterly',
+      startDate: updates.startDate || existing.startDate,
+      maturityDate: updates.maturityDate || existing.maturityDate,
+      maturityAmount: updates.maturityAmount !== undefined ? Number(updates.maturityAmount) : existing.maturityAmount,
+      totalInterest: updates.totalInterest !== undefined ? Number(updates.totalInterest) : existing.totalInterest,
+      isSeniorCitizen: updates.isSeniorCitizen !== undefined ? Boolean(updates.isSeniorCitizen) : existing.isSeniorCitizen,
       quantity: updates.quantity !== undefined ? Number(updates.quantity) : existing.quantity,
       buyPrice: updates.buyPrice !== undefined ? Number(updates.buyPrice) : existing.buyPrice,
       currentPrice: updates.currentPrice !== undefined ? Number(updates.currentPrice) : existing.currentPrice,
@@ -1190,10 +1247,17 @@ export const dbEngine = {
       const inv = db.investments[index];
       pgPool.query(
         `UPDATE public.wealthpulse_investments
-         SET name = $1, symbol = $2, type = $3, quantity = $4, buy_price = $5, current_price = $6, current_valuation = $7, unrealized_pnl = $8, pnl_percentage = $9
-         WHERE id = $10 AND user_id = $11`,
-        [inv.name, inv.symbol, inv.type, inv.quantity, inv.buyPrice, inv.currentPrice, inv.currentValuation, inv.unrealizedPnL, inv.pnlPercentage, inv.id, userId]
-      ).catch(e => console.error('[Supabase PostgreSQL] Relational Inv update error:', e.message));
+         SET name = $1, symbol = $2, type = $3, quantity = $4, buy_price = $5, current_price = $6, current_valuation = $7, unrealized_pnl = $8, pnl_percentage = $9, account_holder = $10, interest_rate = $11, maturity_date = $12, maturity_amount = $13
+         WHERE id = $14 AND user_id = $15`,
+        [inv.name, inv.symbol, inv.type, inv.quantity, inv.buyPrice, inv.currentPrice, inv.currentValuation, inv.unrealizedPnL, inv.pnlPercentage, inv.accountHolder || '', inv.interestRate || 6.9, inv.maturityDate, inv.maturityAmount, inv.id, userId]
+      ).catch(() => {
+        pgPool.query(
+          `UPDATE public.wealthpulse_investments
+           SET name = $1, symbol = $2, type = $3, quantity = $4, buy_price = $5, current_price = $6, current_valuation = $7, unrealized_pnl = $8, pnl_percentage = $9
+           WHERE id = $10 AND user_id = $11`,
+          [inv.name, inv.symbol, inv.type, inv.quantity, inv.buyPrice, inv.currentPrice, inv.currentValuation, inv.unrealizedPnL, inv.pnlPercentage, inv.id, userId]
+        ).catch(e => console.error('[Supabase PostgreSQL] Relational Inv update error:', e.message));
+      });
     }
 
     return db.investments[index];

@@ -199,16 +199,25 @@ export default function AddInvestmentModal({
         const instId = editInvestment.institutionId || 'post_office';
         setFdInstitution(instId);
         setFdScheme(editInvestment.schemeName || editInvestment.name || 'Fixed Deposit');
-        setAccountHolder(editInvestment.accountHolder || '');
+        setAccountHolder(editInvestment.accountHolder || editInvestment.holderName || '');
         setPrincipalAmount(String(editInvestment.principal || editInvestment.buyPrice || '100000'));
-        setTenureYears(String(editInvestment.tenureYears ?? 1));
-        setTenureMonths(String(editInvestment.tenureMonths ?? 0));
-        setTenureDays(String(editInvestment.tenureDays ? (editInvestment.tenureDays % 365) : 0));
-        setInterestRate(String(editInvestment.interestRate || '6.90'));
+        const totalDays = Number(editInvestment.tenureDays || 365);
+        const y = editInvestment.tenureYears !== undefined ? editInvestment.tenureYears : Math.floor(totalDays / 365);
+        const m = editInvestment.tenureMonths !== undefined ? editInvestment.tenureMonths : Math.floor((totalDays % 365) / 30);
+        const d = totalDays - (y * 365) - (m * 30);
+        setTenureYears(String(Math.max(0, y)));
+        setTenureMonths(String(Math.max(0, m)));
+        setTenureDays(String(Math.max(0, d)));
+        setInterestRate(String(editInvestment.interestRate !== undefined ? editInvestment.interestRate : (editInvestment.rate || '6.90')));
         setIsSeniorCitizen(Boolean(editInvestment.isSeniorCitizen));
         setCompoundingFrequency(editInvestment.compoundingFrequency || 'quarterly');
         setStartDate(editInvestment.startDate || new Date().toISOString().split('T')[0]);
         setIsRateManuallyEdited(true);
+        const inst = FD_INSTITUTIONS.find(i => i.id === instId);
+        const matchedOfficial = inst?.officialTenures?.find(t => t.totalDays === totalDays);
+        if (matchedOfficial) {
+          setSelectedTenureLabel(matchedOfficial.label);
+        }
       } else {
         setName(editInvestment.name || '');
         setSymbol(editInvestment.symbol || '');
@@ -276,7 +285,7 @@ export default function AddInvestmentModal({
       }
 
       const finalScheme = fdScheme.trim() || `${selectedBank.shortName} Fixed Deposit`;
-      const finalHolder = accountHolder.trim() || 'Primary Account Holder';
+      const finalHolder = accountHolder.trim() || 'Self';
 
       setSaving(true);
       try {

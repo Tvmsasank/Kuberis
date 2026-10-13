@@ -930,7 +930,7 @@ export default function InvestmentsTab({
                             <td style={{ fontSize: '12.5px', color: 'var(--text-main)', fontWeight: '600' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                 <User size={13} style={{ color: 'var(--text-muted)' }} />
-                                {item.accountHolder || 'Primary Holder'}
+                                {item.accountHolder || 'Self'}
                               </div>
                             </td>
 
@@ -1545,7 +1545,7 @@ export default function InvestmentsTab({
                       {selectedFdForDetail.name || selectedFdForDetail.schemeName}
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <User size={13} /> Account Holder: <strong style={{ color: 'var(--text-main)' }}>{selectedFdForDetail.accountHolder || 'Primary Account Holder'}</strong>
+                      <User size={13} /> Account Holder: <strong style={{ color: 'var(--text-main)' }}>{selectedFdForDetail.accountHolder || 'Self'}</strong>
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>

@@ -2359,13 +2359,78 @@ app.get('/api/fd-rates', (req, res) => {
   }
 });
 
+// Helper to compute personalized FD maturity reminders (1 week, 3 days, today)
+function getMaturityRemindersForUser(userId) {
+  if (!userId) return [];
+  try {
+    const investments = dbEngine.getInvestments(userId);
+    const now = new Date();
+    const reminders = [];
+    investments.filter(i => i.type === 'fd').forEach(fd => {
+      const matureDate = fd.maturityDate ? new Date(fd.maturityDate) : null;
+      if (!matureDate) return;
+      const diffMs = matureDate.getTime() - now.getTime();
+      const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      const scheme = fd.schemeName || fd.name || 'Fixed Deposit';
+      const principalStr = Number(fd.principal || fd.buyPrice || 0).toLocaleString('en-IN');
+      const payoutStr = Number(fd.maturityAmount || fd.currentValuation || 0).toLocaleString('en-IN');
+      const holderStr = fd.accountHolder ? ` for ${fd.accountHolder}` : '';
+
+      if (daysLeft <= 7 && daysLeft > 3) {
+        reminders.push({
+          id: `fd_mat_7d_${fd.id}`,
+          date: new Date().toISOString().split('T')[0],
+          category: 'FD Maturity Alert',
+          title: `Fixed Deposit Maturing in ${daysLeft} Days: ${scheme}`,
+          description: `Your ₹${principalStr} deposit${holderStr} at ${fd.institutionName || 'Bank/Post Office'} will mature on ${fd.maturityDate}. Projected payout: ₹${payoutStr}. Plan your reinvestment or payout instructions.`,
+          severity: 'warning',
+          daysLeft,
+          isNew: true,
+          isUserAlert: true
+        });
+      } else if (daysLeft <= 3 && daysLeft > 0) {
+        reminders.push({
+          id: `fd_mat_3d_${fd.id}`,
+          date: new Date().toISOString().split('T')[0],
+          category: 'Urgent Maturity Alert',
+          title: `🚨 Urgent: ${scheme} Matures in ${daysLeft} Days (${fd.maturityDate})`,
+          description: `Deposit ${scheme}${holderStr} with maturity proceeds of ₹${payoutStr} matures in ${daysLeft} day${daysLeft > 1 ? 's' : ''}. Ensure your bank account details are verified for auto-credit or renewal.`,
+          severity: 'critical',
+          daysLeft,
+          isNew: true,
+          isUserAlert: true
+        });
+      } else if (daysLeft <= 0) {
+        reminders.push({
+          id: `fd_mat_done_${fd.id}`,
+          date: new Date().toISOString().split('T')[0],
+          category: 'FD Matured',
+          title: `✅ Fixed Deposit Matured: ${scheme}`,
+          description: `Your deposit of ₹${principalStr}${holderStr} has reached full maturity on ${fd.maturityDate}. Total payout value: ₹${payoutStr} is ready.`,
+          severity: 'success',
+          daysLeft: 0,
+          isNew: true,
+          isUserAlert: true
+        });
+      }
+    });
+    return reminders;
+  } catch (e) {
+    console.error('Error generating FD maturity reminders:', e.message);
+    return [];
+  }
+}
+
 // GET /api/notifications
 app.get('/api/notifications', (req, res) => {
   try {
+    const userId = getUserIdFromReq(req);
+    const userMaturityNotifs = getMaturityRemindersForUser(userId);
+    const allNotifs = [...userMaturityNotifs, ...RATE_NOTIFICATIONS];
     res.json({
       success: true,
-      notifications: RATE_NOTIFICATIONS,
-      unreadCount: RATE_NOTIFICATIONS.filter(n => n.isNew).length
+      notifications: allNotifs,
+      unreadCount: allNotifs.filter(n => n.isNew).length
     });
   } catch (err) {
     console.error('GET /api/notifications error:', err);
