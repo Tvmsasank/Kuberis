@@ -1471,7 +1471,7 @@ export default function App() {
         categories={settings.categories || []}
         transactions={transactions}
         microWealthPot={settings?.microWealthPot || {}}
-        onSaveTransaction={handleSaveTransaction}
+        onSaveTransaction={handleSaveEntry}
         onSaveInvestment={handleSaveInvestment}
         onSavePreferences={savePreferences}
         isPrivacyMode={isPrivacyMode}
