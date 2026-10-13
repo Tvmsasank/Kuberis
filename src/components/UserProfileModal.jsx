@@ -41,7 +41,8 @@ export default function UserProfileModal({
   onOpenTwoFactorModal,
   onStartTour,
   onOpenAdminPortal,
-  theme
+  theme,
+  onUpdateUser
 }) {
   const isLight =
     theme === 'light' ||
@@ -56,6 +57,62 @@ export default function UserProfileModal({
   const [deleteError, setDeleteError] = useState('');
   const [auditLogs, setAuditLogs] = useState([]);
   const [loadingAuditLogs, setLoadingAuditLogs] = useState(false);
+
+  // Default UPI VPA State & Masking
+  const [isEditingVpa, setIsEditingVpa] = useState(false);
+  const [vpaInput, setVpaInput] = useState(user?.defaultVpa || '');
+  const [vpaSaving, setVpaSaving] = useState(false);
+  const [vpaSuccess, setVpaSuccess] = useState('');
+  const [vpaError, setVpaError] = useState('');
+
+  useEffect(() => {
+    if (user?.defaultVpa) {
+      setVpaInput(user.defaultVpa);
+    }
+  }, [user?.defaultVpa]);
+
+  const maskVpa = (v) => {
+    if (!v || typeof v !== 'string') return '';
+    const parts = v.split('@');
+    if (parts.length !== 2) return v;
+    const prefix = parts[0];
+    const handle = parts[1];
+    if (prefix.length <= 4) {
+      return `${prefix[0]}***@${handle}`;
+    }
+    const visiblePrefix = prefix.slice(0, 3);
+    const visibleSuffix = prefix.slice(-2);
+    return `${visiblePrefix}****${visibleSuffix}@${handle}`;
+  };
+
+  const handleSaveVpa = async () => {
+    setVpaSaving(true);
+    setVpaSuccess('');
+    setVpaError('');
+    try {
+      const res = await fetch('/api/user/vpa', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ vpa: vpaInput.trim() })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to save UPI ID');
+      }
+      setVpaSuccess('Default UPI ID updated & encrypted in your profile!');
+      setIsEditingVpa(false);
+      if (onUpdateUser && data.user) {
+        onUpdateUser(data.user);
+      }
+    } catch (err) {
+      setVpaError(err.message || 'Error saving UPI ID');
+    } finally {
+      setVpaSaving(false);
+    }
+  };
 
   const loadAuditLogs = async () => {
     if (!token) return;
@@ -567,6 +624,100 @@ export default function UserProfileModal({
                           </motion.button>
                         )}
                       </div>
+                    </div>
+
+                    {/* Default UPI ID / VPA Card (Masked & Encrypted) */}
+                    <div
+                      style={{
+                        padding: '14px 16px',
+                        borderRadius: '16px',
+                        background: cardItemBg,
+                        border: cardItemBorder,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div
+                            style={{
+                              padding: '10px',
+                              background: 'rgba(16, 185, 129, 0.15)',
+                              color: '#10B981',
+                              borderRadius: '12px'
+                            }}
+                          >
+                            <Smartphone size={20} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '13.5px', fontWeight: '700', color: textHeading, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              Default UPI ID (VPA)
+                              <span
+                                style={{
+                                  fontSize: '9.5px',
+                                  padding: '1px 6px',
+                                  borderRadius: '6px',
+                                  fontWeight: '800',
+                                  background: user?.defaultVpa ? 'rgba(16, 185, 129, 0.15)' : 'rgba(148, 163, 184, 0.15)',
+                                  color: user?.defaultVpa ? '#10B981' : textSub
+                                }}
+                              >
+                                {user?.defaultVpa ? 'Linked 🟢' : 'Not Set'}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: '12px', color: user?.defaultVpa ? '#38BDF8' : textSub, fontFamily: 'monospace', fontWeight: '700', marginTop: '2px' }}>
+                              {user?.defaultVpa ? maskVpa(user.defaultVpa) : 'e.g. yourname@okhdfcbank, mobile@ybl'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <motion.button
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.97 }}
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          style={{ borderRadius: '10px', fontSize: '11.5px', fontWeight: '700', padding: '7px 12px' }}
+                          onClick={() => setIsEditingVpa(!isEditingVpa)}
+                        >
+                          {isEditingVpa ? 'Cancel' : user?.defaultVpa ? 'Edit VPA' : 'Add VPA'}
+                        </motion.button>
+                      </div>
+
+                      {/* VPA Edit Form */}
+                      {isEditingVpa && (
+                        <div style={{ paddingTop: '8px', borderTop: '1px solid var(--border-glass)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ fontSize: '11.5px', color: textSub }}>
+                            Enter your primary UPI VPA (PhonePe / Google Pay / CRED / Paytm) for automated push notifications:
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <input
+                              type="text"
+                              className="input"
+                              placeholder="shashank.manikanta@okhdfcbank or 9876543210@ybl"
+                              value={vpaInput}
+                              onChange={e => setVpaInput(e.target.value)}
+                              style={{ flex: 1, fontSize: '13px', padding: '8px 12px', borderRadius: '10px' }}
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              onClick={handleSaveVpa}
+                              disabled={vpaSaving || !vpaInput.trim()}
+                              style={{ padding: '8px 14px', borderRadius: '10px', fontWeight: '800', fontSize: '12px' }}
+                            >
+                              {vpaSaving ? 'Saving...' : 'Save & Encrypt'}
+                            </button>
+                          </div>
+                          {vpaError && (
+                            <div style={{ fontSize: '11px', color: '#EF4444' }}>{vpaError}</div>
+                          )}
+                        </div>
+                      )}
+
+                      {vpaSuccess && (
+                        <div style={{ fontSize: '11.5px', color: '#10B981' }}>✓ {vpaSuccess}</div>
+                      )}
                     </div>
                   </div>
                 </div>

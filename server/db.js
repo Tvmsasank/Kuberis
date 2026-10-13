@@ -158,6 +158,7 @@ if (process.env.DATABASE_URL) {
       -- Schema upgrades for WebAuthn Biometrics and Device Security Tracking
       ALTER TABLE public.wealthpulse_users ADD COLUMN IF NOT EXISTS webauthn_credential_id TEXT;
       ALTER TABLE public.wealthpulse_users ADD COLUMN IF NOT EXISTS webauthn_public_key TEXT;
+      ALTER TABLE public.wealthpulse_users ADD COLUMN IF NOT EXISTS default_vpa TEXT;
       ALTER TABLE public.wealthpulse_audit_logs ADD COLUMN IF NOT EXISTS device_id VARCHAR(100);
       ALTER TABLE public.wealthpulse_audit_logs ADD COLUMN IF NOT EXISTS device_name VARCHAR(255);
       ALTER TABLE public.wealthpulse_audit_logs ADD COLUMN IF NOT EXISTS location VARCHAR(255);
@@ -579,8 +580,26 @@ export const dbEngine = {
       hasMpin: !!user.mpinHash,
       hasBiometrics: !!user.webauthnCredentialId,
       twoFactorEnabled: !!user.twoFactorEnabled,
-      activeSessionId: user.activeSessionId || null
+      activeSessionId: user.activeSessionId || null,
+      defaultVpa: user.defaultVpa || null
     };
+  },
+
+  setDefaultVpa(userId, vpa) {
+    const db = loadDb();
+    const user = db.users.find(u => u.id === userId);
+    if (!user) return false;
+    user.defaultVpa = vpa ? String(vpa).trim().toLowerCase() : null;
+    saveDb();
+    if (isPgAvailable && pgPool) {
+      pgPool.query(
+        'UPDATE public.wealthpulse_users SET default_vpa = $1 WHERE id = $2',
+        [user.defaultVpa, userId]
+      ).catch(err => {
+        console.error('[PostgreSQL] Error updating default_vpa:', err.message);
+      });
+    }
+    return true;
   },
 
   setUserActiveSession(userId, sessionId) {

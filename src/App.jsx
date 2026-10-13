@@ -1256,6 +1256,7 @@ export default function App() {
           setIsTourOpen(true);
         }}
         theme={theme}
+        onUpdateUser={updatedUser => setUser(updatedUser)}
       />
 
       {/* Change Password Modal for Authenticated User */}

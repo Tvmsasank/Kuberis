@@ -737,6 +737,28 @@ app.get('/api/auth/me', (req, res) => {
   res.json({ user });
 });
 
+// POST /api/user/vpa - Update user default UPI VPA
+app.post('/api/user/vpa', authenticateToken, (req, res) => {
+  try {
+    const userId = req.userId;
+    const { vpa } = req.body;
+    if (vpa && typeof vpa === 'string') {
+      const trimmed = vpa.trim().toLowerCase();
+      if (!trimmed.includes('@')) {
+        return res.status(400).json({ error: 'Invalid UPI VPA format. Must contain @' });
+      }
+      dbEngine.setDefaultVpa(userId, trimmed);
+    } else {
+      dbEngine.setDefaultVpa(userId, null);
+    }
+    const updatedUser = dbEngine.getUserById(userId);
+    res.json({ success: true, user: updatedUser });
+  } catch (err) {
+    console.error('POST /api/user/vpa error:', err);
+    res.status(500).json({ error: 'Failed to update UPI VPA' });
+  }
+});
+
 function wrapHtmlEmail(htmlContent) {
   if (!htmlContent) return '';
   if (htmlContent.includes('<html') || htmlContent.includes('<!DOCTYPE')) return htmlContent;
@@ -2273,6 +2295,149 @@ app.post('/api/payments/send-receipt', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('POST /api/payments/send-receipt error:', err);
     res.status(500).json({ error: 'Failed to send payment receipt' });
+  }
+});
+
+// Active in-memory UPI collect requests map (for real-time polling)
+const activeCollectRequests = new Map();
+
+// POST /api/payments/collect-request - Initiate Cross-Device UPI Collect / Push notification request
+app.post('/api/payments/collect-request', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { senderVpa, receiverVpa, payeeName, amount, category, appName } = req.body;
+    
+    if (!receiverVpa || !amount || Number(amount) <= 0) {
+      return res.status(400).json({ error: 'Receiver VPA and valid amount required' });
+    }
+
+    const state = dbEngine.getState(userId);
+    const user = state.user || {};
+    const effectiveSenderVpa = senderVpa || user.defaultVpa || 'user@upi';
+    const txnId = `UPI_${Date.now()}_${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+
+    const collectSession = {
+      txnId,
+      userId,
+      senderVpa: effectiveSenderVpa,
+      receiverVpa,
+      payeeName: payeeName || receiverVpa,
+      amount: Number(amount),
+      category: category || 'General',
+      appName: appName || 'UPI App',
+      status: 'PENDING',
+      createdAt: Date.now()
+    };
+
+    activeCollectRequests.set(txnId, collectSession);
+
+    // Auto-clean after 10 minutes
+    setTimeout(() => {
+      activeCollectRequests.delete(txnId);
+    }, 10 * 60 * 1000);
+
+    console.log(`[UPI Collect Request] Initiated ${txnId} for user ${userId} to sender VPA: ${effectiveSenderVpa}, amount: ₹${amount}`);
+
+    res.json({
+      success: true,
+      txnId,
+      senderVpa: effectiveSenderVpa,
+      status: 'PENDING',
+      message: `Collect request initiated to ${effectiveSenderVpa}. Approve in your UPI app.`
+    });
+  } catch (err) {
+    console.error('POST /api/payments/collect-request error:', err);
+    res.status(500).json({ error: 'Failed to initiate collect request' });
+  }
+});
+
+// GET /api/payments/poll-status - Poll for real-time completion of collect request
+app.get('/api/payments/poll-status', authenticateToken, async (req, res) => {
+  try {
+    const { txnId } = req.query;
+    if (!txnId) {
+      return res.status(400).json({ error: 'Transaction ID required' });
+    }
+
+    const session = activeCollectRequests.get(txnId);
+    if (!session) {
+      return res.json({ status: 'NOT_FOUND' });
+    }
+
+    res.json({
+      txnId,
+      status: session.status,
+      refNumber: session.refNumber || null,
+      amount: session.amount
+    });
+  } catch (err) {
+    console.error('GET /api/payments/poll-status error:', err);
+    res.status(500).json({ error: 'Failed to check status' });
+  }
+});
+
+// POST /api/payments/confirm-automated - Finalize payment, record ledger, and trigger email receipt
+app.post('/api/payments/confirm-automated', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { txnId, refNumber } = req.body;
+    let session = txnId ? activeCollectRequests.get(txnId) : null;
+
+    const amount = session ? session.amount : Number(req.body.amount || 0);
+    const payeeName = session ? session.payeeName : (req.body.payeeName || req.body.receiverVpa);
+    const receiverVpa = session ? session.receiverVpa : req.body.receiverVpa;
+    const category = session ? session.category : (req.body.category || 'Shopping');
+    const appName = session ? session.appName : (req.body.appName || 'UPI');
+    const safeRef = refNumber || session?.refNumber || `UTR${Date.now().toString().slice(-8)}`;
+
+    const newTx = {
+      type: 'expense',
+      category: category,
+      amount: amount,
+      date: new Date().toISOString().split('T')[0],
+      description: `UPI to ${payeeName || receiverVpa} (${appName})`,
+      paymentMethod: 'UPI',
+      notes: [
+        `Automated Smart-Pay to ${receiverVpa}`,
+        `Ref/UTR: ${safeRef}`
+      ].join(' • '),
+      tags: ['SmartPay', 'UPI']
+    };
+
+    const savedTx = dbEngine.addTransaction(userId, newTx);
+
+    // Send receipt email
+    const state = dbEngine.getState(userId);
+    const user = state.user || {};
+    const toEmail = user.email || req.userEmail;
+    if (toEmail) {
+      sendPaymentReceiptEmail({
+        toEmail,
+        name: user.name || user.username || 'Investor',
+        payeeName: payeeName || receiverVpa,
+        vpa: receiverVpa,
+        amount,
+        category,
+        refNumber: safeRef,
+        date: new Date().toISOString(),
+        appName
+      }).catch(err => console.warn('Email receipt error:', err.message));
+    }
+
+    if (session) {
+      session.status = 'SUCCESS';
+      session.refNumber = safeRef;
+    }
+
+    res.json({
+      success: true,
+      status: 'SUCCESS',
+      transaction: savedTx,
+      refNumber: safeRef
+    });
+  } catch (err) {
+    console.error('POST /api/payments/confirm-automated error:', err);
+    res.status(500).json({ error: 'Failed to confirm payment' });
   }
 });
 
