@@ -27,6 +27,7 @@ const MAIN_TABS = [
 ];
 
 const MORE_TABS = [
+  { id: 'transactions', label: 'All Transactions', icon: CreditCard },
   { id: 'calculators', label: 'SIP & EPF Calculators', icon: Calculator },
   { id: 'recurring', label: 'Recurring Bills', icon: RefreshCw },
   { id: 'subscriptions', label: 'Subscriptions', icon: Calendar },
@@ -61,33 +62,37 @@ export default function MobileNav({ activeTab, onSelectTab, user, onOpenProfile,
 
   return (
     <>
-      {/* 5-Item Clean Bottom Bar with Smart-Pay Action */}
+      {/* 5-Item Clean Balanced Bottom Bar with Center Pay */}
       <nav className="mobile-nav">
         <div className="mobile-nav-inner" style={{ position: 'relative' }}>
-          {MAIN_TABS.slice(0, 2).map(tab => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                className={`mobile-nav-item ${isActive ? 'active' : ''}`}
-                onClick={() => handleTabClick(tab.id)}
-              >
-                <Icon size={20} />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
+          {/* 1. Home */}
+          <button
+            type="button"
+            className={`mobile-nav-item ${activeTab === 'home' ? 'active' : ''}`}
+            onClick={() => handleTabClick('home')}
+          >
+            <Home size={19} />
+            <span>Home</span>
+          </button>
 
-          {/* ⚡ Glowing Center Smart-Pay Action */}
+          {/* 2. Dashboard */}
+          <button
+            type="button"
+            className={`mobile-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+            onClick={() => handleTabClick('dashboard')}
+          >
+            <LayoutDashboard size={19} />
+            <span>Overview</span>
+          </button>
+
+          {/* 3. ⚡ Center Smart-Pay Action */}
           <button
             type="button"
             className="mobile-nav-item"
             onClick={onOpenSmartPay}
             style={{
               color: '#10B981',
-              transform: 'translateY(-6px)'
+              transform: 'translateY(-4px)'
             }}
             title="Scan UPI QR with Budget Shield"
           >
@@ -109,29 +114,23 @@ export default function MobileNav({ activeTab, onSelectTab, user, onOpenProfile,
             <span style={{ fontSize: '10px', fontWeight: '800', marginTop: '2px', color: '#10B981' }}>Pay</span>
           </button>
 
-          {MAIN_TABS.slice(2).map(tab => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                className={`mobile-nav-item ${isActive ? 'active' : ''}`}
-                onClick={() => handleTabClick(tab.id)}
-              >
-                <Icon size={20} />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
+          {/* 4. Investments */}
+          <button
+            type="button"
+            className={`mobile-nav-item ${activeTab === 'investments' ? 'active' : ''}`}
+            onClick={() => handleTabClick('investments')}
+          >
+            <TrendingUp size={19} />
+            <span>Portfolio</span>
+          </button>
 
-          {/* More Menu Toggle */}
+          {/* 5. More Menu Toggle */}
           <button
             type="button"
             className={`mobile-nav-item ${isMoreActive || isMoreOpen ? 'active' : ''}`}
             onClick={() => setIsMoreOpen(!isMoreOpen)}
           >
-            <MoreHorizontal size={20} />
+            <MoreHorizontal size={19} />
             <span>More</span>
           </button>
         </div>

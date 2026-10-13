@@ -205,92 +205,83 @@ export default function DashboardTab({
         </div>
       </div>
 
-      {/* ⚡ Kuberis Smart-Pay & Micro-Wealth Engine Card (Unique USP) */}
+      {/* ⚡ Kuberis Smart-Pay & Budget Shield Card */}
       <div
         className="card"
         style={{
           marginBottom: '24px',
-          padding: '20px 24px',
-          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(6, 78, 59, 0.2) 100%)',
+          padding: '18px 20px',
+          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(6, 78, 59, 0.18) 100%)',
           border: '1px solid rgba(16, 185, 129, 0.35)',
-          borderRadius: '18px',
-          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.25), 0 0 20px rgba(16, 185, 129, 0.1)',
+          borderRadius: '16px',
+          boxShadow: '0 8px 25px rgba(0, 0, 0, 0.25)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
-          gap: '16px'
+          gap: '14px'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           <div
             style={{
-              width: '48px',
-              height: '48px',
-              borderRadius: '14px',
+              width: '44px',
+              height: '44px',
+              borderRadius: '12px',
               background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
               color: '#000',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 0 16px rgba(16, 185, 129, 0.45)',
+              boxShadow: '0 0 14px rgba(16, 185, 129, 0.45)',
               flexShrink: 0
             }}
           >
-            <Zap size={26} />
+            <Zap size={24} />
           </div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <h3 style={{ fontSize: '17px', fontWeight: '900', margin: 0, color: 'var(--text-main)', letterSpacing: '-0.3px' }}>
-                Kuberis Smart-Pay & Micro-Wealth Engine
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '900', margin: 0, color: 'var(--text-main)', letterSpacing: '-0.3px' }}>
+                Kuberis Smart-Pay
               </h3>
               <span
                 style={{
-                  fontSize: '10.5px',
+                  fontSize: '10px',
                   fontWeight: '800',
-                  padding: '2px 8px',
-                  borderRadius: '10px',
+                  padding: '2px 7px',
+                  borderRadius: '8px',
                   background: 'rgba(16, 185, 129, 0.2)',
                   color: '#10B981',
                   border: '1px solid #10B981'
                 }}
               >
-                USP
+                LIVE UPI
               </span>
             </div>
-            <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
-              Scan any UPI QR with <strong>Pre-Payment Budget Shield</strong> & auto-save spare change into <strong>7.10% Fixed Deposits</strong>.
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>
+              Scan any QR code with instant <strong>Pre-Payment Budget Shield</strong> & native UPI handoff.
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <div style={{ textAlign: 'right', marginRight: '6px' }}>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Micro-Wealth Pot</div>
-            <div style={{ fontSize: '16px', fontWeight: '900', color: '#10B981' }}>
-              {formatInr(settings?.microWealthPot?.balance || 0)}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={onOpenSmartPay}
-            style={{
-              padding: '9px 18px',
-              borderRadius: '12px',
-              fontSize: '13px',
-              fontWeight: '800',
-              gap: '8px',
-              background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
-              color: '#000',
-              border: 'none',
-              boxShadow: '0 0 15px rgba(16, 185, 129, 0.4)'
-            }}
-          >
-            <QrCode size={16} /> Scan & Pay
-          </button>
-        </div>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={onOpenSmartPay}
+          style={{
+            padding: '9px 18px',
+            borderRadius: '12px',
+            fontSize: '13px',
+            fontWeight: '800',
+            gap: '8px',
+            background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+            color: '#000',
+            border: 'none',
+            boxShadow: '0 0 14px rgba(16, 185, 129, 0.4)'
+          }}
+        >
+          <QrCode size={16} /> Scan & Pay
+        </button>
       </div>
 
       {/* Real-Time Investment Portfolio Live Widget on Dashboard */}

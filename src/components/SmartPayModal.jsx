@@ -7,20 +7,13 @@ import {
   ShieldCheck,
   ShieldAlert,
   AlertTriangle,
-  Sparkles,
   Zap,
-  TrendingUp,
   CheckCircle2,
   ExternalLink,
-  ChevronRight,
-  Info,
-  Layers,
+  Lock,
   ArrowRight,
-  PiggyBank,
-  Check,
-  Copy,
   RefreshCw,
-  Coins
+  Info
 } from 'lucide-react';
 import jsQR from 'jsqr';
 
@@ -30,15 +23,12 @@ export default function SmartPayModal({
   budgets = [],
   categories = [],
   transactions = [],
-  microWealthPot = {},
   onSaveTransaction,
-  onSaveInvestment,
-  onSavePreferences,
   isPrivacyMode = false
 }) {
   if (!isOpen) return null;
 
-  // Tabs: 'scan' | 'manual' | 'pot'
+  // Tabs: 'scan' | 'manual'
   const [activeTab, setActiveTab] = useState('scan');
 
   // Payment Form State
@@ -47,17 +37,6 @@ export default function SmartPayModal({
   const [rawAmount, setRawAmount] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [notes, setNotes] = useState('');
-
-  // Round-Up Settings
-  // 'nearest_10' | 'nearest_50' | 'pct_5' | 'none'
-  const [roundUpMode, setRoundUpMode] = useState(microWealthPot?.roundUpMode || 'nearest_10');
-  const [roundUpEnabled, setRoundUpEnabled] = useState(
-    microWealthPot?.roundUpEnabled !== false
-  );
-
-  // Pot Sweeping state
-  const [sweeping, setSweeping] = useState(false);
-  const [sweepSuccess, setSweepSuccess] = useState(false);
 
   // Scanner States
   const [isScanningCamera, setIsScanningCamera] = useState(false);
@@ -73,7 +52,6 @@ export default function SmartPayModal({
   // Initialize Category
   useEffect(() => {
     if (categories && categories.length > 0 && !selectedCategory) {
-      // Pick first non-income or default to first
       const defaultCat = categories.find(c => c.toLowerCase() !== 'salary' && c.toLowerCase() !== 'income') || categories[0];
       setSelectedCategory(defaultCat);
     }
@@ -103,19 +81,46 @@ export default function SmartPayModal({
   const startCamera = async () => {
     setCameraError('');
     setIsScanningCamera(true);
+
+    if (!navigator?.mediaDevices?.getUserMedia) {
+      setCameraError('Camera API is not supported in this browser or requires HTTPS. Use the Upload QR button or enter UPI ID manually.');
+      setIsScanningCamera(false);
+      return;
+    }
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
-      });
+      // First attempt environment (rear) camera
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+          audio: false
+        });
+      } catch (errEnvironment) {
+        // Fallback to any available video camera
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
+      }
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.setAttribute('playsinline', 'true');
-        videoRef.current.play();
+        await videoRef.current.play();
         scanVideoFrame();
       }
     } catch (err) {
       console.error('Camera access error:', err);
-      setCameraError('Unable to access camera. Please allow camera permissions or upload a QR image.');
+      let errMsg = 'Unable to access camera.';
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        errMsg = 'Camera permission was denied. Tap browser settings (lock icon / address bar) → Site permissions → Allow Camera, or upload a QR screenshot.';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        errMsg = 'No camera found on this device. Please upload a QR screenshot.';
+      } else {
+        errMsg = 'Camera is in use by another app or permissions are blocked. Please upload a QR screenshot or type VPA.';
+      }
+      setCameraError(errMsg);
       setIsScanningCamera(false);
     }
   };
@@ -139,7 +144,6 @@ export default function SmartPayModal({
     });
 
     if (code && code.data) {
-      // Detected QR
       parseUpiPayload(code.data);
       stopCamera();
       return;
@@ -167,7 +171,7 @@ export default function SmartPayModal({
         if (code && code.data) {
           parseUpiPayload(code.data);
         } else {
-          setCameraError('No valid UPI QR code detected in the selected image. Please try another image.');
+          setCameraError('No valid UPI QR code detected in the selected image. Please try another screenshot.');
         }
       };
       img.src = uploadEvent.target.result;
@@ -180,17 +184,15 @@ export default function SmartPayModal({
     try {
       let urlStr = qrData.trim();
       if (!urlStr.toLowerCase().startsWith('upi://pay')) {
-        // Fallback: check if it's a bare VPA
         if (urlStr.includes('@')) {
           setVpa(urlStr);
           setActiveTab('manual');
           return;
         }
-        setCameraError('Scanned QR is not an official UPI payment code.');
+        setCameraError('Scanned QR is not an official UPI payment QR code.');
         return;
       }
 
-      // Format query string
       const queryIdx = urlStr.indexOf('?');
       if (queryIdx === -1) {
         setCameraError('Invalid UPI QR format.');
@@ -214,7 +216,7 @@ export default function SmartPayModal({
         setNotes(parsedTn);
       }
 
-      // Auto-suggest category based on merchant name or notes
+      // Auto-suggest category
       const combined = (parsedPn + ' ' + parsedTn).toLowerCase();
       if (combined.includes('swiggy') || combined.includes('zomato') || combined.includes('restaurant') || combined.includes('cafe') || combined.includes('food')) {
         setSelectedCategory('Food & Dining');
@@ -226,7 +228,6 @@ export default function SmartPayModal({
         setSelectedCategory('Entertainment');
       }
 
-      // Switch to manual confirmation tab
       setActiveTab('manual');
     } catch (err) {
       console.error('Failed to parse UPI payload:', err);
@@ -237,32 +238,11 @@ export default function SmartPayModal({
   // Real-Time Calculations
   const numericAmount = Math.max(0, parseFloat(rawAmount) || 0);
 
-  // 1. Calculate Round-up
-  const calculateRoundUp = (amount, mode) => {
-    if (!roundUpEnabled || amount <= 0) return 0;
-    if (mode === 'nearest_10') {
-      const remainder = amount % 10;
-      return remainder === 0 ? 10 : Number((10 - remainder).toFixed(2));
-    }
-    if (mode === 'nearest_50') {
-      const remainder = amount % 50;
-      return remainder === 0 ? 50 : Number((50 - remainder).toFixed(2));
-    }
-    if (mode === 'pct_5') {
-      return Number(Math.max(1, amount * 0.05).toFixed(2));
-    }
-    return 0;
-  };
-
-  const roundUpSpare = calculateRoundUp(numericAmount, roundUpMode);
-  const totalDeduction = Number((numericAmount + roundUpSpare).toFixed(2));
-
-  // 2. Pre-Payment Budget Shield Evaluation
+  // Pre-Payment Budget Shield Evaluation
   const currentCategoryBudget = budgets.find(
     b => b.category?.toLowerCase() === selectedCategory?.toLowerCase()
   );
 
-  // Calculate current month's spent for this category
   const now = new Date();
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
@@ -279,31 +259,30 @@ export default function SmartPayModal({
   const budgetLimit = Number(currentCategoryBudget?.limit) || 0;
   const projectedSpent = spentThisMonth + numericAmount;
   const isBudgetConfigured = budgetLimit > 0;
-  const remainingBefore = Math.max(0, budgetLimit - spentThisMonth);
   const remainingAfter = budgetLimit - projectedSpent;
   const spentPctBefore = isBudgetConfigured ? (spentThisMonth / budgetLimit) * 100 : 0;
   const spentPctAfter = isBudgetConfigured ? (projectedSpent / budgetLimit) * 100 : 0;
 
-  let shieldStatus = 'safe'; // 'safe' | 'warning' | 'over'
+  let shieldStatus = 'safe';
   let shieldMessage = '';
 
   if (!isBudgetConfigured) {
     shieldStatus = 'safe';
-    shieldMessage = `No monthly budget set for ${selectedCategory || 'this category'}. Spending is unrestricted.`;
+    shieldMessage = `No budget limit set for ${selectedCategory || 'this category'}. Spending is unconstrained.`;
   } else if (projectedSpent > budgetLimit) {
     shieldStatus = 'over';
-    shieldMessage = `Over-Budget Alert! This payment will exceed your ${selectedCategory} budget by ₹${Math.abs(remainingAfter).toLocaleString('en-IN', { minimumFractionDigits: 2 })}.`;
+    shieldMessage = `Exceeds monthly ${selectedCategory} budget by ₹${Math.abs(remainingAfter).toLocaleString('en-IN', { minimumFractionDigits: 2 })}!`;
   } else if (spentPctAfter >= 85) {
     shieldStatus = 'warning';
-    shieldMessage = `Budget Caution! After this ₹${numericAmount} payment, you will have utilized ${spentPctAfter.toFixed(0)}% of your ${selectedCategory} budget.`;
+    shieldMessage = `Caution: this payment utilizes ${spentPctAfter.toFixed(0)}% of your monthly ${selectedCategory} budget.`;
   } else {
     shieldStatus = 'safe';
-    shieldMessage = `Safe to spend! Only ${spentPctAfter.toFixed(0)}% of your ${selectedCategory} budget will be utilized.`;
+    shieldMessage = `Safe to spend. Uses ${spentPctAfter.toFixed(0)}% of your monthly ${selectedCategory} budget.`;
   }
 
-  // 3. Generate Universal UPI Intent URLs
+  // Generate Official UPI Intent URLs
   const encodedPn = encodeURIComponent(payeeName || 'Merchant');
-  const encodedTn = encodeURIComponent(notes || 'Payment via Kuberis Smart-Pay');
+  const encodedTn = encodeURIComponent(notes || 'Payment via Kuberis');
   const baseUpiParams = `pa=${encodeURIComponent(vpa)}&pn=${encodedPn}&am=${numericAmount.toFixed(2)}&cu=INR&tn=${encodedTn}`;
 
   const standardUpiUrl = `upi://pay?${baseUpiParams}`;
@@ -311,19 +290,19 @@ export default function SmartPayModal({
   const phonepeUrl = `phonepe://pay?${baseUpiParams}`;
   const paytmUrl = `paytmmp://pay?${baseUpiParams}`;
 
-  // 4. Handle Launching Payment & Ledger Recording
+  // Handle Launching Payment & Ledger Recording
   const handleLaunchPayment = async (intentUrl, appName) => {
     if (!vpa || numericAmount <= 0) {
-      alert('Please provide a valid UPI ID and Amount.');
+      alert('Please enter a valid UPI ID and Amount.');
       return;
     }
 
-    // Try opening the UPI Intent URL if valid app scheme
+    // Launch native UPI app via Android/iOS Intent
     if (intentUrl.startsWith('upi://') || intentUrl.startsWith('tez://') || intentUrl.startsWith('phonepe://') || intentUrl.startsWith('paytmmp://')) {
       window.location.href = intentUrl;
     }
 
-    // Record transaction in Ledger
+    // Auto-record in personal ledger
     const paymentTimestamp = new Date().toISOString();
     const newTx = {
       type: 'expense',
@@ -340,99 +319,19 @@ export default function SmartPayModal({
       try {
         await onSaveTransaction(newTx);
       } catch (err) {
-        console.error('Error saving transaction:', err);
+        console.error('Error recording ledger entry:', err);
       }
     }
 
-    // Accumulate Micro-Wealth Round-Up
-    let updatedPot = {
-      balance: (Number(microWealthPot?.balance) || 0) + roundUpSpare,
-      totalSaved: (Number(microWealthPot?.totalSaved) || 0) + roundUpSpare,
-      totalRoundsCount: (Number(microWealthPot?.totalRoundsCount) || 0) + (roundUpSpare > 0 ? 1 : 0),
-      interestEarned: Number(microWealthPot?.interestEarned) || 0,
-      roundUpMode,
-      roundUpEnabled
-    };
-
-    if (roundUpSpare > 0 && onSavePreferences) {
-      try {
-        await onSavePreferences({ microWealthPot: updatedPot });
-      } catch (err) {
-        console.error('Error updating micro-wealth pot:', err);
-      }
-    }
-
-    // Show instant success reconciliation screen
     setPaymentSuccessData({
       vpa,
       payeeName: payeeName || vpa,
       amount: numericAmount,
-      roundUpSpare,
-      totalDeduction,
       appName: appName || 'UPI App',
-      category: selectedCategory,
-      shieldStatus,
-      newPotBalance: updatedPot.balance
+      category: selectedCategory
     });
   };
 
-  // 5. Sweep Pot into Fixed Deposit
-  const handleSweepPotToFd = async () => {
-    const currentBalance = Number(microWealthPot?.balance) || 0;
-    if (currentBalance < 1000) {
-      alert('Pot requires at least ₹1,000 to open a Government Fixed Deposit.');
-      return;
-    }
-
-    setSweeping(true);
-    try {
-      const todayStr = new Date().toISOString().split('T')[0];
-      const maturityDate = new Date();
-      maturityDate.setFullYear(maturityDate.getFullYear() + 1);
-
-      // Create official 1-Year FD at 6.90%
-      const newFdHolding = {
-        name: 'Post Office Time Deposit (Micro-Wealth Sweep)',
-        type: 'fd',
-        accountHolder: 'Primary Account Holder',
-        category: 'Post Office FD',
-        buyPrice: 1000,
-        quantity: 1,
-        currentValuation: 1000,
-        interestRate: 6.90,
-        tenureYears: 1,
-        tenureDays: 365,
-        depositDate: todayStr,
-        maturityDate: maturityDate.toISOString().split('T')[0],
-        notes: 'Auto-swept milestone from Kuberis Micro-Wealth Spare Change Pot'
-      };
-
-      if (onSaveInvestment) {
-        await onSaveInvestment(newFdHolding);
-      }
-
-      // Deduct ₹1,000 from pot
-      const remainingBalance = Number((currentBalance - 1000).toFixed(2));
-      const updatedPot = {
-        ...microWealthPot,
-        balance: remainingBalance
-      };
-
-      if (onSavePreferences) {
-        await onSavePreferences({ microWealthPot: updatedPot });
-      }
-
-      setSweepSuccess(true);
-      setTimeout(() => setSweepSuccess(false), 5000);
-    } catch (err) {
-      console.error('Failed to sweep to FD:', err);
-      alert('Failed to sweep funds to FD. Please try again.');
-    } finally {
-      setSweeping(false);
-    }
-  };
-
-  // Helper formatting
   const formatInr = (n) =>
     isPrivacyMode
       ? '₹••••'
@@ -443,58 +342,61 @@ export default function SmartPayModal({
         });
 
   return (
-    <div className="modal-backdrop" style={{ zIndex: 10050 }}>
+    <div className="modal-backdrop" style={{ zIndex: 10050, padding: '12px' }}>
       <div
         className="modal-content"
         style={{
-          maxWidth: '560px',
-          width: '95%',
-          maxHeight: '90vh',
+          maxWidth: '480px',
+          width: '100%',
+          maxHeight: '92vh',
           overflowY: 'auto',
-          padding: '24px 28px',
-          borderRadius: '24px',
+          padding: '20px 18px',
+          borderRadius: '20px',
           background: 'var(--bg-card, #0B132B)',
           border: '1px solid var(--border-glass)',
-          boxShadow: '0 25px 60px rgba(0, 0, 0, 0.7), 0 0 30px rgba(16, 185, 129, 0.15)'
+          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.75), 0 0 25px rgba(16, 185, 129, 0.12)'
         }}
       >
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div
               style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '12px',
+                width: '38px',
+                height: '38px',
+                borderRadius: '11px',
                 background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
                 color: '#000',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 0 15px rgba(16, 185, 129, 0.4)'
+                boxShadow: '0 0 12px rgba(16, 185, 129, 0.45)',
+                flexShrink: 0
               }}
             >
-              <Zap size={24} />
+              <Zap size={22} />
             </div>
             <div>
-              <h2 style={{ fontSize: '19px', fontWeight: '900', margin: 0, color: 'var(--text-main)', letterSpacing: '-0.3px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                Kuberis Smart-Pay
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: '900', margin: 0, color: 'var(--text-main)', letterSpacing: '-0.3px' }}>
+                  Smart-Pay
+                </h2>
                 <span
                   style={{
-                    fontSize: '10.5px',
+                    fontSize: '9.5px',
                     fontWeight: '800',
-                    padding: '2px 8px',
-                    borderRadius: '12px',
+                    padding: '2px 6px',
+                    borderRadius: '8px',
                     background: 'rgba(16, 185, 129, 0.15)',
                     color: '#10B981',
                     border: '1px solid rgba(16, 185, 129, 0.3)'
                   }}
                 >
-                  ⚡ LIVE UPI INTENT
+                  SECURE UPI INTENT
                 </span>
-              </h2>
-              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                Pre-Payment Budget Shield • 7.10% Micro-Wealth Engine
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                Pre-Payment Budget Shield • Zero Bank Data Stored
               </div>
             </div>
           </div>
@@ -512,117 +414,90 @@ export default function SmartPayModal({
           </button>
         </div>
 
-        {/* Payment Confirmation / Success Receipt Screen */}
+        {/* Security & Regulatory Safety Assurance Pill */}
+        <div
+          style={{
+            padding: '8px 12px',
+            borderRadius: '10px',
+            background: 'rgba(16, 185, 129, 0.08)',
+            border: '1px solid rgba(16, 185, 129, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '14px',
+            fontSize: '11px',
+            color: 'var(--text-main)'
+          }}
+        >
+          <Lock size={13} style={{ color: '#10B981', flexShrink: 0 }} />
+          <span>
+            <strong>100% Authorized & Secure:</strong> Handled entirely by your device’s UPI apps (CRED, GPay, PhonePe). Kuberis never touches your bank balance or MPIN.
+          </span>
+        </div>
+
+        {/* Payment Confirmation Receipt */}
         {paymentSuccessData ? (
-          <div style={{ textAlign: 'center', padding: '16px 8px', animation: 'fadeIn 0.3s ease' }}>
+          <div style={{ textAlign: 'center', padding: '16px 4px', animation: 'fadeIn 0.3s ease' }}>
             <div
               style={{
-                width: '68px',
-                height: '68px',
+                width: '60px',
+                height: '60px',
                 borderRadius: '50%',
                 background: 'rgba(16, 185, 129, 0.15)',
                 color: '#10B981',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                margin: '0 auto 16px auto',
+                margin: '0 auto 14px auto',
                 border: '2px solid #10B981',
-                boxShadow: '0 0 25px rgba(16, 185, 129, 0.35)'
+                boxShadow: '0 0 20px rgba(16, 185, 129, 0.35)'
               }}
             >
-              <CheckCircle2 size={40} />
+              <CheckCircle2 size={34} />
             </div>
 
-            <h3 style={{ fontSize: '22px', fontWeight: '900', color: 'var(--text-main)', marginBottom: '4px' }}>
-              Payment Triggered via {paymentSuccessData.appName}!
+            <h3 style={{ fontSize: '20px', fontWeight: '900', color: 'var(--text-main)', marginBottom: '4px' }}>
+              Handed off to {paymentSuccessData.appName}!
             </h3>
-            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '20px' }}>
-              Ledger auto-updated & micro-wealth accumulated.
+            <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+              Transaction logged in your personal ledger automatically.
             </p>
 
-            {/* Receipt Summary Card */}
             <div
               style={{
                 background: 'rgba(255, 255, 255, 0.03)',
-                borderRadius: '16px',
+                borderRadius: '14px',
                 border: '1px solid var(--border-color)',
-                padding: '18px 20px',
+                padding: '16px',
                 textAlign: 'left',
-                marginBottom: '20px'
+                marginBottom: '18px'
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <span style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>Payee:</span>
-                <span style={{ fontSize: '13.5px', fontWeight: '800', color: 'var(--text-main)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Payee:</span>
+                <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-main)' }}>
                   {paymentSuccessData.payeeName} ({paymentSuccessData.vpa})
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <span style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>Direct Bill Amount:</span>
-                <span style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-main)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Category:</span>
+                <span style={{ fontSize: '12.5px', fontWeight: '700', color: 'var(--text-main)' }}>
+                  {paymentSuccessData.category}
+                </span>
+              </div>
+              <div style={{ height: '1px', background: 'var(--border-color)', margin: '8px 0' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '12.5px', fontWeight: '700', color: 'var(--text-main)' }}>Amount Paid:</span>
+                <span style={{ fontSize: '18px', fontWeight: '900', color: 'var(--primary)' }}>
                   {formatInr(paymentSuccessData.amount)}
                 </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <span style={{ fontSize: '12.5px', color: '#10B981', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Sparkles size={13} /> Micro-Wealth Round-Up:
-                </span>
-                <span style={{ fontSize: '14px', fontWeight: '800', color: '#10B981' }}>
-                  +{formatInr(paymentSuccessData.roundUpSpare)}
-                </span>
-              </div>
-              <div style={{ height: '1px', background: 'var(--border-color)', margin: '10px 0' }} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)' }}>Total Outlay:</span>
-                <span style={{ fontSize: '18px', fontWeight: '900', color: 'var(--primary)' }}>
-                  {formatInr(paymentSuccessData.totalDeduction)}
-                </span>
-              </div>
-            </div>
-
-            {/* Micro-wealth Pot Milestone Banner */}
-            <div
-              style={{
-                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.08) 100%)',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
-                borderRadius: '16px',
-                padding: '16px',
-                marginBottom: '24px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '14px',
-                textAlign: 'left'
-              }}
-            >
-              <div
-                style={{
-                  width: '42px',
-                  height: '42px',
-                  borderRadius: '12px',
-                  background: 'rgba(16, 185, 129, 0.2)',
-                  color: '#10B981',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}
-              >
-                <PiggyBank size={24} />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-main)' }}>
-                  Micro-Wealth Pot: {formatInr(paymentSuccessData.newPotBalance)}
-                </div>
-                <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                  Earning 7.10% p.a. compound yield. Auto-sweepable to Post Office FD at ₹1,000.
-                </div>
               </div>
             </div>
 
             <button
               type="button"
               className="btn btn-primary"
-              style={{ width: '100%', padding: '12px', borderRadius: '12px', fontWeight: '800' }}
+              style={{ width: '100%', padding: '12px', borderRadius: '12px', fontWeight: '800', fontSize: '13.5px' }}
               onClick={() => {
                 setPaymentSuccessData(null);
                 setRawAmount('');
@@ -632,21 +507,21 @@ export default function SmartPayModal({
                 onClose();
               }}
             >
-              Back to Dashboard
+              Done & Return
             </button>
           </div>
         ) : (
           <>
-            {/* Top Navigation Tabs */}
+            {/* 2 Clean Tabs (Scan QR & Pay VPA) */}
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
+                gridTemplateColumns: '1fr 1fr',
                 gap: '6px',
                 background: 'rgba(255, 255, 255, 0.05)',
                 padding: '4px',
-                borderRadius: '14px',
-                marginBottom: '20px'
+                borderRadius: '12px',
+                marginBottom: '16px'
               }}
             >
               <button
@@ -656,9 +531,9 @@ export default function SmartPayModal({
                   setActiveTab('scan');
                   startCamera();
                 }}
-                style={{ borderRadius: '10px', fontSize: '12px', fontWeight: '700', gap: '6px' }}
+                style={{ borderRadius: '9px', fontSize: '12px', fontWeight: '700', gap: '6px', padding: '8px' }}
               >
-                <QrCode size={15} /> Scan QR
+                <QrCode size={15} /> Scan QR Code
               </button>
               <button
                 type="button"
@@ -667,32 +542,21 @@ export default function SmartPayModal({
                   stopCamera();
                   setActiveTab('manual');
                 }}
-                style={{ borderRadius: '10px', fontSize: '12px', fontWeight: '700', gap: '6px' }}
+                style={{ borderRadius: '9px', fontSize: '12px', fontWeight: '700', gap: '6px', padding: '8px' }}
               >
-                <Zap size={15} /> Pay VPA
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm ${activeTab === 'pot' ? 'btn-primary' : 'btn-ghost'}`}
-                onClick={() => {
-                  stopCamera();
-                  setActiveTab('pot');
-                }}
-                style={{ borderRadius: '10px', fontSize: '12px', fontWeight: '700', gap: '6px' }}
-              >
-                <PiggyBank size={15} /> Pot ({formatInr(microWealthPot?.balance || 0)})
+                <Zap size={15} /> Enter UPI ID
               </button>
             </div>
 
-            {/* TAB 1: High-Speed QR Scanner */}
+            {/* TAB 1: Camera QR Scanner */}
             {activeTab === 'scan' && (
               <div>
                 <div
                   style={{
                     position: 'relative',
                     width: '100%',
-                    height: '260px',
-                    borderRadius: '18px',
+                    height: '240px',
+                    borderRadius: '16px',
                     overflow: 'hidden',
                     background: '#040914',
                     border: '2px dashed rgba(16, 185, 129, 0.4)',
@@ -700,7 +564,7 @@ export default function SmartPayModal({
                     flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    marginBottom: '16px'
+                    marginBottom: '14px'
                   }}
                 >
                   <video
@@ -714,38 +578,37 @@ export default function SmartPayModal({
                   />
                   <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-                  {/* Aiming Reticle Overlay when scanning */}
                   {isScanningCamera && (
                     <div
                       style={{
                         position: 'absolute',
-                        width: '180px',
-                        height: '180px',
+                        width: '170px',
+                        height: '170px',
                         border: '2px solid #10B981',
-                        borderRadius: '16px',
-                        boxShadow: '0 0 20px rgba(16, 185, 129, 0.4), inset 0 0 15px rgba(16, 185, 129, 0.2)',
+                        borderRadius: '14px',
+                        boxShadow: '0 0 20px rgba(16, 185, 129, 0.4)',
                         pointerEvents: 'none',
                         animation: 'pulse 1.8s infinite'
                       }}
                     >
-                      <div style={{ position: 'absolute', top: '50%', left: '0', right: '0', height: '2px', background: '#10B981', opacity: 0.7 }} />
+                      <div style={{ position: 'absolute', top: '50%', left: '0', right: '0', height: '2px', background: '#10B981', opacity: 0.8 }} />
                     </div>
                   )}
 
                   {!isScanningCamera && (
-                    <div style={{ textAlign: 'center', padding: '20px' }}>
-                      <Camera size={44} style={{ color: 'var(--text-muted)', marginBottom: '12px', opacity: 0.6 }} />
-                      <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>
-                        Point camera at any Merchant UPI QR
+                    <div style={{ textAlign: 'center', padding: '16px' }}>
+                      <Camera size={40} style={{ color: 'var(--text-muted)', marginBottom: '10px', opacity: 0.6 }} />
+                      <div style={{ fontSize: '13.5px', fontWeight: '700', color: 'var(--text-main)' }}>
+                        Point Camera at Any Merchant UPI QR
                       </div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                        Google Pay, PhonePe, BharatPe, Paytm, CRED
+                      <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        Scan PhonePe, GPay, Paytm, BharatPe
                       </div>
                       <button
                         type="button"
                         className="btn btn-primary btn-sm"
                         onClick={startCamera}
-                        style={{ marginTop: '16px', borderRadius: '10px' }}
+                        style={{ marginTop: '14px', borderRadius: '10px', padding: '8px 16px', fontSize: '12.5px', fontWeight: '800' }}
                       >
                         <Camera size={14} /> Start Camera Scanner
                       </button>
@@ -756,25 +619,30 @@ export default function SmartPayModal({
                 {cameraError && (
                   <div
                     style={{
-                      padding: '10px 14px',
-                      borderRadius: '10px',
-                      background: 'rgba(239, 68, 68, 0.12)',
+                      padding: '12px 14px',
+                      borderRadius: '12px',
+                      background: 'rgba(239, 68, 68, 0.1)',
                       border: '1px solid rgba(239, 68, 68, 0.3)',
-                      color: '#EF4444',
+                      color: '#FCA5A5',
                       fontSize: '12px',
-                      marginBottom: '16px',
+                      marginBottom: '14px',
                       display: 'flex',
-                      alignItems: 'center',
+                      flexDirection: 'column',
                       gap: '8px'
                     }}
                   >
-                    <AlertTriangle size={16} />
-                    <span>{cameraError}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#EF4444', fontWeight: '700' }}>
+                      <AlertTriangle size={16} />
+                      <span>Camera Access Tip</span>
+                    </div>
+                    <div style={{ lineHeight: '1.45', color: 'var(--text-main)', fontSize: '11.5px' }}>
+                      {cameraError}
+                    </div>
                   </div>
                 )}
 
                 {/* Upload Image Alternative */}
-                <div style={{ display: 'flex', gap: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <input
                     type="file"
                     ref={fileInputRef}
@@ -786,9 +654,9 @@ export default function SmartPayModal({
                     type="button"
                     className="btn btn-secondary"
                     onClick={() => fileInputRef.current?.click()}
-                    style={{ flex: 1, padding: '10px', fontSize: '13px', borderRadius: '12px', gap: '6px' }}
+                    style={{ width: '100%', padding: '10px', fontSize: '12.5px', borderRadius: '11px', gap: '6px', justifyContent: 'center' }}
                   >
-                    <Upload size={16} /> Upload QR Screenshot / Image
+                    <Upload size={15} /> Upload QR Screenshot from Gallery
                   </button>
                   <button
                     type="button"
@@ -797,9 +665,9 @@ export default function SmartPayModal({
                       stopCamera();
                       setActiveTab('manual');
                     }}
-                    style={{ fontSize: '13px', borderRadius: '12px' }}
+                    style={{ width: '100%', fontSize: '12px', borderRadius: '11px', padding: '8px' }}
                   >
-                    Type VPA Manually <ArrowRight size={14} />
+                    Or Enter UPI ID Manually <ArrowRight size={13} />
                   </button>
                 </div>
               </div>
@@ -808,81 +676,80 @@ export default function SmartPayModal({
             {/* TAB 2: Manual VPA & Payment Confirmation */}
             {activeTab === 'manual' && (
               <div>
-                {/* Payee Info Inputs */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+                {/* Responsive Inputs: Stack vertically on mobile */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '14px' }}>
                   <div>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '5px', display: 'block' }}>
-                      UPI ID / VPA *
+                    <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
+                      Recipient UPI ID / VPA *
                     </label>
                     <input
                       type="text"
                       className="input"
-                      placeholder="merchant@upi"
+                      placeholder="merchant@upi or mobile@okhdfcbank"
                       value={vpa}
                       onChange={e => setVpa(e.target.value)}
-                      style={{ width: '100%', borderRadius: '10px', fontSize: '13px', padding: '9px 12px' }}
+                      style={{ width: '100%', borderRadius: '10px', fontSize: '13px', padding: '10px 12px' }}
                     />
                   </div>
 
-                  <div>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '5px', display: 'block' }}>
-                      Payee / Merchant Name
-                    </label>
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="e.g. Swiggy, Starbucks"
-                      value={payeeName}
-                      onChange={e => setPayeeName(e.target.value)}
-                      style={{ width: '100%', borderRadius: '10px', fontSize: '13px', padding: '9px 12px' }}
-                    />
-                  </div>
-                </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
+                        Amount (₹) *
+                      </label>
+                      <div style={{ position: 'relative' }}>
+                        <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', fontWeight: '800', color: 'var(--text-main)', fontSize: '14px' }}>
+                          ₹
+                        </span>
+                        <input
+                          type="number"
+                          step="any"
+                          className="input"
+                          placeholder="0.00"
+                          value={rawAmount}
+                          onChange={e => setRawAmount(e.target.value)}
+                          style={{ width: '100%', paddingLeft: '24px', fontSize: '15px', fontWeight: '800', borderRadius: '10px' }}
+                        />
+                      </div>
+                    </div>
 
-                {/* Amount & Category */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px', marginBottom: '16px' }}>
-                  <div>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '5px', display: 'block' }}>
-                      Amount (₹) *
-                    </label>
-                    <div style={{ position: 'relative' }}>
-                      <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: '800', color: 'var(--text-main)', fontSize: '15px' }}>
-                        ₹
-                      </span>
-                      <input
-                        type="number"
-                        step="any"
+                    <div>
+                      <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
+                        Category
+                      </label>
+                      <select
                         className="input"
-                        placeholder="0.00"
-                        value={rawAmount}
-                        onChange={e => setRawAmount(e.target.value)}
-                        style={{ width: '100%', paddingLeft: '28px', fontSize: '16px', fontWeight: '800', borderRadius: '10px' }}
-                      />
+                        value={selectedCategory}
+                        onChange={e => setSelectedCategory(e.target.value)}
+                        style={{ width: '100%', borderRadius: '10px', fontSize: '12.5px', padding: '9px 10px' }}
+                      >
+                        {categories.map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
                   <div>
-                    <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '5px', display: 'block' }}>
-                      Category (for Shield)
+                    <label style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '4px', display: 'block' }}>
+                      Payee / Merchant Name (Optional)
                     </label>
-                    <select
+                    <input
+                      type="text"
                       className="input"
-                      value={selectedCategory}
-                      onChange={e => setSelectedCategory(e.target.value)}
-                      style={{ width: '100%', borderRadius: '10px', fontSize: '13px', padding: '10px 12px' }}
-                    >
-                      {categories.map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
+                      placeholder="e.g. Swiggy, Groceries, Friend"
+                      value={payeeName}
+                      onChange={e => setPayeeName(e.target.value)}
+                      style={{ width: '100%', borderRadius: '10px', fontSize: '12.5px', padding: '9px 12px' }}
+                    />
                   </div>
                 </div>
 
                 {/* 🛡️ PRE-PAYMENT BUDGET SHIELD BANNER */}
                 <div
                   style={{
-                    padding: '14px 16px',
-                    borderRadius: '14px',
+                    padding: '12px 14px',
+                    borderRadius: '12px',
                     marginBottom: '16px',
                     border: shieldStatus === 'safe'
                       ? '1px solid rgba(16, 185, 129, 0.4)'
@@ -896,7 +763,7 @@ export default function SmartPayModal({
                       : 'rgba(239, 68, 68, 0.1)',
                     display: 'flex',
                     alignItems: 'flex-start',
-                    gap: '12px'
+                    gap: '10px'
                   }}
                 >
                   <div
@@ -906,43 +773,39 @@ export default function SmartPayModal({
                     }}
                   >
                     {shieldStatus === 'safe' ? (
-                      <ShieldCheck size={22} />
+                      <ShieldCheck size={20} />
                     ) : shieldStatus === 'warning' ? (
-                      <AlertTriangle size={22} />
+                      <AlertTriangle size={20} />
                     ) : (
-                      <ShieldAlert size={22} />
+                      <ShieldAlert size={20} />
                     )}
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span
                         style={{
-                          fontSize: '11px',
+                          fontSize: '10.5px',
                           fontWeight: '800',
                           textTransform: 'uppercase',
                           letterSpacing: '0.5px',
                           color: shieldStatus === 'safe' ? '#10B981' : shieldStatus === 'warning' ? '#F59E0B' : '#EF4444'
                         }}
                       >
-                        Pre-Payment Budget Shield: {shieldStatus.toUpperCase()}
+                        Budget Shield: {shieldStatus.toUpperCase()}
                       </span>
                       {isBudgetConfigured && (
-                        <span style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-muted)' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)' }}>
                           Budget: {formatInr(budgetLimit)}/mo
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: '12.5px', fontWeight: '600', color: 'var(--text-main)', marginTop: '3px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-main)', marginTop: '2px' }}>
                       {shieldMessage}
                     </div>
 
                     {isBudgetConfigured && (
-                      <div style={{ marginTop: '8px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', color: 'var(--text-muted)', marginBottom: '3px' }}>
-                          <span>Current: {spentPctBefore.toFixed(0)}%</span>
-                          <span>After Pay: {spentPctAfter.toFixed(0)}%</span>
-                        </div>
-                        <div style={{ width: '100%', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                      <div style={{ marginTop: '6px' }}>
+                        <div style={{ width: '100%', height: '5px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
                           <div
                             style={{
                               width: `${Math.min(100, spentPctAfter)}%`,
@@ -957,94 +820,31 @@ export default function SmartPayModal({
                   </div>
                 </div>
 
-                {/* 🪙 SPARE-CHANGE MICRO-WEALTH CALCULATOR */}
-                <div
-                  style={{
-                    padding: '14px 16px',
-                    borderRadius: '14px',
-                    background: 'rgba(255, 255, 255, 0.03)',
-                    border: '1px solid var(--border-color)',
-                    marginBottom: '18px'
-                  }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Coins size={17} style={{ color: '#10B981' }} />
-                      <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-main)' }}>
-                        Micro-Wealth Round-Up Pot
-                      </span>
-                    </div>
-
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px', color: 'var(--text-muted)' }}>
-                      <input
-                        type="checkbox"
-                        checked={roundUpEnabled}
-                        onChange={e => setRoundUpEnabled(e.target.checked)}
-                      />
-                      <span>Auto-Save</span>
-                    </label>
-                  </div>
-
-                  {roundUpEnabled && (
-                    <>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginBottom: '10px' }}>
-                        {[
-                          { id: 'nearest_10', label: 'Nearest ₹10' },
-                          { id: 'nearest_50', label: 'Nearest ₹50' },
-                          { id: 'pct_5', label: '5% Booster' }
-                        ].map(m => (
-                          <button
-                            key={m.id}
-                            type="button"
-                            className={`btn btn-xs ${roundUpMode === m.id ? 'btn-primary' : 'btn-ghost'}`}
-                            onClick={() => setRoundUpMode(m.id)}
-                            style={{ borderRadius: '8px', fontSize: '11px', padding: '6px' }}
-                          >
-                            {m.label}
-                          </button>
-                        ))}
-                      </div>
-
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', background: 'rgba(16, 185, 129, 0.08)', padding: '8px 12px', borderRadius: '10px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                        <span style={{ color: 'var(--text-muted)' }}>
-                          Spare Change: <strong style={{ color: '#10B981' }}>+{formatInr(roundUpSpare)}</strong>
-                        </span>
-                        <span style={{ color: 'var(--text-main)', fontWeight: '700' }}>
-                          Total with Pot: <strong style={{ color: 'var(--primary)' }}>{formatInr(totalDeduction)}</strong>
-                        </span>
-                      </div>
-                      <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '4px', textAlign: 'right' }}>
-                        * Yields 7.10% p.a. compound growth in your Post Office sweep fund
-                      </div>
-                    </>
-                  )}
-                </div>
-
                 {/* 🚀 1-TAP UNIVERSAL UPI APP LAUNCHERS */}
                 <div>
-                  <div style={{ fontSize: '12px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
-                    Pay & Auto-Record via UPI App
+                  <div style={{ fontSize: '11.5px', fontWeight: '800', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                    Pay via Installed UPI App
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '10px' }}>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => handleLaunchPayment(gpayUrl, 'Google Pay')}
-                      disabled={!vpa || numericAmount <= 0}
-                      style={{ padding: '10px', fontSize: '12.5px', borderRadius: '12px', gap: '8px', fontWeight: '800', justifyContent: 'center' }}
-                    >
-                      <Zap size={15} style={{ color: '#4285F4' }} /> Google Pay
-                    </button>
-
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '8px' }}>
                     <button
                       type="button"
                       className="btn btn-secondary"
                       onClick={() => handleLaunchPayment(phonepeUrl, 'PhonePe')}
                       disabled={!vpa || numericAmount <= 0}
-                      style={{ padding: '10px', fontSize: '12.5px', borderRadius: '12px', gap: '8px', fontWeight: '800', justifyContent: 'center' }}
+                      style={{ padding: '10px 8px', fontSize: '12px', borderRadius: '11px', gap: '6px', fontWeight: '800', justifyContent: 'center' }}
                     >
-                      <Zap size={15} style={{ color: '#5F259F' }} /> PhonePe
+                      <Zap size={14} style={{ color: '#5F259F' }} /> PhonePe
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => handleLaunchPayment(gpayUrl, 'Google Pay')}
+                      disabled={!vpa || numericAmount <= 0}
+                      style={{ padding: '10px 8px', fontSize: '12px', borderRadius: '11px', gap: '6px', fontWeight: '800', justifyContent: 'center' }}
+                    >
+                      <Zap size={14} style={{ color: '#4285F4' }} /> Google Pay
                     </button>
 
                     <button
@@ -1052,135 +852,31 @@ export default function SmartPayModal({
                       className="btn btn-secondary"
                       onClick={() => handleLaunchPayment(paytmUrl, 'Paytm')}
                       disabled={!vpa || numericAmount <= 0}
-                      style={{ padding: '10px', fontSize: '12.5px', borderRadius: '12px', gap: '8px', fontWeight: '800', justifyContent: 'center' }}
+                      style={{ padding: '10px 8px', fontSize: '12px', borderRadius: '11px', gap: '6px', fontWeight: '800', justifyContent: 'center' }}
                     >
-                      <Zap size={15} style={{ color: '#00BAF2' }} /> Paytm
+                      <Zap size={14} style={{ color: '#00BAF2' }} /> Paytm
                     </button>
 
                     <button
                       type="button"
                       className="btn btn-primary"
-                      onClick={() => handleLaunchPayment(standardUpiUrl, 'Default UPI')}
+                      onClick={() => handleLaunchPayment(standardUpiUrl, 'CRED / UPI')}
                       disabled={!vpa || numericAmount <= 0}
-                      style={{ padding: '10px', fontSize: '12.5px', borderRadius: '12px', gap: '8px', fontWeight: '800', justifyContent: 'center' }}
+                      style={{ padding: '10px 8px', fontSize: '12px', borderRadius: '11px', gap: '6px', fontWeight: '800', justifyContent: 'center' }}
                     >
-                      <ExternalLink size={15} /> CRED / Any UPI
+                      <ExternalLink size={14} /> CRED / Any App
                     </button>
                   </div>
 
                   <button
                     type="button"
                     className="btn btn-ghost"
-                    onClick={() => {
-                      // Manual ledger only without opening app
-                      handleLaunchPayment('#manual', 'Manual UPI');
-                    }}
+                    onClick={() => handleLaunchPayment('#manual', 'Manual UPI')}
                     disabled={!vpa || numericAmount <= 0}
-                    style={{ width: '100%', fontSize: '11.5px', color: 'var(--text-muted)' }}
+                    style={{ width: '100%', fontSize: '11px', color: 'var(--text-muted)', padding: '6px' }}
                   >
-                    Already paid? Just record in ledger & add spare change to pot
+                    Already paid? Click to record in ledger only
                   </button>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 3: Micro-Wealth Pot & 7.10% FD Sweep */}
-            {activeTab === 'pot' && (
-              <div>
-                <div
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.05) 100%)',
-                    border: '1px solid rgba(16, 185, 129, 0.35)',
-                    borderRadius: '20px',
-                    padding: '24px 20px',
-                    textAlign: 'center',
-                    marginBottom: '20px',
-                    boxShadow: '0 10px 25px rgba(0,0,0,0.3)'
-                  }}
-                >
-                  <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.6px' }}>
-                    Micro-Wealth Pot Accumulated
-                  </div>
-                  <div style={{ fontSize: '36px', fontWeight: '900', color: 'var(--text-main)', margin: '8px 0', letterSpacing: '-0.5px' }}>
-                    {formatInr(microWealthPot?.balance || 0)}
-                  </div>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '20px', background: 'rgba(16, 185, 129, 0.2)', color: '#10B981', fontSize: '12px', fontWeight: '800' }}>
-                    <TrendingUp size={14} /> 7.10% p.a. Compounding Yield
-                  </div>
-                </div>
-
-                {sweepSuccess && (
-                  <div
-                    style={{
-                      padding: '12px 16px',
-                      borderRadius: '12px',
-                      background: 'rgba(16, 185, 129, 0.15)',
-                      border: '1px solid #10B981',
-                      color: '#10B981',
-                      fontSize: '13px',
-                      fontWeight: '700',
-                      marginBottom: '16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    <CheckCircle2 size={18} />
-                    <span>Success! ₹1,000 swept into a 1-Year Post Office Fixed Deposit at 6.90%/7.10% p.a.!</span>
-                  </div>
-                )}
-
-                {/* Pot Stats Grid */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
-                  <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '12px 14px' }}>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Total Spare Change Saved</div>
-                    <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-main)', marginTop: '2px' }}>
-                      {formatInr(microWealthPot?.totalSaved || 0)}
-                    </div>
-                  </div>
-                  <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '12px 14px' }}>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Payments Rounded Up</div>
-                    <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-main)', marginTop: '2px' }}>
-                      {microWealthPot?.totalRoundsCount || 0} times
-                    </div>
-                  </div>
-                </div>
-
-                {/* Milestone Progress Bar */}
-                <div style={{ marginBottom: '22px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>
-                      ₹1,000 Fixed Deposit Milestone
-                    </span>
-                    <span style={{ fontSize: '12px', fontWeight: '800', color: '#10B981' }}>
-                      {Math.min(100, (((microWealthPot?.balance || 0) / 1000) * 100)).toFixed(0)}%
-                    </span>
-                  </div>
-                  <div style={{ width: '100%', height: '8px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div
-                      style={{
-                        width: `${Math.min(100, (((microWealthPot?.balance || 0) / 1000) * 100))}%`,
-                        height: '100%',
-                        background: 'linear-gradient(90deg, #10B981 0%, #059669 100%)',
-                        transition: 'width 0.4s ease'
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {/* Sweep 1-Tap Action */}
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={handleSweepPotToFd}
-                  disabled={sweeping || (microWealthPot?.balance || 0) < 1000}
-                  style={{ width: '100%', padding: '13px', borderRadius: '14px', fontSize: '14px', fontWeight: '800', gap: '8px' }}
-                >
-                  <Sparkles size={16} />
-                  {sweeping ? 'Sweeping Funds...' : '1-Tap Sweep ₹1,000 to Post Office FD'}
-                </button>
-                <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '8px' }}>
-                  Automatically locks in the official Govt of India Q3 FY27 Post Office Rate (6.90% - 7.50%).
                 </div>
               </div>
             )}

@@ -1470,10 +1470,7 @@ export default function App() {
         budgets={settings.budgets || []}
         categories={settings.categories || []}
         transactions={transactions}
-        microWealthPot={settings?.microWealthPot || {}}
         onSaveTransaction={handleSaveEntry}
-        onSaveInvestment={handleSaveInvestment}
-        onSavePreferences={savePreferences}
         isPrivacyMode={isPrivacyMode}
       />
 
