@@ -128,30 +128,31 @@ export default function SmartPayModal({
         setWaitingElapsedSeconds(prev => prev + 1);
       }, 1000);
 
-      // Automated Polling: If payment gets confirmed via webhook or user approves collect
-      if (currentTxnId) {
-        pollInterval = setInterval(async () => {
-          try {
-            const res = await fetch(`/api/payments/poll-status?txnId=${encodeURIComponent(currentTxnId)}`, {
-              headers: { 'Authorization': token ? `Bearer ${token}` : '' }
-            });
-            const data = await res.json();
-            if (data && data.status === 'SUCCESS') {
-              setAutoConfirmed(true);
-              completeAndShowReceipt(data.refNumber || `UTR${Date.now().toString().slice(-8)}`);
-            }
-          } catch (e) {
-            // Ignore polling network glitches
+      // Automated Polling: Continuously checks backend listener
+      pollInterval = setInterval(async () => {
+        try {
+          const pollUrl = currentTxnId 
+            ? `/api/payments/poll-status?txnId=${encodeURIComponent(currentTxnId)}`
+            : `/api/payments/poll-status?txnId=latest&amount=${numericAmount}`;
+          const res = await fetch(pollUrl, {
+            headers: { 'Authorization': token ? `Bearer ${token}` : '' }
+          });
+          const data = await res.json();
+          if (data && data.status === 'SUCCESS') {
+            setAutoConfirmed(true);
+            completeAndShowReceipt(data.refNumber || `UTR${Date.now().toString().slice(-8)}`);
           }
-        }, 2500);
-      }
+        } catch (e) {
+          // Ignore network glitch during poll
+        }
+      }, 2000);
     }
 
     return () => {
       if (interval) clearInterval(interval);
       if (pollInterval) clearInterval(pollInterval);
     };
-  }, [step, currentTxnId]);
+  }, [step, currentTxnId, numericAmount]);
 
   const stopCamera = () => {
     if (videoRef.current && videoRef.current.srcObject) {
@@ -725,18 +726,19 @@ export default function SmartPayModal({
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '4px 12px',
+                gap: '8px',
+                padding: '6px 14px',
                 borderRadius: '20px',
-                background: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid var(--border-glass)',
-                fontSize: '11px',
-                color: 'var(--text-muted)',
+                background: 'rgba(16, 185, 129, 0.1)',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                fontSize: '11.5px',
+                color: '#10B981',
+                fontWeight: '700',
                 marginBottom: '16px'
               }}
             >
-              <RefreshCw size={12} style={{ animation: 'spin 3s linear infinite', color: '#10B981' }} />
-              <span>Automated bank listener active: {waitingElapsedSeconds}s</span>
+              <RefreshCw size={12} style={{ animation: 'spin 2s linear infinite', color: '#10B981' }} />
+              <span>Listening for bank payment confirmation ({waitingElapsedSeconds}s)...</span>
             </div>
 
             {/* Optional UTR / Reference Input */}
@@ -1127,7 +1129,7 @@ export default function SmartPayModal({
                     <input
                       type="text"
                       className="input"
-                      placeholder="e.g. shashank.manikanta@okhdfcbank"
+                      placeholder="e.g. mobile@ybl, yourname@okhdfcbank"
                       value={senderVpa}
                       onChange={e => setSenderVpa(e.target.value.trim())}
                       style={{ width: '100%', borderRadius: '8px', fontSize: '12.5px', padding: '7px 10px', fontFamily: 'monospace' }}
@@ -1142,7 +1144,7 @@ export default function SmartPayModal({
                     <input
                       type="text"
                       className="input"
-                      placeholder="e.g. merchant@okhdfcbank, mobile@ybl"
+                      placeholder="e.g. merchant@upi, payee@okhdfcbank"
                       value={vpa}
                       onChange={e => setVpa(e.target.value.trim())}
                       style={{ width: '100%', borderRadius: '12px', fontSize: '13.5px', padding: '11px 12px' }}

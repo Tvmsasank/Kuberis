@@ -694,7 +694,7 @@ export default function UserProfileModal({
                             <input
                               type="text"
                               className="input"
-                              placeholder="shashank.manikanta@okhdfcbank or 9876543210@ybl"
+                              placeholder="e.g. mobile@ybl or username@okhdfcbank"
                               value={vpaInput}
                               onChange={e => setVpaInput(e.target.value)}
                               style={{ flex: 1, fontSize: '13px', padding: '8px 12px', borderRadius: '10px' }}

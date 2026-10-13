@@ -2250,6 +2250,16 @@ app.all('/api/transactions/upi-webhook', (req, res) => {
     // Automatically add transaction to user's account in real-time
     const newTx = dbEngine.addTransaction(userId, parsed);
 
+    // Auto-resolve any active collect request session for this user and amount
+    for (const [id, s] of activeCollectRequests.entries()) {
+      if (s.userId === userId && Math.abs(s.amount - Number(parsed.amount)) < 0.01) {
+        s.status = 'SUCCESS';
+        s.refNumber = parsed.refNumber || newTx.id;
+        console.log(`[UPI Webhook Autolink] Linked transaction to collect session ${id}`);
+        break;
+      }
+    }
+
     console.log(`[UPI Webhook Success]: Synced ₹${parsed.amount} to ${parsed.merchant} (Tx ID: ${newTx.id})`);
 
     res.json({
@@ -2354,22 +2364,67 @@ app.post('/api/payments/collect-request', authenticateToken, async (req, res) =>
 // GET /api/payments/poll-status - Poll for real-time completion of collect request
 app.get('/api/payments/poll-status', authenticateToken, async (req, res) => {
   try {
-    const { txnId } = req.query;
-    if (!txnId) {
-      return res.status(400).json({ error: 'Transaction ID required' });
+    const userId = req.userId;
+    const { txnId, amount } = req.query;
+
+    let session = (txnId && txnId !== 'latest') ? activeCollectRequests.get(txnId) : null;
+
+    // If txnId is 'latest', find the most recent session for this user
+    if (!session && userId) {
+      for (const [id, s] of activeCollectRequests.entries()) {
+        if (s.userId === userId && (!amount || Math.abs(s.amount - Number(amount)) < 0.01)) {
+          session = s;
+          break;
+        }
+      }
     }
 
-    const session = activeCollectRequests.get(txnId);
-    if (!session) {
-      return res.json({ status: 'NOT_FOUND' });
+    if (session && session.status === 'SUCCESS') {
+      return res.json({
+        txnId: session.txnId,
+        status: 'SUCCESS',
+        refNumber: session.refNumber || null,
+        amount: session.amount
+      });
     }
 
-    res.json({
-      txnId,
-      status: session.status,
-      refNumber: session.refNumber || null,
-      amount: session.amount
-    });
+    // Auto-detection cross-check: Check if recent transaction in ledger matches
+    if (session && session.amount && userId) {
+      const state = dbEngine.getState(userId);
+      const recentTxs = (state.transactions || []).slice(-15);
+      const sessionCreatedAt = session.createdAt || (Date.now() - 300000);
+      
+      const matchingTx = recentTxs.find(tx => {
+        const isMatchAmount = Math.abs(Number(tx.amount || 0) - Number(session.amount)) < 0.01;
+        const txTime = tx.createdAt ? new Date(tx.createdAt).getTime() : Date.now();
+        const isRecent = txTime >= (sessionCreatedAt - 60000);
+        return isMatchAmount && isRecent;
+      });
+
+      if (matchingTx) {
+        session.status = 'SUCCESS';
+        session.refNumber = matchingTx.id || `UTR${Date.now().toString().slice(-8)}`;
+        return res.json({
+          txnId,
+          status: 'SUCCESS',
+          refNumber: session.refNumber,
+          amount: session.amount,
+          autoDetected: true
+        });
+      }
+    }
+
+    // If session still exists but pending
+    if (session) {
+      return res.json({
+        txnId,
+        status: session.status || 'PENDING',
+        refNumber: session.refNumber || null,
+        amount: session.amount
+      });
+    }
+
+    res.json({ status: 'NOT_FOUND' });
   } catch (err) {
     console.error('GET /api/payments/poll-status error:', err);
     res.status(500).json({ error: 'Failed to check status' });
