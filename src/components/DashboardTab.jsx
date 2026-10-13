@@ -13,7 +13,10 @@ import {
   Building2,
   Briefcase,
   Activity,
-  ChevronRight
+  ChevronRight,
+  Zap,
+  QrCode,
+  ShieldCheck
 } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, Legend } from 'recharts';
 import { calculateDynamicNetWorth } from '../utils/netWorth';
@@ -27,6 +30,7 @@ export default function DashboardTab({
   onOpenAddEntry,
   onOpenImport,
   onNavigateTab,
+  onOpenSmartPay,
   isPrivacyMode = false
 }) {
   const { assets = 0, liabilities = 0, netWorthConfigured = false, recurring = [], subscriptions = [] } = settings;
@@ -198,6 +202,94 @@ export default function DashboardTab({
           <div style={{ fontSize: '11px', color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)', paddingTop: '8px', marginTop: '8px' }}>
             ((Income - Spending) / Income)
           </div>
+        </div>
+      </div>
+
+      {/* ⚡ Kuberis Smart-Pay & Micro-Wealth Engine Card (Unique USP) */}
+      <div
+        className="card"
+        style={{
+          marginBottom: '24px',
+          padding: '20px 24px',
+          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(6, 78, 59, 0.2) 100%)',
+          border: '1px solid rgba(16, 185, 129, 0.35)',
+          borderRadius: '18px',
+          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.25), 0 0 20px rgba(16, 185, 129, 0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '16px'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div
+            style={{
+              width: '48px',
+              height: '48px',
+              borderRadius: '14px',
+              background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+              color: '#000',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 0 16px rgba(16, 185, 129, 0.45)',
+              flexShrink: 0
+            }}
+          >
+            <Zap size={26} />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <h3 style={{ fontSize: '17px', fontWeight: '900', margin: 0, color: 'var(--text-main)', letterSpacing: '-0.3px' }}>
+                Kuberis Smart-Pay & Micro-Wealth Engine
+              </h3>
+              <span
+                style={{
+                  fontSize: '10.5px',
+                  fontWeight: '800',
+                  padding: '2px 8px',
+                  borderRadius: '10px',
+                  background: 'rgba(16, 185, 129, 0.2)',
+                  color: '#10B981',
+                  border: '1px solid #10B981'
+                }}
+              >
+                USP
+              </span>
+            </div>
+            <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '4px' }}>
+              Scan any UPI QR with <strong>Pre-Payment Budget Shield</strong> & auto-save spare change into <strong>7.10% Fixed Deposits</strong>.
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <div style={{ textAlign: 'right', marginRight: '6px' }}>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Micro-Wealth Pot</div>
+            <div style={{ fontSize: '16px', fontWeight: '900', color: '#10B981' }}>
+              {formatInr(settings?.microWealthPot?.balance || 0)}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={onOpenSmartPay}
+            style={{
+              padding: '9px 18px',
+              borderRadius: '12px',
+              fontSize: '13px',
+              fontWeight: '800',
+              gap: '8px',
+              background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+              color: '#000',
+              border: 'none',
+              boxShadow: '0 0 15px rgba(16, 185, 129, 0.4)'
+            }}
+          >
+            <QrCode size={16} /> Scan & Pay
+          </button>
         </div>
       </div>
 

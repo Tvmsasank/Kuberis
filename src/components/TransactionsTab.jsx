@@ -17,6 +17,7 @@ export default function TransactionsTab({
   onOpenEditEntry,
   onOpenTagModal,
   onOpenSmartUpi,
+  onOpenSmartPay,
   onOpenAaModal
 }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -87,20 +88,20 @@ export default function TransactionsTab({
           </button>
 
           <button
-            className="btn btn-secondary"
-            disabled
+            className="btn btn-primary"
+            onClick={onOpenSmartPay}
             style={{
               fontSize: '13px',
               gap: '6px',
-              border: '1px solid var(--border-color)',
-              color: 'var(--text-muted)',
-              background: 'rgba(255, 255, 255, 0.04)',
-              opacity: 0.5,
-              cursor: 'not-allowed'
+              background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+              color: '#000',
+              fontWeight: '800',
+              boxShadow: '0 0 10px rgba(16, 185, 129, 0.35)',
+              border: 'none'
             }}
-            title="Smart UPI / SMS (Coming Soon)"
+            title="Scan UPI QR & Pay with Pre-Payment Budget Shield"
           >
-            <Zap size={15} /> <span>Smart UPI / SMS</span>
+            <Zap size={15} style={{ fill: '#000' }} /> <span>Smart-Pay (UPI)</span>
           </button>
 
           <button className="btn btn-primary" onClick={onOpenAddEntry} style={{ fontSize: '13px' }}>

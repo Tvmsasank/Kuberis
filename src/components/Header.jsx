@@ -21,7 +21,8 @@ import {
   Compass,
   Bell,
   CheckCheck,
-  RefreshCw
+  RefreshCw,
+  Zap
 } from 'lucide-react';
 import { RATE_NOTIFICATIONS } from '../utils/fdRates';
 
@@ -53,7 +54,8 @@ export default function Header({
   isPrivacyMode = false,
   onTogglePrivacyMode,
   onStartTour,
-  onOpenGlassController
+  onOpenGlassController,
+  onOpenSmartPay
 }) {
   const isDark = theme !== 'light';
   const [tickers, setTickers] = useState(INITIAL_TICKERS);
@@ -678,6 +680,29 @@ export default function Header({
                   </div>
                 )}
               </div>
+
+              {/* ⚡ Smart-Pay Live UPI & Budget Shield Quick Launcher */}
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={onOpenSmartPay}
+                title="Kuberis Smart-Pay: Scan UPI QR with Real-Time Budget Shield & 7.10% Round-Ups"
+                style={{
+                  padding: '6px 13px',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  fontWeight: '800',
+                  gap: '6px',
+                  background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                  color: '#000',
+                  boxShadow: '0 0 12px rgba(16, 185, 129, 0.45)',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                <Zap size={14} style={{ fill: '#000' }} />
+                <span>Smart-Pay</span>
+              </button>
 
               {/* Desktop Only Actions */}
               <button className="btn btn-ghost btn-sm desktop-only-action" onClick={onTriggerDriveSync} title="Sync Google Drive Inbox">

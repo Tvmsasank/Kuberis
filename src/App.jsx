@@ -32,6 +32,7 @@ import ChangePasswordModal from './components/ChangePasswordModal';
 import UserProfileModal from './components/UserProfileModal';
 import MpinModal from './components/MpinModal';
 import SmartUpiModal from './components/SmartUpiModal';
+import SmartPayModal from './components/SmartPayModal';
 import AccountAggregatorModal from './components/AccountAggregatorModal';
 import NetWorthModal from './components/NetWorthModal';
 import TwoFactorSetupModal from './components/TwoFactorSetupModal';
@@ -114,6 +115,7 @@ export default function App() {
 
   // Smart UPI Modal State
   const [isSmartUpiOpen, setIsSmartUpiOpen] = useState(false);
+  const [isSmartPayOpen, setIsSmartPayOpen] = useState(false);
 
   // RBI Account Aggregator Modal State
   const [isAaModalOpen, setIsAaModalOpen] = useState(false);
@@ -1048,6 +1050,10 @@ export default function App() {
           }}
           onStartTour={() => setIsTourOpen(true)}
           onOpenGlassController={() => setIsGlassControllerOpen(true)}
+          onOpenSmartPay={() => {
+            if (!user) { setAuthModalMode('login'); setIsAuthModalOpen(true); return; }
+            setIsSmartPayOpen(true);
+          }}
         />
 
         <main className="page-body">
@@ -1081,6 +1087,7 @@ export default function App() {
                   onOpenAddEntry={() => setIsAddEntryOpen(true)}
                   onOpenImport={() => setIsImportOpen(true)}
                   onNavigateTab={setActiveTab}
+                  onOpenSmartPay={() => setIsSmartPayOpen(true)}
                   isPrivacyMode={isPrivacyMode}
                 />
               )}
@@ -1100,6 +1107,7 @@ export default function App() {
                   onOpenEditEntry={tx => { setEditingTx(tx); setIsAddEntryOpen(true); }}
                   onOpenTagModal={tx => setTagModalTx(tx)}
                   onOpenSmartUpi={() => setIsSmartUpiOpen(true)}
+                  onOpenSmartPay={() => setIsSmartPayOpen(true)}
                   onOpenAaModal={() => setIsAaModalOpen(true)}
                   isPrivacyMode={isPrivacyMode}
                 />
@@ -1215,6 +1223,7 @@ export default function App() {
           user={user}
           onOpenProfile={() => setIsProfileModalOpen(true)}
           onLogout={handleLogout}
+          onOpenSmartPay={() => setIsSmartPayOpen(true)}
         />
       )}
 
@@ -1453,6 +1462,19 @@ export default function App() {
         onTransactionAdded={fetchState}
         token={token}
         userEmail={user?.email}
+      />
+
+      <SmartPayModal
+        isOpen={isSmartPayOpen}
+        onClose={() => setIsSmartPayOpen(false)}
+        budgets={budgets}
+        categories={settings.categories || []}
+        transactions={transactions}
+        microWealthPot={settings?.microWealthPot || {}}
+        onSaveTransaction={handleSaveTransaction}
+        onSaveInvestment={handleSaveInvestment}
+        onSavePreferences={savePreferences}
+        isPrivacyMode={isPrivacyMode}
       />
 
       <AccountAggregatorModal

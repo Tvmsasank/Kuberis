@@ -15,7 +15,8 @@ import {
   Calculator,
   X,
   User,
-  LogOut
+  LogOut,
+  Zap
 } from 'lucide-react';
 
 const MAIN_TABS = [
@@ -36,7 +37,7 @@ const MORE_TABS = [
   { id: 'settings', label: 'Settings & Security', icon: Settings }
 ];
 
-export default function MobileNav({ activeTab, onSelectTab, user, onOpenProfile, onLogout }) {
+export default function MobileNav({ activeTab, onSelectTab, user, onOpenProfile, onLogout, onOpenSmartPay }) {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
 
   // Lock background scroll when drawer is open
@@ -60,10 +61,55 @@ export default function MobileNav({ activeTab, onSelectTab, user, onOpenProfile,
 
   return (
     <>
-      {/* 5-Item Clean Bottom Bar */}
+      {/* 5-Item Clean Bottom Bar with Smart-Pay Action */}
       <nav className="mobile-nav">
-        <div className="mobile-nav-inner">
-          {MAIN_TABS.map(tab => {
+        <div className="mobile-nav-inner" style={{ position: 'relative' }}>
+          {MAIN_TABS.slice(0, 2).map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                className={`mobile-nav-item ${isActive ? 'active' : ''}`}
+                onClick={() => handleTabClick(tab.id)}
+              >
+                <Icon size={20} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+
+          {/* ⚡ Glowing Center Smart-Pay Action */}
+          <button
+            type="button"
+            className="mobile-nav-item"
+            onClick={onOpenSmartPay}
+            style={{
+              color: '#10B981',
+              transform: 'translateY(-6px)'
+            }}
+            title="Scan UPI QR with Budget Shield"
+          >
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                color: '#000',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 0 14px rgba(16, 185, 129, 0.55)'
+              }}
+            >
+              <Zap size={20} style={{ fill: '#000' }} />
+            </div>
+            <span style={{ fontSize: '10px', fontWeight: '800', marginTop: '2px', color: '#10B981' }}>Pay</span>
+          </button>
+
+          {MAIN_TABS.slice(2).map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
