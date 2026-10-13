@@ -420,10 +420,13 @@ function ensureDefaultSuperAdmin(db) {
   // Remove any legacy auto-generated root admin records from customer users list
   if (Array.isArray(db.users)) {
     db.users = db.users.filter(u => !u.id || !u.id.startsWith('usr_admin_root_'));
-    // Ensure all customer accounts have normal user role
+    // Ensure all customer accounts have normal user role and default to 2 concurrent sessions (PC + Mobile)
     db.users.forEach(u => {
       if (u.role === 'super_admin') {
         u.role = 'user';
+      }
+      if (!u.maxActiveSessions) {
+        u.maxActiveSessions = 2;
       }
     });
   }
@@ -502,6 +505,9 @@ export const dbEngine = {
       isSuspended: false,
       isLocked: false,
       failedMpinAttempts: 0,
+      maxActiveSessions: 2,
+      activeSessionIds: [],
+      defaultVpa: null,
       createdAt: new Date().toISOString(),
       lastLoginAt: null,
       resetToken: null,
@@ -522,6 +528,9 @@ export const dbEngine = {
       email: newUser.email,
       role: newUser.role,
       hasMpin: false,
+      twoFactorEnabled: false,
+      maxActiveSessions: 2,
+      defaultVpa: null,
       createdAt: newUser.createdAt
     };
   },
@@ -544,6 +553,7 @@ export const dbEngine = {
     user.lastLoginAt = new Date().toISOString();
     const role = (user.role === 'super_admin' ? 'user' : user.role) || 'user';
     user.role = role;
+    if (!user.maxActiveSessions) user.maxActiveSessions = 2;
     saveDb();
 
     return {
@@ -553,6 +563,8 @@ export const dbEngine = {
       role,
       hasMpin: !!user.mpinHash,
       twoFactorEnabled: !!user.twoFactorEnabled,
+      maxActiveSessions: user.maxActiveSessions || 2,
+      defaultVpa: user.defaultVpa || null,
       createdAt: user.createdAt
     };
   },
@@ -560,7 +572,10 @@ export const dbEngine = {
   getUserByEmail(email) {
     const db = loadDb();
     const cleanEmail = (email || '').trim().toLowerCase();
-    return db.users.find(u => u.email === cleanEmail) || null;
+    const user = db.users.find(u => u.email === cleanEmail);
+    if (!user) return null;
+    if (!user.maxActiveSessions) user.maxActiveSessions = 2;
+    return user;
   },
 
   getUserById(userId) {
@@ -593,7 +608,7 @@ export const dbEngine = {
     if (!user) return false;
     user.defaultVpa = vpa ? String(vpa).trim().toLowerCase() : null;
     saveDb();
-    if (isPgAvailable && pgPool) {
+    if (pgPool) {
       pgPool.query(
         'UPDATE public.wealthpulse_users SET default_vpa = $1 WHERE id = $2',
         [user.defaultVpa, userId]
@@ -822,6 +837,7 @@ export const dbEngine = {
     user.lastLoginAt = new Date().toISOString();
     const role = (user.role === 'super_admin' ? 'user' : user.role) || 'user';
     user.role = role;
+    if (!user.maxActiveSessions) user.maxActiveSessions = 2;
     saveDb();
 
     return {
@@ -831,6 +847,8 @@ export const dbEngine = {
       role,
       hasMpin: true,
       twoFactorEnabled: !!user.twoFactorEnabled,
+      maxActiveSessions: user.maxActiveSessions || 2,
+      defaultVpa: user.defaultVpa || null,
       createdAt: user.createdAt
     };
   },
@@ -1598,6 +1616,7 @@ export const dbEngine = {
     return {
       success: true,
       user,
+      userId: user.id,
       sessionId: tokenRecord.sessionId,
       newRefreshToken
     };

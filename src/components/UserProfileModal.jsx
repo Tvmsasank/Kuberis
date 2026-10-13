@@ -85,6 +85,9 @@ export default function UserProfileModal({
     return `${visiblePrefix}****${visibleSuffix}@${handle}`;
   };
 
+  // Active Auth Token resolution
+  const activeAuthToken = token || localStorage.getItem('kuberis_token') || sessionStorage.getItem('kuberis_token') || '';
+
   // Concurrent Sessions State (1 vs 2)
   const [maxSessions, setMaxSessions] = useState(user?.maxActiveSessions || 2);
   const [sessionSaving, setSessionSaving] = useState(false);
@@ -104,7 +107,7 @@ export default function UserProfileModal({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${activeAuthToken}`
         },
         body: JSON.stringify({ maxActiveSessions: newLimit })
       });
@@ -132,7 +135,7 @@ export default function UserProfileModal({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${activeAuthToken}`
         },
         body: JSON.stringify({ vpa: vpaInput.trim() })
       });
@@ -154,13 +157,13 @@ export default function UserProfileModal({
   };
 
   const loadAuditLogs = async () => {
-    if (!token) return;
+    if (!activeAuthToken) return;
     setLoadingAuditLogs(true);
     try {
       const res = await fetch('/api/auth/audit-logs?limit=8', {
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'X-Auth-Token': token
+          'Authorization': `Bearer ${activeAuthToken}`,
+          'X-Auth-Token': activeAuthToken
         }
       });
       const data = await res.json();
@@ -223,7 +226,7 @@ export default function UserProfileModal({
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${activeAuthToken}`
         }
       });
 
@@ -298,6 +301,7 @@ export default function UserProfileModal({
 
             {/* Header */}
             <div
+              className="kuberis-profile-header"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -468,15 +472,12 @@ export default function UserProfileModal({
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {/* Passkeys / FaceID Card */}
                     <div
+                      className="kuberis-profile-card-row"
                       style={{
                         padding: '14px 16px',
                         borderRadius: '16px',
                         background: cardItemBg,
-                        border: cardItemBorder,
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: '12px'
+                        border: cardItemBorder
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -497,16 +498,18 @@ export default function UserProfileModal({
                           <div style={{ fontSize: '11.5px', color: textSub }}>Touch ID & Device Passkeys</div>
                         </div>
                       </div>
-                      <motion.button
-                        whileHover={{ scale: 1.03 }}
-                        whileTap={{ scale: 0.97 }}
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        style={{ borderRadius: '10px', fontSize: '11.5px', fontWeight: '700', padding: '7px 14px' }}
-                        onClick={handleEnableBiometrics}
-                      >
-                        Enable Passkey
-                      </motion.button>
+                      <div className="kuberis-profile-card-actions">
+                        <motion.button
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.97 }}
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          style={{ borderRadius: '10px', fontSize: '11.5px', fontWeight: '700', padding: '7px 14px' }}
+                          onClick={handleEnableBiometrics}
+                        >
+                          Enable Passkey
+                        </motion.button>
+                      </div>
                     </div>
 
                     {bioMessage && (
@@ -522,15 +525,12 @@ export default function UserProfileModal({
 
                     {/* Google Authenticator 2FA Card */}
                     <div
+                      className="kuberis-profile-card-row"
                       style={{
                         padding: '14px 16px',
                         borderRadius: '16px',
                         background: cardItemBg,
-                        border: cardItemBorder,
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: '12px'
+                        border: cardItemBorder
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -573,30 +573,29 @@ export default function UserProfileModal({
                         </div>
                       </div>
                       {onOpenTwoFactorModal && (
-                        <motion.button
-                          whileHover={{ scale: 1.03 }}
-                          whileTap={{ scale: 0.97 }}
-                          type="button"
-                          className={`btn ${user?.twoFactorEnabled ? 'btn-secondary' : 'btn-primary'} btn-sm`}
-                          style={{ borderRadius: '10px', fontSize: '11.5px', fontWeight: '700', padding: '7px 14px' }}
-                          onClick={onOpenTwoFactorModal}
-                        >
-                          {user?.twoFactorEnabled ? 'Manage 2FA' : 'Enable 2FA'}
-                        </motion.button>
+                        <div className="kuberis-profile-card-actions">
+                          <motion.button
+                            whileHover={{ scale: 1.03 }}
+                            whileTap={{ scale: 0.97 }}
+                            type="button"
+                            className={`btn ${user?.twoFactorEnabled ? 'btn-secondary' : 'btn-primary'} btn-sm`}
+                            style={{ borderRadius: '10px', fontSize: '11.5px', fontWeight: '700', padding: '7px 14px' }}
+                            onClick={onOpenTwoFactorModal}
+                          >
+                            {user?.twoFactorEnabled ? 'Manage 2FA' : 'Enable 2FA'}
+                          </motion.button>
+                        </div>
                       )}
                     </div>
 
                     {/* 4-Digit MPIN Security Card */}
                     <div
+                      className="kuberis-profile-card-row"
                       style={{
                         padding: '14px 16px',
                         borderRadius: '16px',
                         background: cardItemBg,
-                        border: cardItemBorder,
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: '12px'
+                        border: cardItemBorder
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -625,7 +624,7 @@ export default function UserProfileModal({
                           </div>
                         </div>
                       </div>
-                      <div style={{ display: 'flex', gap: '6px' }}>
+                      <div className="kuberis-profile-card-actions">
                         <motion.button
                           whileHover={{ scale: 1.03 }}
                           whileTap={{ scale: 0.97 }}
@@ -677,7 +676,7 @@ export default function UserProfileModal({
                         gap: '10px'
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                      <div className="kuberis-profile-card-row">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <div
                             style={{
@@ -711,16 +710,18 @@ export default function UserProfileModal({
                           </div>
                         </div>
 
-                        <motion.button
-                          whileHover={{ scale: 1.03 }}
-                          whileTap={{ scale: 0.97 }}
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          style={{ borderRadius: '10px', fontSize: '11.5px', fontWeight: '700', padding: '7px 12px' }}
-                          onClick={() => setIsEditingVpa(!isEditingVpa)}
-                        >
-                          {isEditingVpa ? 'Cancel' : user?.defaultVpa ? 'Edit VPA' : 'Add VPA'}
-                        </motion.button>
+                        <div className="kuberis-profile-card-actions">
+                          <motion.button
+                            whileHover={{ scale: 1.03 }}
+                            whileTap={{ scale: 0.97 }}
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            style={{ borderRadius: '10px', fontSize: '11.5px', fontWeight: '700', padding: '7px 12px' }}
+                            onClick={() => setIsEditingVpa(!isEditingVpa)}
+                          >
+                            {isEditingVpa ? 'Cancel' : user?.defaultVpa ? 'Edit VPA' : 'Add VPA'}
+                          </motion.button>
+                        </div>
                       </div>
 
                       {/* VPA Edit Form */}
@@ -772,7 +773,7 @@ export default function UserProfileModal({
                       gap: '10px'
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                    <div className="kuberis-profile-card-row">
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div
                           style={{
@@ -812,6 +813,7 @@ export default function UserProfileModal({
 
                       {/* 1 vs 2 Toggle Segmented Button */}
                       <div
+                        className="kuberis-profile-segmented-btns"
                         style={{
                           display: 'flex',
                           background: isLight ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.06)',
@@ -870,6 +872,7 @@ export default function UserProfileModal({
 
                 {/* Account Action Buttons */}
                 <div
+                  className="kuberis-profile-footer-actions"
                   style={{
                     display: 'flex',
                     gap: '8px',
