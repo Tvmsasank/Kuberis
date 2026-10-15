@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CreditCard, Plus, Check, EyeOff, Trash2, ShieldCheck } from 'lucide-react';
+import { CreditCard, Plus, Check, EyeOff, Trash2, ShieldCheck, Bell, Mail, AlertTriangle, Calendar, Clock, CheckCircle2 } from 'lucide-react';
 import { detectRecurring } from '../utils/recurringEngine';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import CustomSelect from './CustomSelect';
@@ -10,7 +10,9 @@ export default function SubscriptionsTab({
   onConfirmSubscription,
   onIgnoreSuggestion,
   onAddManualSubscription,
-  onDeleteSubscription
+  onDeleteSubscription,
+  token,
+  user
 }) {
   const { subscriptions = [], dismissedPatterns = [] } = settings;
 
@@ -30,6 +32,51 @@ export default function SubscriptionsTab({
   const [cadence, setCadence] = useState('monthly');
   const [category, setCategory] = useState('Subscriptions');
   const [nextRenewalDate, setNextRenewalDate] = useState(new Date().toISOString().split('T')[0]);
+  const [testingAlerts, setTestingAlerts] = useState(false);
+  const [alertFeedback, setAlertFeedback] = useState('');
+
+  // Calculate days left for any renewal date
+  const getDaysLeft = (dateStr) => {
+    if (!dateStr) return null;
+    const [year, month, day] = dateStr.split('-').map(Number);
+    if (!year || !month || !day) return null;
+    const renewal = new Date(year, month - 1, day);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diff = Math.round((renewal.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    return diff;
+  };
+
+  // Trigger manual reminder scan & test
+  const handleTriggerEmailScan = async () => {
+    setTestingAlerts(true);
+    setAlertFeedback('');
+    try {
+      const activeToken = token || localStorage.getItem('kuberis_token') || sessionStorage.getItem('kuberis_token');
+      const res = await fetch('/api/subscriptions/trigger-reminders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': activeToken ? `Bearer ${activeToken}` : ''
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setAlertFeedback(
+          data.result?.dispatchedCount > 0 
+            ? `Dispatched ${data.result.dispatchedCount} renewal reminder email(s) to ${user?.email || 'your email'}!`
+            : `All subscriptions are healthy. Any subscription within 2 days of renewal will receive automated emails!`
+        );
+      } else {
+        setAlertFeedback(data.error || 'Failed to check reminders');
+      }
+    } catch (e) {
+      setAlertFeedback('Network error testing renewal reminders.');
+    } finally {
+      setTestingAlerts(false);
+      setTimeout(() => setAlertFeedback(''), 6000);
+    }
+  };
 
   const handleManualSubmit = (e) => {
     e.preventDefault();
@@ -56,12 +103,86 @@ export default function SubscriptionsTab({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h2 style={{ fontSize: '20px', fontWeight: '700' }}>Active Subscriptions</h2>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Detect and track SaaS, streaming, and membership services</p>
+          <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Detect and track SaaS, streaming, and membership services with automated alerts</p>
         </div>
 
-        <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
-          <Plus size={16} /> Add Subscription
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <button 
+            className="btn btn-secondary"
+            onClick={handleTriggerEmailScan}
+            disabled={testingAlerts}
+            title="Scan upcoming renewals and send email alerts for services renewing within 2 days"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+          >
+            {testingAlerts ? (
+              <span className="spinner-border spinner-border-sm" role="status" style={{ width: 14, height: 14, borderWidth: 2 }} />
+            ) : (
+              <Mail size={16} style={{ color: '#38bdf8' }} />
+            )}
+            {testingAlerts ? 'Checking Alerts...' : 'Test Renewal Alerts'}
+          </button>
+
+          <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
+            <Plus size={16} /> Add Subscription
+          </button>
+        </div>
+      </div>
+
+      {/* Proactive 2-Day Prior Email Reminder Banner */}
+      <div style={{
+        background: 'rgba(56, 189, 248, 0.08)',
+        border: '1px solid rgba(56, 189, 248, 0.25)',
+        borderRadius: '14px',
+        padding: '14px 18px',
+        marginBottom: '24px',
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '14px'
+      }}>
+        <div style={{
+          width: '36px',
+          height: '36px',
+          borderRadius: '10px',
+          background: 'rgba(56, 189, 248, 0.15)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#38bdf8',
+          flexShrink: 0
+        }}>
+          <Bell size={18} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: '700', fontSize: '13.5px', color: 'var(--text-main)' }}>
+              ⚡ Automated 2-Day Prior Email Reminders
+            </span>
+            <span className="badge badge-success" style={{ fontSize: '10px', padding: '2px 8px' }}>
+              Active
+            </span>
+          </div>
+          <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', margin: '4px 0 0 0', lineHeight: '1.5' }}>
+            Kuberis automatically scans your subscriptions and dispatches an email alert to <strong>{user?.email || 'your registered email'}</strong> starting <strong>2 days before</strong> any renewal or expiry date, including a reminder to ignore if already paid.
+          </p>
+          {alertFeedback && (
+            <div style={{
+              marginTop: '10px',
+              padding: '8px 12px',
+              borderRadius: '8px',
+              background: alertFeedback.includes('Dispatched') ? 'rgba(16, 185, 129, 0.15)' : 'rgba(56, 189, 248, 0.15)',
+              border: alertFeedback.includes('Dispatched') ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(56, 189, 248, 0.3)',
+              color: alertFeedback.includes('Dispatched') ? '#10b981' : '#38bdf8',
+              fontSize: '12px',
+              fontWeight: '600',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}>
+              <CheckCircle2 size={14} />
+              {alertFeedback}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Subscription Totals */}
@@ -155,24 +276,59 @@ export default function SubscriptionsTab({
                 </tr>
               </thead>
               <tbody>
-                {subscriptions.map(sub => (
-                  <tr key={sub.id}>
-                    <td style={{ fontWeight: '600' }}>{sub.serviceName || sub.merchant}</td>
-                    <td><span className="badge badge-secondary">{sub.category || 'Subscriptions'}</span></td>
-                    <td style={{ textTransform: 'capitalize' }}>{sub.cadence}</td>
-                    <td>{sub.nextRenewalDate || sub.nextDate || 'N/A'}</td>
-                    <td style={{ textAlign: 'right', fontWeight: '700' }}>₹{Number(sub.amount).toFixed(2)}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        style={{ color: 'var(--danger)' }}
-                        onClick={() => setDeleteTarget(sub)}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {subscriptions.map(sub => {
+                  const renewalDate = sub.nextRenewalDate || sub.nextDate;
+                  const daysLeft = getDaysLeft(renewalDate);
+                  return (
+                    <tr key={sub.id}>
+                      <td style={{ fontWeight: '600' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <CreditCard size={15} style={{ color: 'var(--primary)' }} />
+                          {sub.serviceName || sub.merchant}
+                        </div>
+                      </td>
+                      <td><span className="badge badge-secondary">{sub.category || 'Subscriptions'}</span></td>
+                      <td style={{ textTransform: 'capitalize' }}>{sub.cadence}</td>
+                      <td>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span>{renewalDate || 'N/A'}</span>
+                          {daysLeft !== null && (
+                            daysLeft < 0 ? (
+                              <span className="badge badge-secondary" style={{ fontSize: '10.5px' }}>Past Due</span>
+                            ) : daysLeft === 0 ? (
+                              <span className="badge badge-danger" style={{ fontSize: '10.5px', display: 'inline-flex', alignItems: 'center', gap: '3px', background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                                <AlertTriangle size={11} /> Renews Today
+                              </span>
+                            ) : daysLeft === 1 ? (
+                              <span className="badge badge-warning" style={{ fontSize: '10.5px', display: 'inline-flex', alignItems: 'center', gap: '3px', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+                                <Clock size={11} /> Renews Tomorrow
+                              </span>
+                            ) : daysLeft === 2 ? (
+                              <span className="badge" style={{ fontSize: '10.5px', display: 'inline-flex', alignItems: 'center', gap: '3px', background: 'rgba(234, 179, 8, 0.15)', color: '#eab308', border: '1px solid rgba(234, 179, 8, 0.3)' }}>
+                                <Mail size={11} /> Renews in 2 Days (Alert Active)
+                              </span>
+                            ) : (
+                              <span className="badge badge-secondary" style={{ fontSize: '10.5px' }}>
+                                In {daysLeft} days
+                              </span>
+                            )
+                          )}
+                        </div>
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: '700' }}>₹{Number(sub.amount).toFixed(2)}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          style={{ color: 'var(--danger)' }}
+                          onClick={() => setDeleteTarget(sub)}
+                          title="Delete Subscription"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -237,13 +393,16 @@ export default function SubscriptionsTab({
               </div>
 
               <div className="form-group">
-                <label className="form-label">Next Renewal Date</label>
+                <label className="form-label">Next Renewal / Expiry Date</label>
                 <input
                   type="date"
                   className="form-control"
                   value={nextRenewalDate}
                   onChange={e => setNextRenewalDate(e.target.value)}
                 />
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                  💡 Kuberis will automatically email you 2 days prior to this renewal date.
+                </span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '20px' }}>

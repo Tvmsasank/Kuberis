@@ -1217,6 +1217,88 @@ async function sendPaymentReceiptEmail({ toEmail, name, payeeName, vpa, amount, 
   return await sendEmailWithFallback({ to: toEmail, subject, text, html });
 }
 
+// Subscription Expiry & Renewal Alert Email (2 Days Prior)
+async function sendSubscriptionRenewalReminderEmail({ toEmail, name, serviceName, amount, cadence, renewalDate, daysLeft, category }) {
+  const formattedAmount = '₹' + Number(amount || 0).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+  const daysText = daysLeft === 0 ? 'today' : daysLeft === 1 ? 'tomorrow' : `in ${daysLeft} days`;
+  const subject = `⚠️ Subscription Renewal Alert: ${serviceName} renews ${daysText} (${formattedAmount}) - Kuberis`;
+  
+  const text = `Hi ${name || 'Investor'},\n\nThis is a friendly reminder from Kuberis that your subscription for ${serviceName} is scheduled to end / renew ${daysText} on ${renewalDate}.\n\nSubscription Details:\n- Service: ${serviceName}\n- Amount: ${formattedAmount}\n- Billing Cycle: ${cadence || 'Monthly'}\n- Category: ${category || 'Subscriptions'}\n- Renewal / Expiry Date: ${renewalDate}\n\n* Note: Please ignore this email if you have already paid or if auto-debit is enabled.\n\nManage your subscriptions in Kuberis:\nhttps://kuberis.onrender.com/dashboard\n\nRegards,\nTeam Kuberis`;
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 540px; margin: 0 auto; padding: 28px 22px; border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 18px; background: #040D1A; color: #FFFFFF;">
+      <div style="text-align: center; margin-bottom: 22px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 16px;">
+        <h2 style="color: #F59E0B; margin: 0 0 4px 0; font-size: 24px; font-weight: 900; letter-spacing: -0.5px;">⚡ Kuberis Subscriptions Guard</h2>
+        <div style="font-size: 12px; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px; font-weight: 600;">Upcoming Renewal & Expiry Notice</div>
+      </div>
+
+      <div style="text-align: center; margin: 20px 0;">
+        <div style="width: 58px; height: 58px; border-radius: 50%; background: rgba(245, 158, 11, 0.15); border: 2px solid #F59E0B; color: #F59E0B; display: inline-flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 12px;">
+          📅
+        </div>
+        <div style="font-size: 13px; color: #F59E0B; font-weight: 800; text-transform: uppercase; letter-spacing: 0.8px;">
+          ${daysLeft === 0 ? 'Renews Today' : daysLeft === 1 ? 'Renews Tomorrow' : `Renews in ${daysLeft} Days`}
+        </div>
+        <div style="font-size: 28px; font-weight: 900; color: #FFFFFF; margin-top: 4px; letter-spacing: -0.5px;">
+          ${serviceName}
+        </div>
+        <div style="font-size: 16px; color: #10B981; font-weight: 800; margin-top: 4px;">
+          ${formattedAmount} <span style="font-size: 12px; color: #94A3B8; font-weight: 600;">/ ${cadence || 'month'}</span>
+        </div>
+      </div>
+
+      <p style="color: #CBD5E1; font-size: 13.5px; line-height: 1.6; margin-bottom: 20px; text-align: center;">
+        Your recurring subscription for <strong>${serviceName}</strong> is ending or scheduled for automatic renewal on <strong style="color: #F59E0B;">${renewalDate}</strong>.
+      </p>
+
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 22px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; overflow: hidden;">
+        <tbody>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <td style="padding: 10px 14px; font-size: 12.5px; color: #94A3B8; font-weight: 600; width: 40%;">Service / Provider</td>
+            <td style="padding: 10px 14px; font-size: 13px; color: #FFFFFF; font-weight: 700;">${serviceName}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <td style="padding: 10px 14px; font-size: 12.5px; color: #94A3B8; font-weight: 600;">Expected Charge</td>
+            <td style="padding: 10px 14px; font-size: 13.5px; color: #10B981; font-weight: 800;">${formattedAmount}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <td style="padding: 10px 14px; font-size: 12.5px; color: #94A3B8; font-weight: 600;">Billing Cadence</td>
+            <td style="padding: 10px 14px; font-size: 13px; color: #38BDF8; font-weight: 700; text-transform: capitalize;">${cadence || 'Monthly'}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+            <td style="padding: 10px 14px; font-size: 12.5px; color: #94A3B8; font-weight: 600;">Category</td>
+            <td style="padding: 10px 14px; font-size: 13px; color: #FFFFFF;">${category || 'Subscriptions'}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 14px; font-size: 12.5px; color: #94A3B8; font-weight: 600;">Renewal Date</td>
+            <td style="padding: 10px 14px; font-size: 13px; color: #F59E0B; font-weight: 800;">${renewalDate}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Ignored notice as requested -->
+      <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px; padding: 12px 14px; margin-bottom: 20px; font-size: 12px; color: #CBD5E1; line-height: 1.5;">
+        ℹ️ <strong>Note:</strong> Please ignore this email if you have already paid or if your card / UPI auto-debit has already processed for this cycle.
+      </div>
+
+      <div style="text-align: center; margin: 24px 0 10px 0;">
+        <a href="https://kuberis.onrender.com/dashboard" style="background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: #000000; padding: 12px 26px; text-decoration: none; border-radius: 10px; font-weight: 800; font-size: 14px; display: inline-block; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.35);">
+          Manage Subscriptions in Kuberis →
+        </a>
+      </div>
+
+      <div style="font-size: 11px; color: #64748B; text-align: center; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 14px; margin-top: 18px; line-height: 1.4;">
+        © 2026 Kuberis OS. Non-custodial personal wealth intelligence.
+      </div>
+    </div>
+  `;
+
+  return await sendEmailWithFallback({ to: toEmail, subject, text, html });
+}
+
 async function sendPasswordChangedAlertEmail({ toEmail, name, deviceName, ipAddress, location, resetUrl }) {
   const subject = '🔐 Password Changed Successfully - Kuberis Security Alert';
   const text = `Hi ${name || 'there'},\n\nThe password for your Kuberis account (${toEmail}) was successfully changed.\nDevice: ${deviceName || 'Unknown Device'}\nIP Address: ${ipAddress || '127.0.0.1'}\nLocation: ${location || 'India - IN'}\nTime: ${new Date().toLocaleString('en-IN')}\n\nIf you did not initiate this change, immediately reset your password: ${resetUrl}`;
@@ -2786,6 +2868,121 @@ function getMaturityRemindersForUser(userId) {
   }
 }
 
+// Helper to compute subscription expiry & renewal reminders for notification center
+function getSubscriptionRemindersForUser(userId) {
+  if (!userId) return [];
+  try {
+    const settings = dbEngine.getUserSettings(userId) || {};
+    const subscriptions = Array.isArray(settings.subscriptions) ? settings.subscriptions : [];
+    const now = new Date();
+    const reminders = [];
+
+    subscriptions.forEach(sub => {
+      const renewalDateStr = sub.nextRenewalDate || sub.nextDate;
+      if (!renewalDateStr) return;
+
+      const [rYear, rMonth, rDay] = renewalDateStr.split('-').map(Number);
+      if (!rYear || !rMonth || !rDay) return;
+      const renewalDate = new Date(rYear, rMonth - 1, rDay);
+      const diffMs = renewalDate.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const daysLeft = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+      const service = sub.serviceName || sub.merchant || 'Subscription';
+      const formattedAmount = '₹' + Number(sub.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+
+      if (daysLeft >= 0 && daysLeft <= 2) {
+        const severity = daysLeft === 0 ? 'critical' : 'warning';
+        const daysLabel = daysLeft === 0 ? 'today' : daysLeft === 1 ? 'tomorrow' : `in 2 days`;
+        reminders.push({
+          id: `sub_renew_${sub.id}_${renewalDateStr}`,
+          date: new Date().toISOString().split('T')[0],
+          category: 'Subscription Alert',
+          title: `⚠️ ${service} Renewal Alert (${daysLabel})`,
+          description: `Your ${service} subscription (${formattedAmount}) will end or renew on ${renewalDateStr}. (Ignore if already paid or auto-debited).`,
+          severity,
+          daysLeft,
+          serviceName: service,
+          amount: sub.amount,
+          renewalDate: renewalDateStr,
+          isNew: true,
+          isUserAlert: true
+        });
+      }
+    });
+
+    return reminders;
+  } catch (err) {
+    console.error('Error generating subscription reminders:', err.message);
+    return [];
+  }
+}
+
+// In-memory record of sent subscription reminder emails to avoid repeat emails on the same renewal cycle
+// Key format: `${userId}_${subId}_${renewalDateStr}_${daysLeft}`
+const dispatchedSubscriptionReminders = new Set();
+
+// Evaluates and dispatches renewal emails to users who have subscriptions ending in 2 days (or today/tomorrow)
+async function checkAndDispatchSubscriptionRenewalEmails(filterUserId = null) {
+  try {
+    const db = dbEngine.loadDb ? dbEngine.loadDb() : null;
+    const users = filterUserId 
+      ? [{ id: filterUserId, email: (dbEngine.getUserById(filterUserId) || {}).email, name: (dbEngine.getUserById(filterUserId) || {}).name }]
+      : (db && Array.isArray(db.users) ? db.users : []);
+
+    const now = new Date();
+    const todayZero = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+    let dispatchedCount = 0;
+
+    for (const u of users) {
+      if (!u || !u.id || !u.email) continue;
+      const settings = dbEngine.getUserSettings(u.id) || {};
+      const subscriptions = Array.isArray(settings.subscriptions) ? settings.subscriptions : [];
+
+      for (const sub of subscriptions) {
+        const renewalDateStr = sub.nextRenewalDate || sub.nextDate;
+        if (!renewalDateStr) continue;
+
+        const [rYear, rMonth, rDay] = renewalDateStr.split('-').map(Number);
+        if (!rYear || !rMonth || !rDay) continue;
+        const renewalDate = new Date(rYear, rMonth - 1, rDay);
+        const diffMs = renewalDate.getTime() - todayZero;
+        const daysLeft = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+        // Trigger email starting from 2 days before the end of the date (daysLeft <= 2 and daysLeft >= 0)
+        if (daysLeft >= 0 && daysLeft <= 2) {
+          const dispatchKey = `${u.id}_${sub.id || sub.serviceName}_${renewalDateStr}_${daysLeft}`;
+          if (!dispatchedSubscriptionReminders.has(dispatchKey)) {
+            dispatchedSubscriptionReminders.add(dispatchKey);
+
+            console.log(`[Subscription Alert] Sending ${daysLeft}-day reminder email to ${u.email} for ${sub.serviceName || sub.merchant} (${renewalDateStr})`);
+            
+            sendSubscriptionRenewalReminderEmail({
+              toEmail: u.email,
+              name: u.name || 'Investor',
+              serviceName: sub.serviceName || sub.merchant || 'Subscription Service',
+              amount: sub.amount,
+              cadence: sub.cadence || 'monthly',
+              renewalDate: renewalDateStr,
+              daysLeft,
+              category: sub.category || 'Subscriptions'
+            }).catch(err => {
+              console.warn(`[Subscription Email Failed] for ${u.email}:`, err.message);
+            });
+
+            dispatchedCount++;
+          }
+        }
+      }
+    }
+
+    return { success: true, dispatchedCount };
+  } catch (err) {
+    console.error('Error in checkAndDispatchSubscriptionRenewalEmails:', err);
+    return { success: false, error: err.message };
+  }
+}
+
 let liveNewsCache = {
   items: [],
   lastFetchedAt: 0
@@ -2880,8 +3077,17 @@ app.get('/api/notifications', async (req, res) => {
   try {
     const userId = getUserIdFromReq(req);
     const userMaturityNotifs = getMaturityRemindersForUser(userId);
+    const userSubReminders = getSubscriptionRemindersForUser(userId);
     const liveNews = await fetchLiveFinancialNews();
-    const allNotifs = [...userMaturityNotifs, ...liveNews, ...RATE_NOTIFICATIONS];
+    const allNotifs = [...userSubReminders, ...userMaturityNotifs, ...liveNews, ...RATE_NOTIFICATIONS];
+
+    // Asynchronously dispatch 2-day subscription alert emails if any subscription is due
+    if (userId) {
+      setImmediate(() => {
+        checkAndDispatchSubscriptionRenewalEmails(userId).catch(() => {});
+      });
+    }
+
     res.json({
       success: true,
       notifications: allNotifs,
@@ -3578,6 +3784,32 @@ app.get('/api/admin/audit-logs', authenticateSuperAdmin, (req, res) => {
     res.status(500).json({ error: 'Failed to retrieve admin audit logs' });
   }
 });
+
+// POST /api/subscriptions/trigger-reminders (Manual or automated trigger for subscription renewal alerts)
+app.post('/api/subscriptions/trigger-reminders', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.userId;
+    const result = await checkAndDispatchSubscriptionRenewalEmails(userId);
+    res.json({ success: true, message: 'Subscription renewal reminders checked and dispatched', result });
+  } catch (err) {
+    console.error('POST /api/subscriptions/trigger-reminders error:', err);
+    res.status(500).json({ error: 'Failed to trigger subscription reminders' });
+  }
+});
+
+// Daily Subscription Renewal Scanner: Runs every 6 hours automatically across all registered users
+setInterval(() => {
+  console.log('[Kuberis Scheduler] Scanning for subscriptions expiring / renewing in 2 days...');
+  checkAndDispatchSubscriptionRenewalEmails().catch(err => {
+    console.warn('[Kuberis Scheduler Error]:', err.message);
+  });
+}, 6 * 60 * 60 * 1000);
+
+// Run an initial scan 15 seconds after server boot
+setTimeout(() => {
+  console.log('[Kuberis Scheduler] Running initial boot scan for upcoming subscription renewals (2-day window)...');
+  checkAndDispatchSubscriptionRenewalEmails().catch(() => {});
+}, 15 * 1000);
 
 // API 404 Handler (Always returns JSON for /api routes)
 app.use('/api/*', (req, res) => {

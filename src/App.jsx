@@ -1148,6 +1148,8 @@ export default function App() {
                   onIgnoreSuggestion={handleIgnoreSuggestion}
                   onAddManualSubscription={handleAddManualSubscription}
                   onDeleteSubscription={handleDeleteSubscription}
+                  token={token}
+                  user={user}
                 />
               )}
 
