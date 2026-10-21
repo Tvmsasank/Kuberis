@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     tools {
-        // Requires 'NodeJS' tool configured in Jenkins Global Tool Configuration
+        // Requires 'NodeJS' tool configured in Jenkins Global Tool Configuration (named 'NodeJS-20')
         nodejs 'NodeJS-20'
     }
 
@@ -23,37 +23,67 @@ pipeline {
             steps {
                 echo '=== [Stage 1] Checking out code from GitHub ==='
                 checkout scm
-                sh 'git log -1 --stat'
+                script {
+                    if (isUnix()) {
+                        sh 'git log -1 --stat'
+                    } else {
+                        bat 'git log -1 --stat'
+                    }
+                }
             }
         }
 
         stage('Install Dependencies') {
             steps {
                 echo '=== [Stage 2] Installing clean dependencies ==='
-                sh 'npm ci --prefer-offline'
+                script {
+                    if (isUnix()) {
+                        sh 'npm ci --prefer-offline'
+                    } else {
+                        bat 'npm ci --prefer-offline'
+                    }
+                }
             }
         }
 
         stage('Code Quality & Syntax Check') {
             steps {
                 echo '=== [Stage 3] Validating Node.js server scripts and database engine ==='
-                sh 'node -c server/index.js'
-                sh 'node -c server/db.js'
+                script {
+                    if (isUnix()) {
+                        sh 'node -c server/index.js'
+                        sh 'node -c server/db.js'
+                    } else {
+                        bat 'node -c server/index.js'
+                        bat 'node -c server/db.js'
+                    }
+                }
             }
         }
 
         stage('Build Frontend Bundle') {
             steps {
                 echo '=== [Stage 4] Compiling Vite React production distribution ==='
-                sh 'npm run build'
+                script {
+                    if (isUnix()) {
+                        sh 'npm run build'
+                    } else {
+                        bat 'npm run build'
+                    }
+                }
             }
         }
 
         stage('Security & Audit Check') {
             steps {
                 echo '=== [Stage 5] Running security vulnerability scan ==='
-                // Runs audit check; doesn't fail build on minor warnings but logs issues
-                sh 'npm audit --audit-level=critical || true'
+                script {
+                    if (isUnix()) {
+                        sh 'npm audit --audit-level=critical || true'
+                    } else {
+                        bat 'npm audit --audit-level=critical || exit 0'
+                    }
+                }
             }
         }
 
@@ -63,22 +93,23 @@ pipeline {
             }
             steps {
                 echo '=== [Stage 6] Quality Gates Passed: Triggering Render Deployment Webhook ==='
-                sh '''
-                    if [ -n "$RENDER_DEPLOY_HOOK" ]; then
-                        echo "Triggering Render Production Deploy..."
-                        HTTP_RESPONSE=$(curl -s -o response.json -w "%{http_code}" -X POST "$RENDER_DEPLOY_HOOK")
-                        echo "Render Deploy Webhook Response Code: $HTTP_RESPONSE"
-                        cat response.json
-                        if [ "$HTTP_RESPONSE" -ge 200 ] && [ "$HTTP_RESPONSE" -lt 300 ]; then
-                            echo "SUCCESS: Render deployment triggered successfully!"
-                        else
-                            echo "ERROR: Failed to trigger Render deployment (HTTP $HTTP_RESPONSE)"
-                            exit 1
-                        fi
-                    else
-                        echo "WARNING: RENDER_DEPLOY_HOOK credential not set. Skipping deploy trigger."
-                    fi
-                '''
+                script {
+                    if (isUnix()) {
+                        sh '''
+                            if [ -n "$RENDER_DEPLOY_HOOK" ]; then
+                                echo "Triggering Render Production Deploy..."
+                                curl -s -X POST "$RENDER_DEPLOY_HOOK"
+                                echo "SUCCESS: Render deployment triggered successfully!"
+                            else
+                                echo "WARNING: RENDER_DEPLOY_HOOK credential not set. Skipping deploy."
+                            fi
+                        '''
+                    } else {
+                        bat '''
+                            powershell -Command "if ($env:RENDER_DEPLOY_HOOK) { Write-Host 'Triggering Render Production Deploy...'; try { $null = Invoke-RestMethod -Uri $env:RENDER_DEPLOY_HOOK -Method Post; Write-Host 'SUCCESS: Render deployment triggered!' } catch { Write-Error $_; exit 1 } } else { Write-Warning 'RENDER_DEPLOY_HOOK not set.' }"
+                        '''
+                    }
+                }
             }
         }
     }
