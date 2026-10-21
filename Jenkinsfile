@@ -88,25 +88,43 @@ pipeline {
         }
 
         stage('Deploy to Render (Production Gate)') {
-            when {
-                branch 'main'
-            }
             steps {
                 echo '=== [Stage 6] Quality Gates Passed: Triggering Render Deployment Webhook ==='
                 script {
                     if (isUnix()) {
                         sh '''
-                            if [ -n "$RENDER_DEPLOY_HOOK" ]; then
-                                echo "Triggering Render Production Deploy..."
-                                curl -s -X POST "$RENDER_DEPLOY_HOOK"
-                                echo "SUCCESS: Render deployment triggered successfully!"
+                            if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+                                echo "❌ ERROR: RENDER_DEPLOY_HOOK credential is empty or not configured in Jenkins!"
+                                echo "Please go to Jenkins -> Manage Jenkins -> Credentials and add 'kuberis-render-deploy-hook'."
+                                exit 1
+                            fi
+                            echo "Triggering Render Production Deploy via Webhook..."
+                            HTTP_CODE=$(curl -s -o response.json -w "%{http_code}" -X POST "$RENDER_DEPLOY_HOOK")
+                            echo "Render Webhook Response Code: $HTTP_CODE"
+                            cat response.json
+                            if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+                                echo "✅ SUCCESS: Render deployment triggered successfully!"
                             else
-                                echo "WARNING: RENDER_DEPLOY_HOOK credential not set. Skipping deploy."
+                                echo "❌ ERROR: Render webhook returned HTTP $HTTP_CODE"
+                                exit 1
                             fi
                         '''
                     } else {
-                        bat '''
-                            powershell -Command "if ($env:RENDER_DEPLOY_HOOK) { Write-Host 'Triggering Render Production Deploy...'; try { $null = Invoke-RestMethod -Uri $env:RENDER_DEPLOY_HOOK -Method Post; Write-Host 'SUCCESS: Render deployment triggered!' } catch { Write-Error $_; exit 1 } } else { Write-Warning 'RENDER_DEPLOY_HOOK not set.' }"
+                        powershell '''
+                            $hook = $env:RENDER_DEPLOY_HOOK
+                            if (-not $hook -or $hook.Trim() -eq "") {
+                                Write-Error "❌ ERROR: RENDER_DEPLOY_HOOK credential is empty or not configured in Jenkins! Add a Secret Text credential with ID 'kuberis-render-deploy-hook'."
+                                exit 1
+                            }
+                            Write-Host "Triggering Render Production Deploy via Webhook..."
+                            try {
+                                $response = Invoke-RestMethod -Uri $hook -Method Post
+                                Write-Host "✅ SUCCESS: Render deployment triggered successfully!"
+                                Write-Host ($response | ConvertTo-Json -Compress)
+                            } catch {
+                                Write-Error "❌ ERROR: Failed to trigger Render deploy webhook: $_"
+                                exit 1
+                            }
                         '''
                     }
                 }
