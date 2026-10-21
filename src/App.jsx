@@ -1025,6 +1025,7 @@ export default function App() {
           theme={theme}
           onSelectTheme={handleSelectTheme}
           user={user}
+          token={token}
           isPrivacyMode={isPrivacyMode}
           onTogglePrivacyMode={handleTogglePrivacyMode}
           onOpenLogin={() => { setAuthModalMode('login'); setIsAuthModalOpen(true); }}

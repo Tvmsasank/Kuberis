@@ -44,6 +44,7 @@ export default function Header({
   theme = 'dark',
   onSelectTheme,
   user,
+  token,
   onOpenLogin,
   onOpenRegister,
   onOpenProfileModal,
@@ -62,9 +63,13 @@ export default function Header({
   const [flashedTicker, setFlashedTicker] = useState(null); // { index, dir }
   const [notifications, setNotifications] = useState(RATE_NOTIFICATIONS);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+
+  const activeToken = token || (typeof window !== 'undefined' ? (localStorage.getItem('kuberis_token') || sessionStorage.getItem('kuberis_token') || '') : '');
+
   const [readNotifIds, setReadNotifIds] = useState(() => {
     try {
-      const saved = localStorage.getItem('kuberis_read_notifs');
+      const key = user?.id ? `kuberis_read_notifs_${user.id}` : 'kuberis_read_notifs';
+      const saved = localStorage.getItem(key) || localStorage.getItem('kuberis_read_notifs');
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -72,15 +77,41 @@ export default function Header({
   });
   const notifRef = useRef(null);
 
+  // Sync stored read IDs whenever user changes
+  useEffect(() => {
+    try {
+      const key = user?.id ? `kuberis_read_notifs_${user.id}` : 'kuberis_read_notifs';
+      const saved = localStorage.getItem(key) || localStorage.getItem('kuberis_read_notifs');
+      if (saved) {
+        setReadNotifIds(JSON.parse(saved));
+      }
+    } catch {}
+  }, [user?.id]);
+
   // 🔔 Fetch Live Rate Notifications from Backend
   useEffect(() => {
     const fetchNotifications = async () => {
       try {
-        const res = await fetch('/api/notifications');
+        const headers = {
+          'Content-Type': 'application/json',
+          ...(activeToken ? { 'Authorization': `Bearer ${activeToken}`, 'X-Auth-Token': activeToken } : {})
+        };
+        const res = await fetch('/api/notifications', { headers });
         if (res.ok) {
           const data = await res.json();
           if (data.success && Array.isArray(data.notifications)) {
             setNotifications(data.notifications);
+            if (Array.isArray(data.readNotificationIds) && data.readNotificationIds.length > 0) {
+              setReadNotifIds(prev => {
+                const combined = Array.from(new Set([...prev, ...data.readNotificationIds]));
+                try {
+                  const key = user?.id ? `kuberis_read_notifs_${user.id}` : 'kuberis_read_notifs';
+                  localStorage.setItem(key, JSON.stringify(combined));
+                  localStorage.setItem('kuberis_read_notifs', JSON.stringify(combined));
+                } catch {}
+                return combined;
+              });
+            }
           }
         }
       } catch (err) {
@@ -88,7 +119,7 @@ export default function Header({
       }
     };
     fetchNotifications();
-  }, []);
+  }, [user?.id, activeToken]);
 
   // 🖱️ Dismiss Notification dropdown on click outside
   useEffect(() => {
@@ -107,16 +138,63 @@ export default function Header({
 
   const handleMarkAllRead = async () => {
     const allIds = notifications.map(n => n.id);
-    setReadNotifIds(allIds);
+    const updated = Array.from(new Set([...readNotifIds, ...allIds]));
+    setReadNotifIds(updated);
+
+    const key = user?.id ? `kuberis_read_notifs_${user.id}` : 'kuberis_read_notifs';
     try {
-      localStorage.setItem('kuberis_read_notifs', JSON.stringify(allIds));
+      localStorage.setItem(key, JSON.stringify(updated));
+      localStorage.setItem('kuberis_read_notifs', JSON.stringify(updated));
+    } catch {}
+
+    // Optimistically update notifications in state
+    setNotifications(prev => prev.map(n => ({ ...n, isRead: true, isNew: false })));
+
+    try {
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(activeToken ? { 'Authorization': `Bearer ${activeToken}`, 'X-Auth-Token': activeToken } : {})
+      };
       await fetch('/api/notifications/read', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: allIds })
+        headers,
+        body: JSON.stringify({ ids: allIds, markAll: true })
       });
     } catch (err) {
       // Offline fallback
+    }
+  };
+
+  const handleMarkSingleRead = async (notif) => {
+    if (!notif?.id) return;
+    const isAlreadyRead = readNotifIds.includes(notif.id);
+    if (!isAlreadyRead) {
+      const updated = Array.from(new Set([...readNotifIds, notif.id]));
+      setReadNotifIds(updated);
+
+      const key = user?.id ? `kuberis_read_notifs_${user.id}` : 'kuberis_read_notifs';
+      try {
+        localStorage.setItem(key, JSON.stringify(updated));
+        localStorage.setItem('kuberis_read_notifs', JSON.stringify(updated));
+      } catch {}
+
+      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true, isNew: false } : n));
+
+      try {
+        const headers = {
+          'Content-Type': 'application/json',
+          ...(activeToken ? { 'Authorization': `Bearer ${activeToken}`, 'X-Auth-Token': activeToken } : {})
+        };
+        await fetch('/api/notifications/read', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ id: notif.id })
+        });
+      } catch (err) {}
+    }
+
+    if (notif.source && notif.source.startsWith('http')) {
+      window.open(notif.source, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -125,11 +203,26 @@ export default function Header({
   const handleSyncWithInternet = async () => {
     setIsSyncingRates(true);
     try {
-      const res = await fetch('/api/notifications/sync', { method: 'POST' });
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(activeToken ? { 'Authorization': `Bearer ${activeToken}`, 'X-Auth-Token': activeToken } : {})
+      };
+      const res = await fetch('/api/notifications/sync', { method: 'POST', headers });
       if (res.ok) {
         const data = await res.json();
         if (data.notifications && Array.isArray(data.notifications)) {
           setNotifications(data.notifications);
+          if (Array.isArray(data.readNotificationIds) && data.readNotificationIds.length > 0) {
+            setReadNotifIds(prev => {
+              const combined = Array.from(new Set([...prev, ...data.readNotificationIds]));
+              try {
+                const key = user?.id ? `kuberis_read_notifs_${user.id}` : 'kuberis_read_notifs';
+                localStorage.setItem(key, JSON.stringify(combined));
+                localStorage.setItem('kuberis_read_notifs', JSON.stringify(combined));
+              } catch {}
+              return combined;
+            });
+          }
         }
       }
     } catch (err) {
@@ -593,15 +686,18 @@ export default function Header({
                           return (
                             <div
                               key={notif.id}
+                              onClick={() => handleMarkSingleRead(notif)}
                               style={{
                                 padding: '14px 16px',
                                 borderBottom: '1px solid var(--border-color)',
                                 background: isUnread
-                                  ? (isDark ? 'rgba(16, 185, 129, 0.06)' : 'rgba(16, 185, 129, 0.04)')
+                                  ? (isDark ? 'rgba(16, 185, 129, 0.08)' : 'rgba(16, 185, 129, 0.05)')
                                   : 'transparent',
-                                transition: 'background 0.2s ease',
-                                position: 'relative'
+                                transition: 'all 0.2s ease',
+                                position: 'relative',
+                                cursor: 'pointer'
                               }}
+                              title={isUnread ? "Click to mark as read" : (notif.source ? "Click to view original source" : "")}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                                 <span

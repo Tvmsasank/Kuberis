@@ -60,7 +60,8 @@ const getInitialUserSettings = () => ({
   },
   processedDriveFileIds: [],
   driveResetAt: null,
-  freshStart: true
+  freshStart: true,
+  readNotifications: []
 });
 
 const getInitialDb = () => ({

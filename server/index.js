@@ -2983,6 +2983,18 @@ async function checkAndDispatchSubscriptionRenewalEmails(filterUserId = null) {
   }
 }
 
+// Deterministic hash to guarantee stable, persistent IDs for live web news articles across fetches
+function generateStableNotifId(prefix, text) {
+  let hash = 0;
+  const clean = String(text || '').trim().toLowerCase();
+  for (let i = 0; i < clean.length; i++) {
+    const char = clean.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return `${prefix}_${Math.abs(hash).toString(36)}`;
+}
+
 let liveNewsCache = {
   items: [],
   lastFetchedAt: 0
@@ -3047,8 +3059,10 @@ async function fetchLiveFinancialNews() {
           ? new Date().toISOString().split('T')[0]
           : dateObj.toISOString().split('T')[0];
 
+        const stableId = generateStableNotifId('news', cleanTitle || link);
+
         items.push({
-          id: `news_${Date.now()}_${index}`,
+          id: stableId,
           date: formattedDate,
           category,
           title: cleanTitle,
@@ -3088,10 +3102,28 @@ app.get('/api/notifications', async (req, res) => {
       });
     }
 
+    let readNotificationIds = [];
+    if (userId) {
+      const userSettings = dbEngine.getUserSettings(userId) || {};
+      readNotificationIds = Array.isArray(userSettings.readNotifications) ? userSettings.readNotifications : [];
+    }
+
+    const annotatedNotifs = allNotifs.map(n => {
+      const isRead = readNotificationIds.includes(n.id);
+      return {
+        ...n,
+        isRead,
+        isNew: !isRead && Boolean(n.isNew)
+      };
+    });
+
+    const unreadCount = annotatedNotifs.filter(n => !readNotificationIds.includes(n.id)).length;
+
     res.json({
       success: true,
-      notifications: allNotifs,
-      unreadCount: allNotifs.filter(n => n.isNew).length
+      notifications: annotatedNotifs,
+      readNotificationIds,
+      unreadCount
     });
   } catch (err) {
     console.error('GET /api/notifications error:', err);
@@ -3102,17 +3134,47 @@ app.get('/api/notifications', async (req, res) => {
 // POST /api/notifications/read
 app.post('/api/notifications/read', (req, res) => {
   try {
-    const { id } = req.body || {};
-    if (id) {
-      const target = RATE_NOTIFICATIONS.find(n => n.id === id);
-      if (target) target.isNew = false;
-      const cached = (liveNewsCache.items || []).find(n => n.id === id);
-      if (cached) cached.isNew = false;
-    } else {
-      RATE_NOTIFICATIONS.forEach(n => { n.isNew = false; });
-      (liveNewsCache.items || []).forEach(n => { n.isNew = false; });
+    const userId = getUserIdFromReq(req);
+    const { id, ids, markAll } = req.body || {};
+
+    let idsToMark = [];
+    if (Array.isArray(ids) && ids.length > 0) {
+      idsToMark = ids;
+    } else if (id) {
+      idsToMark = [id];
+    } else if (markAll) {
+      const liveItems = (liveNewsCache.items || []).map(n => n.id);
+      const rateItems = RATE_NOTIFICATIONS.map(n => n.id);
+      idsToMark = [...liveItems, ...rateItems];
     }
-    res.json({ success: true });
+
+    // Update in-memory collections so raw objects also reflect read status
+    idsToMark.forEach(targetId => {
+      const targetRate = RATE_NOTIFICATIONS.find(n => n.id === targetId);
+      if (targetRate) {
+        targetRate.isNew = false;
+        targetRate.isRead = true;
+      }
+      const cached = (liveNewsCache.items || []).find(n => n.id === targetId);
+      if (cached) {
+        cached.isNew = false;
+        cached.isRead = true;
+      }
+    });
+
+    let currentReadIds = [];
+    if (userId) {
+      const userSettings = dbEngine.getUserSettings(userId) || {};
+      const existing = Array.isArray(userSettings.readNotifications) ? userSettings.readNotifications : [];
+      const readSet = new Set([...existing, ...idsToMark]);
+      currentReadIds = Array.from(readSet);
+      dbEngine.updateUserSettings(userId, { readNotifications: currentReadIds });
+    }
+
+    res.json({
+      success: true,
+      readNotificationIds: currentReadIds
+    });
   } catch (err) {
     console.error('POST /api/notifications/read error:', err);
     res.status(500).json({ error: 'Failed to mark notifications read' });
@@ -3122,6 +3184,7 @@ app.post('/api/notifications/read', (req, res) => {
 // ALL /api/notifications/sync (Live Internet Crawl & Govt Rates Sync)
 app.all('/api/notifications/sync', async (req, res) => {
   try {
+    const userId = getUserIdFromReq(req);
     const todayStr = new Date().toISOString().split('T')[0];
     
     // Invalidate cache to force live fresh crawl
@@ -3143,13 +3206,29 @@ app.all('/api/notifications/sync', async (req, res) => {
       RATE_NOTIFICATIONS.unshift(todayNotif);
     }
 
+    let readNotificationIds = [];
+    if (userId) {
+      const userSettings = dbEngine.getUserSettings(userId) || {};
+      readNotificationIds = Array.isArray(userSettings.readNotifications) ? userSettings.readNotifications : [];
+    }
+
     const merged = [...liveNews, ...RATE_NOTIFICATIONS];
+    const annotated = merged.map(n => {
+      const isRead = readNotificationIds.includes(n.id);
+      return {
+        ...n,
+        isRead,
+        isNew: !isRead && Boolean(n.isNew)
+      };
+    });
+
     res.json({
       success: true,
       message: 'Rates and live financial market news synced against internet sources',
       syncedAt: new Date().toISOString(),
-      notifications: merged,
-      unreadCount: merged.filter(n => n.isNew).length
+      notifications: annotated,
+      readNotificationIds,
+      unreadCount: annotated.filter(n => !readNotificationIds.includes(n.id)).length
     });
   } catch (err) {
     console.error('ALL /api/notifications/sync error:', err);
