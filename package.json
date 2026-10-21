@@ -10,7 +10,8 @@
     "prebuild": "npm install",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "node server/index.js"
+    "start": "node server/index.js",
+    "test": "node -c server/index.js && node -c server/db.js"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^4.7.0",
