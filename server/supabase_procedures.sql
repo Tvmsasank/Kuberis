@@ -40,6 +40,21 @@ CREATE INDEX IF NOT EXISTS idx_wealthpulse_users_email ON public.wealthpulse_use
 CREATE INDEX IF NOT EXISTS idx_wealthpulse_transactions_user_id ON public.wealthpulse_transactions (user_id);
 
 -- ----------------------------------------------------------------------------
+-- 1.1 ROW LEVEL SECURITY (RLS) & ACCESS CONTROL (SUPABASE POSTGREST PROTECTION)
+-- ----------------------------------------------------------------------------
+ALTER TABLE public.wealthpulse_store ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.wealthpulse_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.wealthpulse_transactions ENABLE ROW LEVEL SECURITY;
+
+-- Block anonymous and unauthenticated web clients from querying database tables directly
+REVOKE ALL ON TABLE public.wealthpulse_store FROM anon, authenticated;
+REVOKE ALL ON TABLE public.wealthpulse_users FROM anon, authenticated;
+REVOKE ALL ON TABLE public.wealthpulse_transactions FROM anon, authenticated;
+
+-- Ensure postgres (Node.js backend) and service_role retain full access
+GRANT ALL ON ALL TABLES IN SCHEMA public TO postgres, service_role;
+
+-- ----------------------------------------------------------------------------
 -- 2. STORED PROCEDURES (SECURITY DEFINER FUNCTIONS WITH PARAMETER SANITIZATION)
 -- ----------------------------------------------------------------------------
 

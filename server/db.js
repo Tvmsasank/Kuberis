@@ -182,6 +182,23 @@ if (process.env.DATABASE_URL) {
       ALTER TABLE public.wealthpulse_investments ADD COLUMN IF NOT EXISTS is_senior_citizen BOOLEAN DEFAULT FALSE;
       ALTER TABLE public.wealthpulse_investments ADD COLUMN IF NOT EXISTS notes TEXT;
 
+      -- Enforce Row-Level Security (RLS) on all public tables to secure Supabase PostgREST API
+      ALTER TABLE public.wealthpulse_store ENABLE ROW LEVEL SECURITY;
+      ALTER TABLE public.wealthpulse_users ENABLE ROW LEVEL SECURITY;
+      ALTER TABLE public.wealthpulse_audit_logs ENABLE ROW LEVEL SECURITY;
+      ALTER TABLE public.wealthpulse_refresh_tokens ENABLE ROW LEVEL SECURITY;
+      ALTER TABLE public.wealthpulse_super_admins ENABLE ROW LEVEL SECURITY;
+
+      -- Revoke public PostgREST API access from anonymous and regular authenticated web roles
+      REVOKE ALL ON TABLE public.wealthpulse_store FROM anon, authenticated;
+      REVOKE ALL ON TABLE public.wealthpulse_users FROM anon, authenticated;
+      REVOKE ALL ON TABLE public.wealthpulse_audit_logs FROM anon, authenticated;
+      REVOKE ALL ON TABLE public.wealthpulse_refresh_tokens FROM anon, authenticated;
+      REVOKE ALL ON TABLE public.wealthpulse_super_admins FROM anon, authenticated;
+
+      -- Ensure postgres administrative superuser & service_role retain full access
+      GRANT ALL ON ALL TABLES IN SCHEMA public TO postgres, service_role;
+
       CREATE OR REPLACE FUNCTION public.sp_upsert_wealthpulse_user(
         p_id VARCHAR,
         p_name VARCHAR,
