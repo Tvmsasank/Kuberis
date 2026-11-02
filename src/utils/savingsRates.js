@@ -7,8 +7,8 @@ export const SAVINGS_BANKS_CATALOG = [
   // 🕒 1. DAILY PAYOUT & DAILY COMPOUNDING
   {
     id: 'slice',
-    name: 'slice (Slice Small Finance Bank)',
-    shortName: 'slice Bank',
+    name: 'Slice (Slice Small Finance Bank)',
+    shortName: 'Slice Bank',
     category: 'daily_payout',
     badge: 'Daily Compounding',
     payoutFrequency: 'daily', // 'daily' | 'monthly' | 'quarterly' | 'annually'
@@ -213,27 +213,6 @@ export const SAVINGS_BANKS_CATALOG = [
     slabs: [
       { min: 0, max: 5000000, rate: 3.00, label: 'Up to ₹50 Lakh' },
       { min: 5000000, max: Infinity, rate: 3.50, label: 'Above ₹50 Lakh' }
-    ]
-  },
-
-  // 🛠️ 4. CUSTOM / OTHER BANK
-  {
-    id: 'custom',
-    name: 'Other / Custom Bank Account',
-    shortName: 'Custom Bank',
-    category: 'custom',
-    badge: 'Customizable',
-    payoutFrequency: 'quarterly',
-    compoundingFrequency: 'quarterly',
-    baseRate: 4.00,
-    logo: '💳',
-    themeColor: '#4F46E5',
-    headline: 'Custom Rate & Payout Cycle',
-    description: 'Configure your own personalized interest rate, compounding frequency, and balance tier.',
-    officialSource: '',
-    isFlat: true,
-    slabs: [
-      { min: 0, max: Infinity, rate: 4.00, label: 'User Custom Rate' }
     ]
   }
 ];

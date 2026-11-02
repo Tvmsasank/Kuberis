@@ -101,7 +101,14 @@ export default function CustomSelect({
     if (disabled) return;
     setIsOpen(false);
     if (onChange) {
-      onChange({ target: { value: val, name } });
+      const syntheticEvt = {
+        target: { value: val, name },
+        value: val,
+        name,
+        toString() { return String(val); },
+        valueOf() { return String(val); }
+      };
+      onChange(syntheticEvt);
     }
   };
 

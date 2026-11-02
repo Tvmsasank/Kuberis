@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   ShieldCheck,
   Zap,
@@ -8,18 +8,11 @@ import {
   Trash2,
   Calendar,
   ExternalLink,
-  Info,
-  Clock,
   Sparkles,
-  Layers,
   ArrowUpRight,
-  ArrowDownRight,
-  HelpCircle,
-  CheckCircle2,
-  Sliders,
-  DollarSign,
   Building,
-  Target
+  Target,
+  X
 } from 'lucide-react';
 import {
   SAVINGS_BANKS_CATALOG,
@@ -45,7 +38,6 @@ export default function EmergencyFundsTab({
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [ledgerTarget, setLedgerTarget] = useState(null);
   const [showDirectoryModal, setShowDirectoryModal] = useState(false);
-  const [showQuickAdjustModal, setShowQuickAdjustModal] = useState(null);
 
   // Directory comparison amount
   const [compareAmount, setCompareAmount] = useState('50000');
@@ -100,7 +92,7 @@ export default function EmergencyFundsTab({
   // Monthly burn calculation from user's expense transactions
   const monthlyExpenseBurn = useMemo(() => {
     const expenses = (transactions || []).filter(t => t.type === 'expense');
-    if (!expenses.length) return 25000; // sensible default benchmark if no transactions
+    if (!expenses.length) return 25000;
 
     const dates = expenses.map(t => new Date(t.date).getTime()).filter(t => !isNaN(t));
     if (!dates.length) return 25000;
@@ -148,22 +140,6 @@ export default function EmergencyFundsTab({
     await onSaveSettings({ emergencyTargetMonths: Number(months) });
   };
 
-  // Quick seed Slice Bank account if user has none
-  const handleQuickSeedSlice = async () => {
-    const sliceFund = {
-      id: `ef_slice_${Date.now()}`,
-      name: 'Slice Bank Daily Savings',
-      bankId: 'slice',
-      depositAmount: 3000,
-      depositDate: '2026-10-31',
-      payoutFrequency: 'daily',
-      customRate: null,
-      targetGoal: 50000,
-      notes: 'Initial deposit ₹3,000 on 31 Oct 2026 earning 5.50% p.a. daily compounding.'
-    };
-    await onSaveSettings({ emergencyFunds: [...emergencyFunds, sliceFund] });
-  };
-
   // Format currency helper
   const formatINR = (val) => {
     if (isPrivacyMode) return '••••••';
@@ -186,8 +162,8 @@ export default function EmergencyFundsTab({
       <div
         className="card"
         style={{
-          background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.15) 0%, rgba(16, 185, 129, 0.10) 100%)',
-          border: '1px solid rgba(124, 58, 237, 0.3)',
+          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(124, 58, 237, 0.10) 100%)',
+          border: '1px solid rgba(16, 185, 129, 0.25)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -199,30 +175,30 @@ export default function EmergencyFundsTab({
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div
             style={{
-              width: '54px',
-              height: '54px',
+              width: '52px',
+              height: '52px',
               borderRadius: '16px',
-              background: 'linear-gradient(135deg, #7C3AED, #10B981)',
+              background: 'linear-gradient(135deg, #10B981, #7C3AED)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: '#fff',
-              boxShadow: '0 8px 24px rgba(124, 58, 237, 0.35)'
+              boxShadow: '0 8px 24px rgba(16, 185, 129, 0.3)'
             }}
           >
             <ShieldCheck size={28} />
           </div>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
               <h1 style={{ fontSize: '24px', fontWeight: '800', margin: 0, letterSpacing: '-0.5px' }}>
                 Emergency Reserves & Liquid Accounts
               </h1>
               <span
                 className="badge"
                 style={{
-                  background: 'rgba(124, 58, 237, 0.25)',
-                  color: '#A78BFA',
-                  border: '1px solid rgba(124, 58, 237, 0.4)',
+                  background: 'rgba(16, 185, 129, 0.2)',
+                  color: '#10B981',
+                  border: '1px solid rgba(16, 185, 129, 0.35)',
                   fontSize: '11px',
                   fontWeight: '600'
                 }}
@@ -231,7 +207,7 @@ export default function EmergencyFundsTab({
               </span>
             </div>
             <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
-              Live daily interest accrual, progressive RBI slab yields, and automatic synchronization with your Net Worth.
+              Live interest accrual, official RBI slab yields, and automatic synchronization with your Net Worth.
             </p>
           </div>
         </div>
@@ -307,10 +283,10 @@ export default function EmergencyFundsTab({
             +{formatINR(totalDailyYield)} <span style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-muted)' }}>/ day</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
-            <span>Credits every 24h into daily accounts (Slice)</span>
+            <span>Compounded and credited into your accounts daily</span>
           </div>
           <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)', paddingTop: '8px' }}>
-            Compounding on daily closing balance
+            Calculated on daily closing balances
           </div>
         </div>
 
@@ -389,57 +365,6 @@ export default function EmergencyFundsTab({
         </div>
       </div>
 
-      {/* Slice Bank Daily Compounding Callout Banner */}
-      <div
-        className="card"
-        style={{
-          background: 'linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, rgba(79, 70, 229, 0.08) 100%)',
-          border: '1px solid rgba(124, 58, 237, 0.25)',
-          padding: '20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px'
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '28px' }}>⚡</span>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-main)' }}>
-                  Slice Bank Daily Interest Compounding (5.50% p.a.)
-                </span>
-                <span className="badge" style={{ background: '#7C3AED', color: '#fff', fontSize: '10px', fontWeight: '700' }}>
-                  24h Payout
-                </span>
-              </div>
-              <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
-                Unlike traditional banks that credit quarterly, Slice credits interest every morning.
-                Daily percentage is <strong>~0.015068%</strong> (5.50% / 365).
-              </p>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Example with ₹3,000 on 31 Oct</div>
-              <div style={{ fontSize: '13px', fontWeight: '700', color: '#10B981' }}>
-                Day 1: ₹3000.45 → Day 2: ₹3000.90
-              </div>
-            </div>
-            {!emergencyFunds.some(f => f.bankId === 'slice') && (
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={handleQuickSeedSlice}
-                style={{ fontSize: '12px', padding: '6px 12px' }}
-              >
-                + Add My ₹3,000 Slice Fund
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Emergency Funds Accounts Section */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
@@ -472,11 +397,11 @@ export default function EmergencyFundsTab({
                 width: '64px',
                 height: '64px',
                 borderRadius: '50%',
-                background: 'rgba(124, 58, 237, 0.1)',
+                background: 'rgba(16, 185, 129, 0.1)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#7C3AED',
+                color: '#10B981',
                 fontSize: '28px'
               }}
             >
@@ -485,22 +410,13 @@ export default function EmergencyFundsTab({
             <div>
               <h3 style={{ fontSize: '18px', fontWeight: '700', margin: 0 }}>No Emergency Funds Added Yet</h3>
               <p style={{ margin: '6px 0 0', fontSize: '13px', color: 'var(--text-muted)', maxWidth: '460px' }}>
-                Track high-yield liquid savings accounts like your Slice Bank (5.50% daily compounding) or IDFC FIRST (7.00% monthly).
+                Track high-yield liquid savings accounts and watch daily compounded returns auto-sync into your portfolio.
               </p>
             </div>
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
               <button
                 type="button"
                 className="btn btn-primary"
-                onClick={handleQuickSeedSlice}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
-              >
-                <Zap size={16} />
-                <span>Add ₹3,000 Slice Bank Account</span>
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
                 onClick={() => {
                   setEditingFund(null);
                   setShowAddEditModal(true);
@@ -508,7 +424,16 @@ export default function EmergencyFundsTab({
                 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
               >
                 <Plus size={16} />
-                <span>Add Custom Bank Account</span>
+                <span>Add Emergency Fund</span>
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowDirectoryModal(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+              >
+                <Building size={16} />
+                <span>View Bank Rates Directory</span>
               </button>
             </div>
           </div>
@@ -531,7 +456,7 @@ export default function EmergencyFundsTab({
                     display: 'flex',
                     flexDirection: 'column',
                     justifyContent: 'space-between',
-                    borderLeft: `4px solid ${fund.bankInfo?.themeColor || '#7C3AED'}`,
+                    borderLeft: `4px solid ${fund.bankInfo?.themeColor || '#10B981'}`,
                     position: 'relative'
                   }}
                 >
@@ -571,9 +496,9 @@ export default function EmergencyFundsTab({
                       <span
                         className="badge"
                         style={{
-                          background: isSlice ? 'rgba(124, 58, 237, 0.2)' : 'rgba(59, 130, 246, 0.15)',
-                          color: isSlice ? '#A78BFA' : '#60A5FA',
-                          border: `1px solid ${isSlice ? 'rgba(124, 58, 237, 0.4)' : 'rgba(59, 130, 246, 0.3)'}`,
+                          background: isSlice ? 'rgba(124, 58, 237, 0.2)' : 'rgba(16, 185, 129, 0.15)',
+                          color: isSlice ? '#A78BFA' : '#10B981',
+                          border: `1px solid ${isSlice ? 'rgba(124, 58, 237, 0.4)' : 'rgba(16, 185, 129, 0.3)'}`,
                           fontSize: '10px',
                           fontWeight: '700'
                         }}
@@ -613,7 +538,7 @@ export default function EmergencyFundsTab({
                         </div>
                         <div>
                           <span style={{ color: 'var(--text-muted)' }}>Today's Accrual:</span>
-                          <div style={{ fontWeight: '700', color: '#7C3AED', marginTop: '2px' }}>
+                          <div style={{ fontWeight: '700', color: '#10B981', marginTop: '2px' }}>
                             +{formatINR(fund.dailyInterestToday)}/day
                           </div>
                         </div>
@@ -695,7 +620,7 @@ export default function EmergencyFundsTab({
 
       {/* Live Interactive Compounding Simulator */}
       <div className="card" style={{ padding: '24px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Sparkles size={20} style={{ color: '#F59E0B' }} />
@@ -708,16 +633,21 @@ export default function EmergencyFundsTab({
             </p>
           </div>
 
-          {/* Controls: Principal & Bank Selector */}
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Deposit:</span>
-              <div style={{ position: 'relative' }}>
-                <span style={{ position: 'absolute', left: '8px', top: '7px', fontSize: '12px', color: 'var(--text-muted)' }}>₹</span>
+          {/* Controls: Redesigned with proper spacing, form-control theme, and full-width dropdown */}
+          <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* Deposit Input */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                Deposit:
+              </label>
+              <div style={{ position: 'relative', width: '130px' }}>
+                <span style={{ position: 'absolute', left: '10px', top: '9px', fontSize: '13px', color: 'var(--primary)', fontWeight: '700' }}>
+                  ₹
+                </span>
                 <input
                   type="number"
-                  className="input"
-                  style={{ width: '110px', paddingLeft: '22px', fontSize: '12px' }}
+                  className="form-control"
+                  style={{ paddingLeft: '24px', height: '38px', fontSize: '13px', fontWeight: '700' }}
                   value={simulatorPrincipal}
                   onChange={e => setSimulatorPrincipal(e.target.value)}
                   placeholder="3000"
@@ -725,17 +655,25 @@ export default function EmergencyFundsTab({
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Bank:</span>
-              <CustomSelect
-                options={SAVINGS_BANKS_CATALOG.map(b => ({
-                  value: b.id,
-                  label: `${b.shortName} (${b.baseRate}%)`
-                }))}
-                value={simulatorBankId}
-                onChange={setSimulatorBankId}
-                width="180px"
-              />
+            {/* Bank Selector */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                Bank:
+              </label>
+              <div style={{ width: '240px' }}>
+                <CustomSelect
+                  options={SAVINGS_BANKS_CATALOG.map(b => ({
+                    value: b.id,
+                    label: `${b.shortName} (${b.baseRate}%)`
+                  }))}
+                  value={simulatorBankId}
+                  onChange={(e) => {
+                    const selectedVal = e?.target ? e.target.value : (e?.value || e);
+                    setSimulatorBankId(String(selectedVal));
+                  }}
+                  size="md"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -819,7 +757,7 @@ export default function EmergencyFundsTab({
               depositAmount: Number(compareAmount) || 10000,
               depositDate: new Date().toISOString().split('T')[0],
               payoutFrequency: bank.payoutFrequency,
-              customRate: bank.id === 'custom' ? 4.0 : null
+              customRate: null
             });
             setShowAddEditModal(true);
           }}
@@ -854,11 +792,21 @@ function AddEditFundModal({ fund, onClose, onSave }) {
   const [targetGoal, setTargetGoal] = useState(fund?.targetGoal ? String(fund.targetGoal) : '');
   const [notes, setNotes] = useState(fund?.notes || '');
 
+  // Prevent background scrolling while modal is open
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
+
   const selectedBank = SAVINGS_BANKS_CATALOG.find(b => b.id === bankId) || SAVINGS_BANKS_CATALOG[0];
 
   const handleBankChange = (newBankId) => {
-    setBankId(newBankId);
-    const bank = SAVINGS_BANKS_CATALOG.find(b => b.id === newBankId);
+    const val = newBankId?.target ? newBankId.target.value : (newBankId?.value || newBankId);
+    const bankKey = String(val);
+    setBankId(bankKey);
+    const bank = SAVINGS_BANKS_CATALOG.find(b => b.id === bankKey);
     if (bank) {
       setPayoutFrequency(bank.payoutFrequency);
       if (!fund) {
@@ -885,38 +833,47 @@ function AddEditFundModal({ fund, onClose, onSave }) {
   };
 
   return (
-    <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1050 }}>
+    <div className="modal-backdrop" onClick={onClose}>
       <div
         className="modal-content"
+        onClick={e => e.stopPropagation()}
         style={{
           width: '100%',
           maxWidth: '540px',
           maxHeight: '90vh',
           overflowY: 'auto',
-          padding: '24px'
+          padding: '28px',
+          borderRadius: '24px',
+          background: 'var(--bg-card)',
+          backdropFilter: 'blur(28px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(28px) saturate(180%)',
+          border: '1px solid var(--border-glass)',
+          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.7)'
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '24px' }}>🛡️</span>
+            <div style={{ padding: '8px', borderRadius: '12px', background: 'var(--primary-light)', color: 'var(--primary)' }}>
+              <ShieldCheck size={20} />
+            </div>
             <div>
-              <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0 }}>
+              <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
                 {fund ? 'Edit Emergency Fund' : 'Add Emergency Fund'}
               </h2>
-              <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                 Configure bank account and interest compounding details
-              </p>
+              </div>
             </div>
           </div>
-          <button type="button" className="btn btn-secondary" onClick={onClose} style={{ padding: '6px 10px' }}>
-            ✕
+          <button className="modal-close" onClick={onClose} aria-label="Close" style={{ padding: '6px' }}>
+            <X size={20} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Bank Selection */}
-          <div>
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '6px' }}>
+          <div className="form-group">
+            <label className="form-label">
               Select Bank / Account Type
             </label>
             <CustomSelect
@@ -933,44 +890,48 @@ function AddEditFundModal({ fund, onClose, onSave }) {
           </div>
 
           {/* Account Label */}
-          <div>
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '6px' }}>
+          <div className="form-group">
+            <label className="form-label">
               Account Name / Label
             </label>
             <input
               type="text"
-              className="input"
+              className="form-control"
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="e.g. Slice Bank Daily Savings"
+              placeholder="e.g. Slice Bank Savings"
               required
             />
           </div>
 
           {/* Deposit Amount & Date */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '6px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <div className="form-group">
+              <label className="form-label">
                 Initial Deposit Amount (₹)
               </label>
-              <input
-                type="number"
-                step="any"
-                min="1"
-                className="input"
-                value={depositAmount}
-                onChange={e => setDepositAmount(e.target.value)}
-                placeholder="3000"
-                required
-              />
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: '12px', top: '10px', fontSize: '13px', color: 'var(--primary)', fontWeight: '700' }}>₹</span>
+                <input
+                  type="number"
+                  step="any"
+                  min="1"
+                  className="form-control"
+                  style={{ paddingLeft: '28px' }}
+                  value={depositAmount}
+                  onChange={e => setDepositAmount(e.target.value)}
+                  placeholder="3000"
+                  required
+                />
+              </div>
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '6px' }}>
+            <div className="form-group">
+              <label className="form-label">
                 Deposit Date
               </label>
               <input
                 type="date"
-                className="input"
+                className="form-control"
                 value={depositDate}
                 onChange={e => setDepositDate(e.target.value)}
                 required
@@ -979,9 +940,9 @@ function AddEditFundModal({ fund, onClose, onSave }) {
           </div>
 
           {/* Payout & Compounding Frequency */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '6px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+            <div className="form-group">
+              <label className="form-label">
                 Payout Frequency
               </label>
               <CustomSelect
@@ -991,17 +952,20 @@ function AddEditFundModal({ fund, onClose, onSave }) {
                   { value: 'quarterly', label: '🗓️ Quarterly (SBI/HDFC)' }
                 ]}
                 value={payoutFrequency}
-                onChange={setPayoutFrequency}
+                onChange={(e) => {
+                  const val = e?.target ? e.target.value : (e?.value || e);
+                  setPayoutFrequency(String(val));
+                }}
               />
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '6px' }}>
+            <div className="form-group">
+              <label className="form-label">
                 Custom Rate % (Optional override)
               </label>
               <input
                 type="number"
                 step="0.01"
-                className="input"
+                className="form-control"
                 value={customRate}
                 onChange={e => setCustomRate(e.target.value)}
                 placeholder={`Default: ${selectedBank.baseRate}%`}
@@ -1010,31 +974,35 @@ function AddEditFundModal({ fund, onClose, onSave }) {
           </div>
 
           {/* Target Goal (Optional) */}
-          <div>
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '6px' }}>
+          <div className="form-group">
+            <label className="form-label">
               Target Emergency Goal Amount (₹, Optional)
             </label>
-            <input
-              type="number"
-              step="any"
-              className="input"
-              value={targetGoal}
-              onChange={e => setTargetGoal(e.target.value)}
-              placeholder="e.g. 50000"
-            />
+            <div style={{ position: 'relative' }}>
+              <span style={{ position: 'absolute', left: '12px', top: '10px', fontSize: '13px', color: 'var(--primary)', fontWeight: '700' }}>₹</span>
+              <input
+                type="number"
+                step="any"
+                className="form-control"
+                style={{ paddingLeft: '28px' }}
+                value={targetGoal}
+                onChange={e => setTargetGoal(e.target.value)}
+                placeholder="e.g. 50000"
+              />
+            </div>
           </div>
 
           {/* Notes */}
-          <div>
-            <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)', marginBottom: '6px' }}>
-              Notes / Tags
+          <div className="form-group">
+            <label className="form-label">
+              Notes / Description
             </label>
             <input
               type="text"
-              className="input"
+              className="form-control"
               value={notes}
               onChange={e => setNotes(e.target.value)}
-              placeholder="e.g. Kept for medical emergency / daily interest checking"
+              placeholder="e.g. Primary liquid reserve for medical / urgent expenses"
             />
           </div>
 
@@ -1058,24 +1026,39 @@ function AddEditFundModal({ fund, onClose, onSave }) {
 function DayByDayLedgerModal({ fund, onClose, formatINR }) {
   const history = fund?.dayByDayHistory || [];
 
+  // Prevent background scrolling while modal is open
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
+
   return (
-    <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1050 }}>
+    <div className="modal-backdrop" onClick={onClose}>
       <div
         className="modal-content"
+        onClick={e => e.stopPropagation()}
         style={{
           width: '100%',
-          maxWidth: '720px',
-          maxHeight: '90vh',
+          maxWidth: '740px',
+          maxHeight: '88vh',
           display: 'flex',
           flexDirection: 'column',
-          padding: '24px'
+          padding: '28px',
+          borderRadius: '24px',
+          background: 'var(--bg-card)',
+          backdropFilter: 'blur(28px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(28px) saturate(180%)',
+          border: '1px solid var(--border-glass)',
+          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.7)'
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '24px' }}>📜</span>
-              <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0 }}>
+              <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
                 Compounding Ledger: {fund.name}
               </h2>
             </div>
@@ -1083,8 +1066,8 @@ function DayByDayLedgerModal({ fund, onClose, formatINR }) {
               Accrual history from {fund.depositDate} to Today ({fund.daysElapsed} days elapsed)
             </p>
           </div>
-          <button type="button" className="btn btn-secondary" onClick={onClose} style={{ padding: '6px 10px' }}>
-            ✕
+          <button className="modal-close" onClick={onClose} aria-label="Close" style={{ padding: '6px' }}>
+            <X size={20} />
           </button>
         </div>
 
@@ -1094,8 +1077,8 @@ function DayByDayLedgerModal({ fund, onClose, formatINR }) {
             display: 'grid',
             gridTemplateColumns: 'repeat(3, 1fr)',
             gap: '12px',
-            padding: '12px',
-            borderRadius: '8px',
+            padding: '14px',
+            borderRadius: '12px',
             background: 'var(--bg-glass)',
             border: '1px solid var(--border-color)',
             marginBottom: '16px'
@@ -1122,7 +1105,7 @@ function DayByDayLedgerModal({ fund, onClose, formatINR }) {
         </div>
 
         {/* Ledger Table */}
-        <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
             <thead>
               <tr style={{ background: 'var(--bg-glass)', borderBottom: '1px solid var(--border-color)', position: 'sticky', top: 0 }}>
@@ -1140,7 +1123,7 @@ function DayByDayLedgerModal({ fund, onClose, formatINR }) {
                   key={idx}
                   style={{
                     borderBottom: '1px solid var(--border-color)',
-                    background: idx === history.length - 1 ? 'rgba(124, 58, 237, 0.08)' : 'transparent'
+                    background: idx === history.length - 1 ? 'rgba(16, 185, 129, 0.08)' : 'transparent'
                   }}
                 >
                   <td style={{ padding: '8px 14px', fontWeight: '600' }}>
@@ -1179,24 +1162,39 @@ function DayByDayLedgerModal({ fund, onClose, formatINR }) {
 function BankDirectoryModal({ compareAmount, onCompareAmountChange, onClose, onSelectBankForFund, formatINR }) {
   const amount = Number(compareAmount) || 50000;
 
+  // Prevent background scrolling while modal is open
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
+
   return (
-    <div className="modal-overlay" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1050 }}>
+    <div className="modal-backdrop" onClick={onClose}>
       <div
         className="modal-content"
+        onClick={e => e.stopPropagation()}
         style={{
           width: '100%',
           maxWidth: '850px',
-          maxHeight: '90vh',
+          maxHeight: '88vh',
           display: 'flex',
           flexDirection: 'column',
-          padding: '24px'
+          padding: '28px',
+          borderRadius: '24px',
+          background: 'var(--bg-card)',
+          backdropFilter: 'blur(28px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(28px) saturate(180%)',
+          border: '1px solid var(--border-glass)',
+          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.7)'
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '24px' }}>🏛️</span>
-              <h2 style={{ fontSize: '20px', fontWeight: '800', margin: 0 }}>
+              <h2 style={{ fontSize: '20px', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
                 Indian Savings Accounts Interest Directory
               </h2>
             </div>
@@ -1204,16 +1202,16 @@ function BankDirectoryModal({ compareAmount, onCompareAmountChange, onClose, onS
               Official savings rates and progressive tier breakdowns (Q3-Q4 FY 2026-27).
             </p>
           </div>
-          <button type="button" className="btn btn-secondary" onClick={onClose} style={{ padding: '6px 10px' }}>
-            ✕
+          <button className="modal-close" onClick={onClose} aria-label="Close" style={{ padding: '6px' }}>
+            <X size={20} />
           </button>
         </div>
 
-        {/* Live Comparison Input */}
+        {/* Live Comparison Input with Kuberis Theme & Clean Placeholders */}
         <div
           style={{
             padding: '16px',
-            borderRadius: '12px',
+            borderRadius: '16px',
             background: 'var(--bg-glass)',
             border: '1px solid var(--border-color)',
             display: 'flex',
@@ -1221,32 +1219,42 @@ function BankDirectoryModal({ compareAmount, onCompareAmountChange, onClose, onS
             justifyContent: 'space-between',
             flexWrap: 'wrap',
             gap: '12px',
-            marginBottom: '16px'
+            marginBottom: '18px'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)' }}>
               Compare Returns for Deposit Amount:
             </span>
-            <div style={{ position: 'relative' }}>
-              <span style={{ position: 'absolute', left: '10px', top: '7px', fontSize: '12px', color: 'var(--text-muted)' }}>₹</span>
+            <div style={{ position: 'relative', width: '150px' }}>
+              <span style={{ position: 'absolute', left: '12px', top: '10px', fontSize: '13px', color: 'var(--primary)', fontWeight: '700' }}>
+                ₹
+              </span>
               <input
                 type="number"
-                className="input"
-                style={{ width: '140px', paddingLeft: '24px', fontSize: '13px', fontWeight: '700' }}
+                className="form-control"
+                style={{ paddingLeft: '28px', fontSize: '14px', fontWeight: '700', height: '38px' }}
                 value={compareAmount}
                 onChange={e => onCompareAmountChange(e.target.value)}
+                placeholder="50000"
               />
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '6px' }}>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             {[3000, 25000, 50000, 100000, 500000].map(val => (
               <button
                 key={val}
                 type="button"
                 className="btn btn-secondary"
                 onClick={() => onCompareAmountChange(String(val))}
-                style={{ padding: '4px 8px', fontSize: '11px' }}
+                style={{
+                  padding: '5px 10px',
+                  fontSize: '11px',
+                  fontWeight: compareAmount === String(val) ? '700' : '500',
+                  background: compareAmount === String(val) ? 'var(--primary-light)' : 'var(--bg-app)',
+                  color: compareAmount === String(val) ? 'var(--primary)' : 'var(--text-muted)',
+                  border: compareAmount === String(val) ? '1px solid var(--primary)' : '1px solid var(--border-color)'
+                }}
               >
                 ₹{val >= 100000 ? `${val / 100000}L` : `${val / 1000}k`}
               </button>
@@ -1254,9 +1262,9 @@ function BankDirectoryModal({ compareAmount, onCompareAmountChange, onClose, onS
           </div>
         </div>
 
-        {/* Banks Cards / Table List */}
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {SAVINGS_BANKS_CATALOG.filter(b => b.id !== 'custom').map(bank => {
+        {/* Banks Cards List */}
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', paddingRight: '4px' }}>
+          {SAVINGS_BANKS_CATALOG.map(bank => {
             const { effectiveAnnualRate, annualInterest, dailyInterest, slabBreakdown } = calculateBankSlabInterest(amount, bank.id);
             const isSlice = bank.id === 'slice';
 
@@ -1265,8 +1273,8 @@ function BankDirectoryModal({ compareAmount, onCompareAmountChange, onClose, onS
                 key={bank.id}
                 style={{
                   padding: '16px',
-                  borderRadius: '12px',
-                  background: isSlice ? 'rgba(124, 58, 237, 0.08)' : 'var(--bg-glass)',
+                  borderRadius: '14px',
+                  background: 'var(--bg-glass)',
                   border: isSlice ? '1px solid rgba(124, 58, 237, 0.35)' : '1px solid var(--border-color)',
                   display: 'flex',
                   flexDirection: 'column',
@@ -1312,7 +1320,7 @@ function BankDirectoryModal({ compareAmount, onCompareAmountChange, onClose, onS
                       type="button"
                       className="btn btn-primary"
                       onClick={() => onSelectBankForFund(bank)}
-                      style={{ fontSize: '11px', padding: '6px 12px' }}
+                      style={{ fontSize: '11px', padding: '6px 14px' }}
                     >
                       + Select
                     </button>
@@ -1320,7 +1328,7 @@ function BankDirectoryModal({ compareAmount, onCompareAmountChange, onClose, onS
                 </div>
 
                 {/* Slabs breakdown details */}
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)', background: 'rgba(0,0,0,0.1)', padding: '8px 12px', borderRadius: '6px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', background: 'rgba(0,0,0,0.2)', padding: '10px 14px', borderRadius: '8px' }}>
                   <div style={{ fontWeight: '600', marginBottom: '4px', color: 'var(--text-main)' }}>
                     Progressive Slabs Calculation for {formatINR(amount)}:
                   </div>
