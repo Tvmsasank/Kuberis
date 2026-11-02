@@ -38,6 +38,8 @@ const getInitialUserSettings = () => ({
   budgets: [],
   subscriptions: [],
   recurring: [],
+  emergencyFunds: [],
+  emergencyTargetMonths: 6,
   dismissedPatterns: [],
   assets: 0,
   liabilities: 0,

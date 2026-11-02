@@ -16,7 +16,8 @@ import {
   X,
   User,
   LogOut,
-  Zap
+  Zap,
+  ShieldCheck
 } from 'lucide-react';
 
 const MAIN_TABS = [
@@ -27,6 +28,7 @@ const MAIN_TABS = [
 ];
 
 const MORE_TABS = [
+  { id: 'emergency', label: 'Emergency Reserves', icon: ShieldCheck },
   { id: 'transactions', label: 'All Transactions', icon: CreditCard },
   { id: 'calculators', label: 'SIP & EPF Calculators', icon: Calculator },
   { id: 'recurring', label: 'Recurring Bills', icon: RefreshCw },

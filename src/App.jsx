@@ -16,6 +16,7 @@ import RulesTagsTab from './components/RulesTagsTab';
 import SettingsTab from './components/SettingsTab';
 import InvestmentsTab from './components/InvestmentsTab';
 import Calculators from './components/Calculators';
+import EmergencyFundsTab from './components/EmergencyFundsTab';
 
 // Modals
 import AddEntryModal from './components/AddEntryModal';
@@ -52,7 +53,7 @@ const getInitialTab = () => {
     const rawHash = window.location.hash.replace('#/', '').replace('#', '').trim();
     const currentTab = rawPath || rawHash;
     const validTabs = [
-      'home', 'dashboard', 'investments', 'transactions', 'calculators',
+      'home', 'dashboard', 'investments', 'emergency', 'transactions', 'calculators',
       'recurring', 'subscriptions', 'budgets', 'goals', 'documents', 'rules', 'settings'
     ];
     const savedTab = localStorage.getItem('kuberis_active_tab') || localStorage.getItem('wealthpulse_active_tab');
@@ -1122,6 +1123,15 @@ export default function App() {
                   onDeleteInvestment={handleDeleteInvestment}
                   onRefreshPrices={handleRefreshPrices}
                   isSyncing={isSyncingPrices}
+                  isPrivacyMode={isPrivacyMode}
+                />
+              )}
+
+              {activeTab === 'emergency' && (
+                <EmergencyFundsTab
+                  settings={settings}
+                  transactions={transactions}
+                  onSaveSettings={savePreferences}
                   isPrivacyMode={isPrivacyMode}
                 />
               )}

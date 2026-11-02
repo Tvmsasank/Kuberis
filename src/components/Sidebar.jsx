@@ -11,13 +11,15 @@ import {
   Target,
   FileText,
   Sliders,
-  Settings
+  Settings,
+  ShieldCheck
 } from 'lucide-react';
 
 export const NAV_ITEMS = [
   { id: 'home', label: 'Home', icon: Home },
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'investments', label: 'Investments', icon: TrendingUp },
+  { id: 'emergency', label: 'Emergency Funds', icon: ShieldCheck },
   { id: 'transactions', label: 'Transactions', icon: Receipt },
   { id: 'calculators', label: 'Calculators', icon: Calculator },
   { id: 'recurring', label: 'Recurring', icon: RefreshCw },

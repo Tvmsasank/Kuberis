@@ -26,6 +26,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { calculateDynamicNetWorth } from '../utils/netWorth';
+import { simulateEmergencyFundGrowth } from '../utils/savingsRates';
 import CustomSelect from './CustomSelect';
 
 const ASSET_CATEGORIES = [
@@ -102,6 +103,8 @@ export default function NetWorthModal({
   // Calculate dynamic metrics using unified helper
   const {
     liveInvestmentsValuation,
+    emergencyFunds,
+    emergencyFundsTotal,
     manualAssets,
     customAssetsList,
     customAssetsTotal,
@@ -529,6 +532,34 @@ export default function NetWorthModal({
                 </div>
               </div>
             </div>
+
+            {/* Emergency Funds Liquid Reserves Card (Slice & High-Yield Savings) */}
+            {emergencyFundsTotal > 0 && (
+              <div style={{ padding: '14px 18px', borderRadius: '16px', background: 'rgba(124, 58, 237, 0.08)', border: '1px solid rgba(124, 58, 237, 0.25)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <div>
+                    <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      🛡️ Emergency Funds & Liquid Accounts <span className="badge" style={{ fontSize: '9px', padding: '1px 6px', background: '#7C3AED', color: '#fff' }}>Daily Compounding Auto-Sync</span>
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      {emergencyFunds.map(ef => {
+                        const growth = simulateEmergencyFundGrowth({
+                          depositAmount: ef.depositAmount || 0,
+                          depositDate: ef.depositDate,
+                          bankId: ef.bankId || 'slice',
+                          customRate: ef.customRate,
+                          payoutFrequency: ef.payoutFrequency || 'daily'
+                        });
+                        return `${ef.name || 'Emergency Fund'}: ${formatInr(growth.currentBalance)}`;
+                      }).join(' • ')}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '16px', fontWeight: '900', color: '#8B5CF6' }}>
+                    {formatInr(emergencyFundsTotal)}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Notice if unitemized manual asset balance exists */}
             {customAssetsList.length === 0 && manualAssets > 0 && (

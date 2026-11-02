@@ -1,3 +1,5 @@
+import { simulateEmergencyFundGrowth } from './savingsRates';
+
 /**
  * Helper utility to calculate dynamic Net Worth, Total Assets, and Total Liabilities
  * consistently across the entire Kuberis application without double-counting.
@@ -11,7 +13,29 @@ export function calculateDynamicNetWorth(investments = [], settings = {}) {
     0
   );
 
-  // 2. Additional Assets (Itemized custom assets OR raw manualAssets input)
+  // 2. Emergency Funds Liquid Accounts (Slice daily compounding, high-yield savings)
+  const emergencyFunds = Array.isArray(settings.emergencyFunds) ? settings.emergencyFunds : [];
+  const emergencyFundsTotal = emergencyFunds.reduce((sum, ef) => {
+    try {
+      const p = Number(ef.depositAmount || ef.amount || 0);
+      if (p <= 0) return sum;
+      if (ef.depositDate) {
+        const growth = simulateEmergencyFundGrowth({
+          depositAmount: p,
+          depositDate: ef.depositDate,
+          bankId: ef.bankId || 'slice',
+          customRate: ef.customRate,
+          payoutFrequency: ef.payoutFrequency || 'daily'
+        });
+        return sum + (Number(growth.currentBalance) || p);
+      }
+      return sum + p;
+    } catch (e) {
+      return sum + (Number(ef.depositAmount || ef.amount || 0));
+    }
+  }, 0);
+
+  // 3. Additional Assets (Itemized custom assets OR raw manualAssets input)
   const manualAssets = Number(settings.manualAssets || 0);
   const customAssetsList = Array.isArray(settings.customAssetsList) ? settings.customAssetsList : [];
   const customAssetsTotal = customAssetsList.reduce(
@@ -21,7 +45,7 @@ export function calculateDynamicNetWorth(investments = [], settings = {}) {
 
   // Use customAssetsTotal if itemized assets exist; otherwise fallback to manualAssets
   const additionalAssetsTotal = customAssetsList.length > 0 ? customAssetsTotal : manualAssets;
-  const totalAssets = liveInvestmentsValuation + additionalAssetsTotal;
+  const totalAssets = liveInvestmentsValuation + emergencyFundsTotal + additionalAssetsTotal;
 
   // 3. Total Liabilities (Itemized custom liabilities OR raw manualLiabilities input)
   const manualLiabilities = Number(settings.manualLiabilities || 0);
@@ -39,6 +63,8 @@ export function calculateDynamicNetWorth(investments = [], settings = {}) {
 
   return {
     liveInvestmentsValuation,
+    emergencyFunds,
+    emergencyFundsTotal,
     manualAssets,
     customAssetsList,
     customAssetsTotal,
