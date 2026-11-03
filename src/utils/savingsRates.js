@@ -286,84 +286,157 @@ export function calculateBankSlabInterest(balance = 0, bankId = 'slice', customR
 }
 
 /**
+ * Date helper to parse YYYY-MM-DD in local time without UTC offset bugs
+ */
+export function parseLocalDate(dateStr) {
+  if (!dateStr) return new Date();
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d, 12, 0, 0, 0);
+}
+
+/**
+ * Date helper to format Date object as local YYYY-MM-DD
+ */
+export function formatLocalDate(dateObj) {
+  if (!dateObj || !(dateObj instanceof Date) || isNaN(dateObj.getTime())) return '';
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const d = String(dateObj.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
  * Computes exact daily compounded balance from depositDate to today (or targetDate).
- * Accurately models slice's daily compounding:
- * Day 0: deposit
- * Day 1: balance = balance + (balance * rate / 36500)
- * Day 2: balance = balance + (balance * rate / 36500)
+ * Supports multiple deposits and withdrawals over time (e.g. 5 to 10 deposits a month).
+ * Accurately models Slice Bank's 24h daily payout with paisa-level precision (0.45 + 0.45 = 0.90).
  */
 export function simulateEmergencyFundGrowth({
   depositAmount = 3000,
   depositDate = '2026-10-31',
+  deposits = [], // Array of { id, type: 'deposit'|'withdrawal', amount, date, notes }
   targetDate = null,
   bankId = 'slice',
   customRate = null,
   payoutFrequency = 'daily' // 'daily' | 'monthly' | 'quarterly' | 'annually'
 }) {
-  const principal = Math.max(0, Number(depositAmount) || 0);
-  if (!depositDate) {
+  const initialPrincipal = Math.max(0, Number(depositAmount) || 0);
+
+  if (!depositDate && (!deposits || deposits.length === 0)) {
     return {
-      currentBalance: principal,
+      currentBalance: 0,
       accruedInterest: 0,
+      netPrincipal: 0,
+      depositsCount: 0,
       daysElapsed: 0,
       dailyInterestToday: 0,
       effectiveRate: 5.5,
-      dayByDayHistory: []
+      dayByDayHistory: [],
+      allEvents: []
     };
   }
 
-  const [dYear, dMonth, dDay] = depositDate.split('-').map(Number);
-  const start = new Date(dYear, dMonth - 1, dDay);
-
-  let end;
-  if (targetDate) {
-    const [tYear, tMonth, tDay] = targetDate.split('-').map(Number);
-    end = new Date(tYear, tMonth - 1, tDay);
-  } else {
-    const now = new Date();
-    end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  // Compile all transactions chronologically
+  const allEvents = [];
+  if (depositDate && initialPrincipal > 0) {
+    allEvents.push({
+      id: 'initial_deposit',
+      type: 'deposit',
+      amount: initialPrincipal,
+      date: depositDate,
+      notes: 'Initial Deposit',
+      isInitial: true
+    });
   }
 
-  const diffTime = end.getTime() - start.getTime();
-  const daysElapsed = Math.max(0, Math.round(diffTime / (1000 * 60 * 60 * 24)));
+  if (Array.isArray(deposits)) {
+    deposits.forEach(dep => {
+      const amt = Number(dep.amount);
+      if (amt > 0 && dep.date) {
+        allEvents.push({
+          id: dep.id || `event_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          type: dep.type === 'withdrawal' ? 'withdrawal' : 'deposit',
+          amount: amt,
+          date: dep.date,
+          notes: dep.notes || (dep.type === 'withdrawal' ? 'Withdrawal' : 'Deposit'),
+          isInitial: false
+        });
+      }
+    });
+  }
 
-  let runningBalance = principal;
+  // Sort events chronologically
+  allEvents.sort((a, b) => a.date.localeCompare(b.date));
+
+  // Determine starting date
+  const earliestDate = allEvents.length > 0 ? allEvents[0].date : (depositDate || formatLocalDate(new Date()));
+  const start = parseLocalDate(earliestDate);
+
+  // Determine ending date
+  const now = new Date();
+  const end = targetDate ? parseLocalDate(targetDate) : parseLocalDate(formatLocalDate(now));
+
+  const diffTime = end.getTime() - start.getTime();
+  const totalDays = Math.max(0, Math.round(diffTime / (1000 * 60 * 60 * 24)));
+
+  // Map events by date for fast lookup
+  const eventsByDate = new Map();
+  allEvents.forEach(evt => {
+    if (!eventsByDate.has(evt.date)) {
+      eventsByDate.set(evt.date, []);
+    }
+    eventsByDate.get(evt.date).push(evt);
+  });
+
+  let runningBalance = 0;
+  let netPrincipal = 0;
   let totalInterestEarned = 0;
   const history = [];
 
-  // Day 0 baseline
-  history.push({
-    day: 0,
-    date: depositDate,
-    openingBalance: principal,
-    dailyInterest: 0,
-    closingBalance: principal,
-    cumulativeInterest: 0
-  });
-
   const isDailyCompounding = payoutFrequency === 'daily' || bankId === 'slice';
 
-  for (let i = 1; i <= daysElapsed; i++) {
+  // Process day by day from Day 0 (start date) to today
+  for (let i = 0; i <= totalDays; i++) {
     const curDate = new Date(start);
     curDate.setDate(curDate.getDate() + i);
-    const dateStr = curDate.toISOString().split('T')[0];
+    const dateStr = formatLocalDate(curDate);
 
-    // Compute interest for the day on the opening balance
-    const { effectiveAnnualRate } = calculateBankSlabInterest(runningBalance, bankId, customRate);
-    const dayInterest = (runningBalance * effectiveAnnualRate) / (100 * 365);
+    const dayOpeningBalance = runningBalance;
+    const dayEvents = eventsByDate.get(dateStr) || [];
+    let dayNetEvents = 0;
+
+    // Apply any deposits or withdrawals occurring on this day
+    for (const evt of dayEvents) {
+      if (evt.type === 'deposit') {
+        runningBalance += evt.amount;
+        netPrincipal += evt.amount;
+        dayNetEvents += evt.amount;
+      } else if (evt.type === 'withdrawal') {
+        const withdrawable = Math.min(runningBalance, evt.amount);
+        runningBalance -= withdrawable;
+        netPrincipal = Math.max(0, netPrincipal - withdrawable);
+        dayNetEvents -= withdrawable;
+      }
+    }
+
+    // Daily interest calculation:
+    // Interest is credited starting from the day after deposit (Day 1 onwards on closing balance)
+    let dayInterest = 0;
+    if (i > 0 && runningBalance > 0) {
+      const { effectiveAnnualRate } = calculateBankSlabInterest(runningBalance, bankId, customRate);
+      const rawInterest = (runningBalance * effectiveAnnualRate) / (100 * 365);
+      // Slice Bank and Indian banks credit interest rounded to exact paisa (2 decimals)
+      dayInterest = Math.round(rawInterest * 100) / 100;
+    }
 
     totalInterestEarned += dayInterest;
 
     let closingBalance = runningBalance;
     if (isDailyCompounding) {
-      // Compounded daily immediately (Slice model)
       closingBalance = runningBalance + dayInterest;
       runningBalance = closingBalance;
     } else {
-      // For monthly / quarterly payout, interest accrues and compounds at payout milestones
       const isMonthEnd = new Date(curDate.getFullYear(), curDate.getMonth() + 1, 0).getDate() === curDate.getDate();
       const isQuarterEnd = isMonthEnd && [2, 5, 8, 11].includes(curDate.getMonth());
-
       if ((payoutFrequency === 'monthly' && isMonthEnd) || (payoutFrequency === 'quarterly' && isQuarterEnd)) {
         closingBalance = runningBalance + dayInterest;
         runningBalance = closingBalance;
@@ -373,23 +446,29 @@ export function simulateEmergencyFundGrowth({
     history.push({
       day: i,
       date: dateStr,
-      openingBalance: runningBalance - (isDailyCompounding ? dayInterest : 0),
-      dailyInterest: Number(dayInterest.toFixed(4)),
+      openingBalance: Number(dayOpeningBalance.toFixed(2)),
+      events: dayEvents,
+      netEvents: dayNetEvents,
+      dailyInterest: dayInterest,
       closingBalance: Number(closingBalance.toFixed(2)),
       cumulativeInterest: Number(totalInterestEarned.toFixed(2))
     });
   }
 
-  // Todays daily earning
+  // Todays daily earning rate based on current balance
   const latestEarning = calculateBankSlabInterest(runningBalance, bankId, customRate);
+  const dailyYieldToday = Math.round((latestEarning.dailyInterest || 0) * 100) / 100;
 
   return {
     currentBalance: Number(runningBalance.toFixed(2)),
     accruedInterest: Number(totalInterestEarned.toFixed(2)),
-    daysElapsed,
-    dailyInterestToday: Number(latestEarning.dailyInterest.toFixed(4)),
+    netPrincipal: Number(netPrincipal.toFixed(2)),
+    depositsCount: allEvents.filter(e => e.type === 'deposit').length,
+    daysElapsed: totalDays,
+    dailyInterestToday: dailyYieldToday,
     effectiveRate: latestEarning.effectiveAnnualRate,
-    dayByDayHistory: history
+    dayByDayHistory: history,
+    allEvents
   };
 }
 

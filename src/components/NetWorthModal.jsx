@@ -546,6 +546,7 @@ export default function NetWorthModal({
                         const growth = simulateEmergencyFundGrowth({
                           depositAmount: ef.depositAmount || 0,
                           depositDate: ef.depositDate,
+                          deposits: Array.isArray(ef.deposits) ? ef.deposits : [],
                           bankId: ef.bankId || 'slice',
                           customRate: ef.customRate,
                           payoutFrequency: ef.payoutFrequency || 'daily'

@@ -7,18 +7,24 @@ import {
   Edit2,
   Trash2,
   Calendar,
-  ExternalLink,
   Sparkles,
   ArrowUpRight,
+  ArrowDownRight,
   Building,
   Target,
-  X
+  X,
+  Coins,
+  History,
+  PlusCircle,
+  MinusCircle,
+  FileText
 } from 'lucide-react';
 import {
   SAVINGS_BANKS_CATALOG,
   calculateBankSlabInterest,
   simulateEmergencyFundGrowth,
-  generateEmergencyProjections
+  generateEmergencyProjections,
+  formatLocalDate
 } from '../utils/savingsRates';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import CustomSelect from './CustomSelect';
@@ -38,6 +44,7 @@ export default function EmergencyFundsTab({
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [ledgerTarget, setLedgerTarget] = useState(null);
   const [showDirectoryModal, setShowDirectoryModal] = useState(false);
+  const [depositModalTarget, setDepositModalTarget] = useState(null);
 
   // Directory comparison amount
   const [compareAmount, setCompareAmount] = useState('50000');
@@ -52,6 +59,7 @@ export default function EmergencyFundsTab({
       const growth = simulateEmergencyFundGrowth({
         depositAmount: fund.depositAmount || 0,
         depositDate: fund.depositDate,
+        deposits: Array.isArray(fund.deposits) ? fund.deposits : [],
         bankId: fund.bankId || 'slice',
         customRate: fund.customRate,
         payoutFrequency: fund.payoutFrequency || 'daily'
@@ -65,9 +73,15 @@ export default function EmergencyFundsTab({
     });
   }, [emergencyFunds]);
 
+  // Keep ledgerTarget in sync with liveFunds updates
+  const activeLedgerFund = useMemo(() => {
+    if (!ledgerTarget) return null;
+    return liveFunds.find(f => f.id === ledgerTarget.id) || ledgerTarget;
+  }, [ledgerTarget, liveFunds]);
+
   // Overall aggregates
   const totalPrincipal = useMemo(() => {
-    return liveFunds.reduce((sum, f) => sum + (Number(f.depositAmount) || 0), 0);
+    return liveFunds.reduce((sum, f) => sum + (Number(f.netPrincipal) || 0), 0);
   }, [liveFunds]);
 
   const totalCompoundedBalance = useMemo(() => {
@@ -120,6 +134,7 @@ export default function EmergencyFundsTab({
       const newFund = {
         id: `ef_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
         createdAt: new Date().toISOString(),
+        deposits: [],
         ...fundData
       };
       updatedFunds = [...emergencyFunds, newFund];
@@ -134,6 +149,47 @@ export default function EmergencyFundsTab({
     const updated = emergencyFunds.filter(f => f.id !== fundId);
     await onSaveSettings({ emergencyFunds: updated });
     setDeleteTarget(null);
+    if (ledgerTarget && ledgerTarget.id === fundId) {
+      setLedgerTarget(null);
+    }
+  };
+
+  // Add a new deposit or withdrawal to a fund
+  const handleAddDeposit = async (fundId, depositData) => {
+    const updated = emergencyFunds.map(f => {
+      if (f.id === fundId) {
+        const existingDeposits = Array.isArray(f.deposits) ? f.deposits : [];
+        const newDep = {
+          id: `dep_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          createdAt: new Date().toISOString(),
+          ...depositData
+        };
+        return {
+          ...f,
+          deposits: [...existingDeposits, newDep]
+        };
+      }
+      return f;
+    });
+
+    await onSaveSettings({ emergencyFunds: updated });
+    setDepositModalTarget(null);
+  };
+
+  // Delete an individual deposit or withdrawal
+  const handleDeleteDeposit = async (fundId, depositId) => {
+    const updated = emergencyFunds.map(f => {
+      if (f.id === fundId) {
+        const existingDeposits = Array.isArray(f.deposits) ? f.deposits : [];
+        return {
+          ...f,
+          deposits: existingDeposits.filter(d => d.id !== depositId)
+        };
+      }
+      return f;
+    });
+
+    await onSaveSettings({ emergencyFunds: updated });
   };
 
   const handleUpdateTargetMonths = async (months) => {
@@ -207,7 +263,7 @@ export default function EmergencyFundsTab({
               </span>
             </div>
             <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--text-muted)' }}>
-              Live interest accrual, official RBI slab yields, and automatic synchronization with your Net Worth.
+              Accurate multi-deposit tracking, official RBI slab yields, and automatic synchronization with your Net Worth.
             </p>
           </div>
         </div>
@@ -265,7 +321,7 @@ export default function EmergencyFundsTab({
             <span style={{ color: 'var(--text-muted)' }}>total interest earned</span>
           </div>
           <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)', paddingTop: '8px' }}>
-            Principal: {formatINR(totalPrincipal)} • Auto-synced to Net Worth
+            Net Principal: {formatINR(totalPrincipal)} • Auto-synced to Net Worth
           </div>
         </div>
 
@@ -410,7 +466,7 @@ export default function EmergencyFundsTab({
             <div>
               <h3 style={{ fontSize: '18px', fontWeight: '700', margin: 0 }}>No Emergency Funds Added Yet</h3>
               <p style={{ margin: '6px 0 0', fontSize: '13px', color: 'var(--text-muted)', maxWidth: '460px' }}>
-                Track high-yield liquid savings accounts and watch daily compounded returns auto-sync into your portfolio.
+                Track high-yield liquid savings accounts, record multiple deposits anytime, and watch daily compounded returns auto-sync into your Net Worth.
               </p>
             </div>
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -447,6 +503,8 @@ export default function EmergencyFundsTab({
           >
             {liveFunds.map(fund => {
               const isSlice = fund.bankId === 'slice';
+              const depositsCount = fund.depositsCount || 1;
+
               return (
                 <div
                   key={fund.id}
@@ -531,9 +589,14 @@ export default function EmergencyFundsTab({
 
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '12px', borderTop: '1px dashed var(--border-color)', paddingTop: '10px', fontSize: '11px' }}>
                         <div>
-                          <span style={{ color: 'var(--text-muted)' }}>Initial Deposit:</span>
-                          <div style={{ fontWeight: '600', color: 'var(--text-main)', marginTop: '2px' }}>
-                            {formatINR(fund.depositAmount)}
+                          <span style={{ color: 'var(--text-muted)' }}>Net Principal Deposited:</span>
+                          <div style={{ fontWeight: '700', color: 'var(--text-main)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>{formatINR(fund.netPrincipal)}</span>
+                            {depositsCount > 1 && (
+                              <span className="badge" style={{ fontSize: '9px', padding: '1px 5px', background: 'var(--primary-light)', color: 'var(--primary)' }}>
+                                {depositsCount} deposits
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div>
@@ -543,7 +606,7 @@ export default function EmergencyFundsTab({
                           </div>
                         </div>
                         <div>
-                          <span style={{ color: 'var(--text-muted)' }}>Deposit Date:</span>
+                          <span style={{ color: 'var(--text-muted)' }}>Active Since:</span>
                           <div style={{ fontWeight: '500', color: 'var(--text-main)', marginTop: '2px' }}>
                             {fund.depositDate}
                           </div>
@@ -573,19 +636,34 @@ export default function EmergencyFundsTab({
                       justifyContent: 'space-between',
                       borderTop: '1px solid var(--border-color)',
                       paddingTop: '12px',
-                      marginTop: '8px'
+                      marginTop: '8px',
+                      flexWrap: 'wrap',
+                      gap: '8px'
                     }}
                   >
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => setLedgerTarget(fund)}
-                      style={{ fontSize: '11px', padding: '5px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}
-                      title="View day-by-day compounding statement"
-                    >
-                      <Calendar size={13} />
-                      <span>Ledger History</span>
-                    </button>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => setDepositModalTarget(fund)}
+                        style={{ fontSize: '11px', padding: '5px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        title="Deposit more amount or withdraw"
+                      >
+                        <PlusCircle size={13} />
+                        <span>Deposit / Withdraw</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => setLedgerTarget(fund)}
+                        style={{ fontSize: '11px', padding: '5px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        title="View day-by-day compounding statement"
+                      >
+                        <Calendar size={13} />
+                        <span>Ledger History</span>
+                      </button>
+                    </div>
 
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <button
@@ -596,7 +674,7 @@ export default function EmergencyFundsTab({
                           setShowAddEditModal(true);
                         }}
                         style={{ padding: '6px', fontSize: '12px' }}
-                        title="Edit Fund"
+                        title="Edit Account Details"
                       >
                         <Edit2 size={14} />
                       </button>
@@ -722,6 +800,15 @@ export default function EmergencyFundsTab({
         })()}
       </div>
 
+      {/* QUICK DEPOSIT / WITHDRAW MODAL */}
+      {depositModalTarget && (
+        <AddTransactionModal
+          fund={depositModalTarget}
+          onClose={() => setDepositModalTarget(null)}
+          onSave={(depositData) => handleAddDeposit(depositModalTarget.id, depositData)}
+        />
+      )}
+
       {/* ADD / EDIT FUND MODAL */}
       {showAddEditModal && (
         <AddEditFundModal
@@ -735,10 +822,12 @@ export default function EmergencyFundsTab({
       )}
 
       {/* DAY-BY-DAY LEDGER MODAL */}
-      {ledgerTarget && (
+      {activeLedgerFund && (
         <DayByDayLedgerModal
-          fund={ledgerTarget}
+          fund={activeLedgerFund}
           onClose={() => setLedgerTarget(null)}
+          onOpenDepositModal={() => setDepositModalTarget(activeLedgerFund)}
+          onDeleteDeposit={(depositId) => handleDeleteDeposit(activeLedgerFund.id, depositId)}
           formatINR={formatINR}
         />
       )}
@@ -755,7 +844,7 @@ export default function EmergencyFundsTab({
               name: `${bank.shortName} Savings Account`,
               bankId: bank.id,
               depositAmount: Number(compareAmount) || 10000,
-              depositDate: new Date().toISOString().split('T')[0],
+              depositDate: formatLocalDate(new Date()),
               payoutFrequency: bank.payoutFrequency,
               customRate: null
             });
@@ -775,6 +864,185 @@ export default function EmergencyFundsTab({
           onCancel={() => setDeleteTarget(null)}
         />
       )}
+    </div>
+  );
+}
+
+// ==========================================
+// ADD DEPOSIT / WITHDRAWAL TRANSACTION MODAL
+// ==========================================
+function AddTransactionModal({ fund, onClose, onSave }) {
+  const [type, setType] = useState('deposit'); // 'deposit' | 'withdrawal'
+  const [amount, setAmount] = useState('');
+  const [date, setDate] = useState(() => formatLocalDate(new Date()));
+  const [notes, setNotes] = useState('');
+  const [error, setError] = useState('');
+
+  // Prevent background scrolling while modal is open
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      setError('Please enter a valid amount greater than ₹0.');
+      return;
+    }
+    if (!date) {
+      setError('Please select a transaction date.');
+      return;
+    }
+
+    onSave({
+      type,
+      amount: parsedAmount,
+      date,
+      notes: notes.trim() || (type === 'deposit' ? 'Month-end Surplus' : 'Emergency Withdrawal')
+    });
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        className="modal-content"
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '100%',
+          maxWidth: '460px',
+          padding: '28px',
+          borderRadius: '24px',
+          background: 'var(--bg-card)',
+          backdropFilter: 'blur(28px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(28px) saturate(180%)',
+          border: '1px solid var(--border-glass)',
+          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.7)'
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ padding: '8px', borderRadius: '12px', background: type === 'deposit' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: type === 'deposit' ? '#10B981' : '#EF4444' }}>
+              {type === 'deposit' ? <PlusCircle size={20} /> : <MinusCircle size={20} />}
+            </div>
+            <div>
+              <h2 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
+                {type === 'deposit' ? 'Deposit Into Fund' : 'Withdraw From Fund'}
+              </h2>
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                {fund.name}
+              </div>
+            </div>
+          </div>
+          <button className="modal-close" onClick={onClose} aria-label="Close" style={{ padding: '6px' }}>
+            <X size={20} />
+          </button>
+        </div>
+
+        {error && (
+          <div style={{ padding: '10px 14px', background: 'var(--danger-light)', color: 'var(--danger)', borderRadius: '12px', marginBottom: '16px', fontSize: '13px' }}>
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Segmented Toggle */}
+          <div className="form-group">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', background: 'var(--bg-app)', padding: '5px', borderRadius: '14px', border: '1px solid var(--border-color)' }}>
+              <button
+                type="button"
+                className="btn"
+                style={{
+                  padding: '9px',
+                  borderRadius: '10px',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  background: type === 'deposit' ? '#10B981' : 'transparent',
+                  color: type === 'deposit' ? '#FFFFFF' : 'var(--text-muted)',
+                  boxShadow: type === 'deposit' ? '0 2px 10px rgba(16, 185, 129, 0.4)' : 'none',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={() => setType('deposit')}
+              >
+                + Deposit Money
+              </button>
+              <button
+                type="button"
+                className="btn"
+                style={{
+                  padding: '9px',
+                  borderRadius: '10px',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  background: type === 'withdrawal' ? '#EF4444' : 'transparent',
+                  color: type === 'withdrawal' ? '#FFFFFF' : 'var(--text-muted)',
+                  boxShadow: type === 'withdrawal' ? '0 2px 10px rgba(239, 68, 68, 0.4)' : 'none',
+                  transition: 'all 0.2s ease'
+                }}
+                onClick={() => setType('withdrawal')}
+              >
+                - Withdraw Money
+              </button>
+            </div>
+          </div>
+
+          {/* Amount */}
+          <div className="form-group">
+            <label className="form-label">Amount (₹)</label>
+            <div style={{ position: 'relative' }}>
+              <span style={{ position: 'absolute', left: '12px', top: '10px', fontSize: '13px', color: 'var(--primary)', fontWeight: '700' }}>₹</span>
+              <input
+                type="number"
+                step="any"
+                min="1"
+                className="form-control"
+                style={{ paddingLeft: '28px', fontSize: '15px', fontWeight: '700' }}
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                placeholder="3000"
+                required
+                autoFocus
+              />
+            </div>
+          </div>
+
+          {/* Date */}
+          <div className="form-group">
+            <label className="form-label">Transaction Date</label>
+            <input
+              type="date"
+              className="form-control"
+              value={date}
+              onChange={e => setDate(e.target.value)}
+              required
+            />
+          </div>
+
+          {/* Notes */}
+          <div className="form-group">
+            <label className="form-label">Notes / Description (Optional)</label>
+            <input
+              type="text"
+              className="form-control"
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder={type === 'deposit' ? 'e.g. November month-end surplus' : 'e.g. Urgent car repair'}
+            />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
+            <button type="button" className="btn btn-secondary" onClick={onClose}>
+              Cancel
+            </button>
+            <button type="submit" className="btn btn-primary" style={{ background: type === 'deposit' ? '#10B981' : '#EF4444' }}>
+              {type === 'deposit' ? 'Confirm Deposit' : 'Confirm Withdrawal'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
@@ -824,11 +1092,12 @@ function AddEditFundModal({ fund, onClose, onSave }) {
       name: name.trim() || `${selectedBank.shortName} Fund`,
       bankId,
       depositAmount: amt,
-      depositDate: depositDate || new Date().toISOString().split('T')[0],
+      depositDate: depositDate || formatLocalDate(new Date()),
       payoutFrequency,
       customRate: customRate ? parseFloat(customRate) : null,
       targetGoal: targetGoal ? parseFloat(targetGoal) : null,
-      notes: notes.trim()
+      notes: notes.trim(),
+      deposits: fund?.deposits || []
     });
   };
 
@@ -861,7 +1130,7 @@ function AddEditFundModal({ fund, onClose, onSave }) {
                 {fund ? 'Edit Emergency Fund' : 'Add Emergency Fund'}
               </h2>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                Configure bank account and interest compounding details
+                Configure bank account and initial deposit details
               </div>
             </div>
           </div>
@@ -927,7 +1196,7 @@ function AddEditFundModal({ fund, onClose, onSave }) {
             </div>
             <div className="form-group">
               <label className="form-label">
-                Deposit Date
+                Initial Deposit Date
               </label>
               <input
                 type="date"
@@ -1021,10 +1290,12 @@ function AddEditFundModal({ fund, onClose, onSave }) {
 }
 
 // ==========================================
-// DAY-BY-DAY LEDGER MODAL
+// DAY-BY-DAY LEDGER & TRANSACTIONS MODAL
 // ==========================================
-function DayByDayLedgerModal({ fund, onClose, formatINR }) {
+function DayByDayLedgerModal({ fund, onClose, onOpenDepositModal, onDeleteDeposit, formatINR }) {
   const history = fund?.dayByDayHistory || [];
+  const allEvents = fund?.allEvents || [];
+  const [activeTab, setActiveTab] = useState('statement'); // 'statement' | 'transactions'
 
   // Prevent background scrolling while modal is open
   useEffect(() => {
@@ -1041,8 +1312,8 @@ function DayByDayLedgerModal({ fund, onClose, formatINR }) {
         onClick={e => e.stopPropagation()}
         style={{
           width: '100%',
-          maxWidth: '740px',
-          maxHeight: '88vh',
+          maxWidth: '820px',
+          maxHeight: '90vh',
           display: 'flex',
           flexDirection: 'column',
           padding: '28px',
@@ -1054,7 +1325,8 @@ function DayByDayLedgerModal({ fund, onClose, formatINR }) {
           boxShadow: '0 24px 60px rgba(0, 0, 0, 0.7)'
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '24px' }}>📜</span>
@@ -1066,87 +1338,245 @@ function DayByDayLedgerModal({ fund, onClose, formatINR }) {
               Accrual history from {fund.depositDate} to Today ({fund.daysElapsed} days elapsed)
             </p>
           </div>
-          <button className="modal-close" onClick={onClose} aria-label="Close" style={{ padding: '6px' }}>
-            <X size={20} />
-          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={onOpenDepositModal}
+              style={{ fontSize: '12px', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <PlusCircle size={14} />
+              <span>+ Deposit / Withdraw</span>
+            </button>
+            <button className="modal-close" onClick={onClose} aria-label="Close" style={{ padding: '6px' }}>
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Summary Mini Bar */}
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
             gap: '12px',
             padding: '14px',
-            borderRadius: '12px',
+            borderRadius: '14px',
             background: 'var(--bg-glass)',
             border: '1px solid var(--border-color)',
             marginBottom: '16px'
           }}
         >
           <div>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Initial Principal:</span>
-            <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>
-              {formatINR(fund.depositAmount)}
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Net Principal Deposited:</span>
+            <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-main)', marginTop: '2px' }}>
+              {formatINR(fund.netPrincipal || fund.depositAmount)}
             </div>
           </div>
           <div>
             <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Total Accrued Interest:</span>
-            <div style={{ fontSize: '15px', fontWeight: '700', color: '#10B981' }}>
+            <div style={{ fontSize: '16px', fontWeight: '800', color: '#10B981', marginTop: '2px' }}>
               +{formatINR(fund.accruedInterest)}
             </div>
           </div>
           <div>
             <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Current Compounded Balance:</span>
-            <div style={{ fontSize: '15px', fontWeight: '800', color: '#7C3AED' }}>
+            <div style={{ fontSize: '16px', fontWeight: '800', color: '#7C3AED', marginTop: '2px' }}>
               {formatINR(fund.currentBalance)}
             </div>
           </div>
         </div>
 
-        {/* Ledger Table */}
-        <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ background: 'var(--bg-glass)', borderBottom: '1px solid var(--border-color)', position: 'sticky', top: 0 }}>
-                <th style={{ padding: '10px 14px' }}>Day</th>
-                <th style={{ padding: '10px 14px' }}>Date</th>
-                <th style={{ padding: '10px 14px' }}>Opening Balance</th>
-                <th style={{ padding: '10px 14px' }}>Daily Interest Earned</th>
-                <th style={{ padding: '10px 14px' }}>Cumulative Earned</th>
-                <th style={{ padding: '10px 14px' }}>Closing Balance</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((row, idx) => (
-                <tr
-                  key={idx}
-                  style={{
-                    borderBottom: '1px solid var(--border-color)',
-                    background: idx === history.length - 1 ? 'rgba(16, 185, 129, 0.08)' : 'transparent'
-                  }}
-                >
-                  <td style={{ padding: '8px 14px', fontWeight: '600' }}>
-                    {row.day === 0 ? 'Day 0 (Deposit)' : `Day ${row.day}`}
-                  </td>
-                  <td style={{ padding: '8px 14px', color: 'var(--text-muted)' }}>{row.date}</td>
-                  <td style={{ padding: '8px 14px' }}>{formatINR(row.openingBalance)}</td>
-                  <td style={{ padding: '8px 14px', color: row.dailyInterest > 0 ? '#10B981' : 'var(--text-muted)', fontWeight: '700' }}>
-                    {row.dailyInterest > 0 ? `+${formatINR(row.dailyInterest)}` : '—'}
-                  </td>
-                  <td style={{ padding: '8px 14px', color: '#10B981' }}>
-                    {formatINR(row.cumulativeInterest)}
-                  </td>
-                  <td style={{ padding: '8px 14px', fontWeight: '700', color: 'var(--text-main)' }}>
-                    {formatINR(row.closingBalance)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* View Switcher: Statement vs Transactions */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
+          <button
+            type="button"
+            className="btn"
+            style={{
+              padding: '6px 14px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: '700',
+              background: activeTab === 'statement' ? 'var(--primary)' : 'transparent',
+              color: activeTab === 'statement' ? '#FFFFFF' : 'var(--text-muted)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+            onClick={() => setActiveTab('statement')}
+          >
+            <History size={14} />
+            <span>Day-by-Day Compounding Statement</span>
+          </button>
+          <button
+            type="button"
+            className="btn"
+            style={{
+              padding: '6px 14px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: '700',
+              background: activeTab === 'transactions' ? 'var(--primary)' : 'transparent',
+              color: activeTab === 'transactions' ? '#FFFFFF' : 'var(--text-muted)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+            onClick={() => setActiveTab('transactions')}
+          >
+            <FileText size={14} />
+            <span>Deposits & Withdrawals Log ({allEvents.length})</span>
+          </button>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
+        {/* Tab 1: Day-by-Day Statement */}
+        {activeTab === 'statement' && (
+          <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ background: 'var(--bg-glass)', borderBottom: '1px solid var(--border-color)', position: 'sticky', top: 0 }}>
+                  <th style={{ padding: '10px 14px' }}>Day</th>
+                  <th style={{ padding: '10px 14px' }}>Date</th>
+                  <th style={{ padding: '10px 14px' }}>Events / Deposits</th>
+                  <th style={{ padding: '10px 14px' }}>Opening Balance</th>
+                  <th style={{ padding: '10px 14px' }}>Daily Interest</th>
+                  <th style={{ padding: '10px 14px' }}>Cumulative Earned</th>
+                  <th style={{ padding: '10px 14px' }}>Closing Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((row, idx) => {
+                  const hasEvents = row.events && row.events.length > 0;
+                  const isLast = idx === history.length - 1;
+
+                  return (
+                    <tr
+                      key={idx}
+                      style={{
+                        borderBottom: '1px solid var(--border-color)',
+                        background: hasEvents
+                          ? 'rgba(16, 185, 129, 0.05)'
+                          : isLast
+                          ? 'rgba(124, 58, 237, 0.06)'
+                          : 'transparent'
+                      }}
+                    >
+                      <td style={{ padding: '8px 14px', fontWeight: '600' }}>
+                        {row.day === 0 ? 'Day 0' : `Day ${row.day}`}
+                      </td>
+                      <td style={{ padding: '8px 14px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                        {row.date}
+                      </td>
+                      <td style={{ padding: '8px 14px' }}>
+                        {hasEvents ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                            {row.events.map((evt, eIdx) => (
+                              <span
+                                key={eIdx}
+                                className="badge"
+                                style={{
+                                  background: evt.type === 'deposit' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                                  color: evt.type === 'deposit' ? '#10B981' : '#EF4444',
+                                  fontSize: '10.5px',
+                                  fontWeight: '700',
+                                  padding: '2px 6px',
+                                  width: 'fit-content'
+                                }}
+                              >
+                                {evt.type === 'deposit' ? `+${formatINR(evt.amount)}` : `-${formatINR(evt.amount)}`}
+                                {evt.notes ? ` (${evt.notes})` : ''}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span style={{ color: 'var(--text-muted)' }}>—</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '8px 14px' }}>
+                        {formatINR(row.openingBalance)}
+                      </td>
+                      <td style={{ padding: '8px 14px', color: row.dailyInterest > 0 ? '#10B981' : 'var(--text-muted)', fontWeight: '700' }}>
+                        {row.dailyInterest > 0 ? `+${formatINR(row.dailyInterest)}` : '—'}
+                      </td>
+                      <td style={{ padding: '8px 14px', color: '#10B981', fontWeight: '600' }}>
+                        {formatINR(row.cumulativeInterest)}
+                      </td>
+                      <td style={{ padding: '8px 14px', fontWeight: '700', color: 'var(--text-main)' }}>
+                        {formatINR(row.closingBalance)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Tab 2: Transactions Log (Deposits & Withdrawals) */}
+        {activeTab === 'transactions' && (
+          <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '12px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ background: 'var(--bg-glass)', borderBottom: '1px solid var(--border-color)', position: 'sticky', top: 0 }}>
+                  <th style={{ padding: '10px 14px' }}>Date</th>
+                  <th style={{ padding: '10px 14px' }}>Type</th>
+                  <th style={{ padding: '10px 14px' }}>Amount</th>
+                  <th style={{ padding: '10px 14px' }}>Notes / Description</th>
+                  <th style={{ padding: '10px 14px', textAlign: 'right' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allEvents.map((evt, idx) => (
+                  <tr key={evt.id || idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <td style={{ padding: '10px 14px', fontWeight: '600', color: 'var(--text-main)' }}>
+                      {evt.date}
+                    </td>
+                    <td style={{ padding: '10px 14px' }}>
+                      <span
+                        className="badge"
+                        style={{
+                          background: evt.type === 'deposit' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                          color: evt.type === 'deposit' ? '#10B981' : '#EF4444',
+                          fontWeight: '700',
+                          fontSize: '11px'
+                        }}
+                      >
+                        {evt.type === 'deposit' ? 'Deposit' : 'Withdrawal'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '10px 14px', fontWeight: '700', color: evt.type === 'deposit' ? '#10B981' : '#EF4444', fontSize: '13px' }}>
+                      {evt.type === 'deposit' ? `+${formatINR(evt.amount)}` : `-${formatINR(evt.amount)}`}
+                    </td>
+                    <td style={{ padding: '10px 14px', color: 'var(--text-muted)' }}>
+                      {evt.notes || '—'}
+                    </td>
+                    <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                      {!evt.isInitial ? (
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={() => onDeleteDeposit(evt.id)}
+                          style={{ padding: '4px 8px', fontSize: '11px', color: '#EF4444' }}
+                          title="Delete this deposit entry"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Base Deposit</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+            Slice Bank credits interest calculated on daily closing balance every morning.
+          </span>
           <button type="button" className="btn btn-secondary" onClick={onClose}>
             Close Ledger
           </button>

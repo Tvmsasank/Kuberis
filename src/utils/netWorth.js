@@ -19,10 +19,11 @@ export function calculateDynamicNetWorth(investments = [], settings = {}) {
     try {
       const p = Number(ef.depositAmount || ef.amount || 0);
       if (p <= 0) return sum;
-      if (ef.depositDate) {
+      if (ef.depositDate || (Array.isArray(ef.deposits) && ef.deposits.length > 0)) {
         const growth = simulateEmergencyFundGrowth({
           depositAmount: p,
           depositDate: ef.depositDate,
+          deposits: Array.isArray(ef.deposits) ? ef.deposits : [],
           bankId: ef.bankId || 'slice',
           customRate: ef.customRate,
           payoutFrequency: ef.payoutFrequency || 'daily'
