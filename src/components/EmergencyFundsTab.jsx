@@ -1440,9 +1440,9 @@ function DayByDayLedgerModal({ fund, onClose, onOpenDepositModal, onDeleteDeposi
                   <th style={{ padding: '10px 14px' }}>Date</th>
                   <th style={{ padding: '10px 14px' }}>Events / Deposits</th>
                   <th style={{ padding: '10px 14px' }}>Opening Balance</th>
-                  <th style={{ padding: '10px 14px' }}>Daily Interest</th>
+                  <th style={{ padding: '10px 14px' }}>Interest Credited</th>
                   <th style={{ padding: '10px 14px' }}>Cumulative Earned</th>
-                  <th style={{ padding: '10px 14px' }}>Closing Balance</th>
+                  <th style={{ padding: '10px 14px' }}>Closing Settled Balance</th>
                 </tr>
               </thead>
               <tbody>
@@ -1464,6 +1464,20 @@ function DayByDayLedgerModal({ fund, onClose, onOpenDepositModal, onDeleteDeposi
                     >
                       <td style={{ padding: '8px 14px', fontWeight: '600' }}>
                         {row.day === 0 ? 'Day 0' : `Day ${row.day}`}
+                        {isLast && (
+                          <span
+                            className="badge"
+                            style={{
+                              marginLeft: '6px',
+                              fontSize: '9.5px',
+                              padding: '1px 5px',
+                              background: 'rgba(124, 58, 237, 0.2)',
+                              color: '#A78BFA'
+                            }}
+                          >
+                            Today
+                          </span>
+                        )}
                       </td>
                       <td style={{ padding: '8px 14px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                         {row.date}
@@ -1575,7 +1589,7 @@ function DayByDayLedgerModal({ fund, onClose, onOpenDepositModal, onDeleteDeposi
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-            Slice Bank credits interest calculated on daily closing balance every morning.
+            ⚡ <strong>T+1 Banking Schedule:</strong> Interest earned on each day's closing balance is credited into your account the following morning.
           </span>
           <button type="button" className="btn btn-secondary" onClick={onClose}>
             Close Ledger

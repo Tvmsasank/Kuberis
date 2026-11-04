@@ -390,11 +390,12 @@ export function simulateEmergencyFundGrowth({
   let runningBalance = 0;
   let netPrincipal = 0;
   let totalInterestEarned = 0;
+  let uncreditedInterest = 0;
   const history = [];
 
   const isDailyCompounding = payoutFrequency === 'daily' || bankId === 'slice';
 
-  // Process day by day from Day 0 (start date) to today
+  // Process day by day from Day 0 (start date) to today (or targetDate)
   for (let i = 0; i <= totalDays; i++) {
     const curDate = new Date(start);
     curDate.setDate(curDate.getDate() + i);
@@ -404,7 +405,34 @@ export function simulateEmergencyFundGrowth({
     const dayEvents = eventsByDate.get(dateStr) || [];
     let dayNetEvents = 0;
 
-    // Apply any deposits or withdrawals occurring on this day
+    // 1. T+1 Banking Credit Timing:
+    // Interest earned on previous day's closing balance (runningBalance) is credited on morning of day i
+    let dayInterestEarned = 0;
+    if (i > 0 && runningBalance > 0) {
+      const { effectiveAnnualRate } = calculateBankSlabInterest(runningBalance, bankId, customRate);
+      const rawInterest = (runningBalance * effectiveAnnualRate) / (100 * 365);
+      // Slice Bank and Indian SFBs credit interest rounded to exact paisa (2 decimals)
+      dayInterestEarned = Math.round(rawInterest * 100) / 100;
+    }
+
+    totalInterestEarned += dayInterestEarned;
+
+    let creditedInterestToday = 0;
+    if (isDailyCompounding) {
+      creditedInterestToday = dayInterestEarned;
+      runningBalance += creditedInterestToday;
+    } else {
+      uncreditedInterest += dayInterestEarned;
+      const isMonthEnd = new Date(curDate.getFullYear(), curDate.getMonth() + 1, 0).getDate() === curDate.getDate();
+      const isQuarterEnd = isMonthEnd && [2, 5, 8, 11].includes(curDate.getMonth());
+      if ((payoutFrequency === 'monthly' && isMonthEnd) || (payoutFrequency === 'quarterly' && isQuarterEnd)) {
+        creditedInterestToday = Math.round(uncreditedInterest * 100) / 100;
+        runningBalance += creditedInterestToday;
+        uncreditedInterest = 0;
+      }
+    }
+
+    // 2. Apply any deposits or withdrawals occurring on this day
     for (const evt of dayEvents) {
       if (evt.type === 'deposit') {
         runningBalance += evt.amount;
@@ -418,44 +446,19 @@ export function simulateEmergencyFundGrowth({
       }
     }
 
-    // Daily interest calculation:
-    // Interest is credited starting from the day after deposit (Day 1 onwards on closing balance)
-    let dayInterest = 0;
-    if (i > 0 && runningBalance > 0) {
-      const { effectiveAnnualRate } = calculateBankSlabInterest(runningBalance, bankId, customRate);
-      const rawInterest = (runningBalance * effectiveAnnualRate) / (100 * 365);
-      // Slice Bank and Indian banks credit interest rounded to exact paisa (2 decimals)
-      dayInterest = Math.round(rawInterest * 100) / 100;
-    }
-
-    totalInterestEarned += dayInterest;
-
-    let closingBalance = runningBalance;
-    if (isDailyCompounding) {
-      closingBalance = runningBalance + dayInterest;
-      runningBalance = closingBalance;
-    } else {
-      const isMonthEnd = new Date(curDate.getFullYear(), curDate.getMonth() + 1, 0).getDate() === curDate.getDate();
-      const isQuarterEnd = isMonthEnd && [2, 5, 8, 11].includes(curDate.getMonth());
-      if ((payoutFrequency === 'monthly' && isMonthEnd) || (payoutFrequency === 'quarterly' && isQuarterEnd)) {
-        closingBalance = runningBalance + dayInterest;
-        runningBalance = closingBalance;
-      }
-    }
-
     history.push({
       day: i,
       date: dateStr,
       openingBalance: Number(dayOpeningBalance.toFixed(2)),
       events: dayEvents,
       netEvents: dayNetEvents,
-      dailyInterest: dayInterest,
-      closingBalance: Number(closingBalance.toFixed(2)),
+      dailyInterest: dayInterestEarned,
+      closingBalance: Number(runningBalance.toFixed(2)),
       cumulativeInterest: Number(totalInterestEarned.toFixed(2))
     });
   }
 
-  // Todays daily earning rate based on current balance
+  // Today's daily earning rate based on current balance
   const latestEarning = calculateBankSlabInterest(runningBalance, bankId, customRate);
   const dailyYieldToday = Math.round((latestEarning.dailyInterest || 0) * 100) / 100;
 
